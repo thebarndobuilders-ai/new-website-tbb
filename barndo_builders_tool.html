@@ -4669,6 +4669,22 @@ const MATERIALS = [
       const teeBlocking = Math.ceil(i.intWallLF / 10);
       return fieldStuds + teeBlocking;
     }},
+  { id: "king_jack_2x6", label: "2×6 king & jack studs (exterior openings)", cat: "Wall framing", uom: "ea", packSize: null,
+    priceCost: 9.42, priceSell: 9.50, priceRetail: 14,
+    // Stick frame only — post frame openings get jamb posts + 2×6 frame lumber instead.
+    // 2 kings + 2 jacks per window and man door; garage doors get doubled jacks
+    // under the wide header: 2 kings + 4 jacks.
+    formula: i => {
+      if (i.constructionType === 'post') return 0;
+      const winDoor = ((i.windows || 0) + (i.extDoors || 0)) * 4;
+      const garage = (i.garageDoors || 0) * 6;
+      return winDoor + garage;
+    },
+    labelFn: i => `2×6 king & jack studs (2K+2J per window/door · 2K+4J per garage door)`},
+  { id: "king_jack_2x4", label: "2×4 king & jack studs (interior door openings)", cat: "Wall framing", uom: "ea", packSize: null,
+    priceCost: 5.75, priceSell: 6.25, priceRetail: 8,
+    // Interior walls stay stick-framed even on post-frame builds: 2 kings + 2 jacks per door.
+    formula: i => (i.intDoors || 0) * 4 },
   { id: "gable_stud_2x6", label: "2×6 gable studs (16\" OC · gable triangles)", cat: "Wall framing", uom: "ea", packSize: null,
     priceCost: 7.06, priceSell: 9.50, priceRetail: 12,
     // Plain count + one buy length (no cut-to-slope callout): 16" OC across each gable,
