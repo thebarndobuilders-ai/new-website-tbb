@@ -4272,6 +4272,33 @@ function colorsFor(product) {
 // ordered at `stock` feet. Used by both the material formulas and the
 // roof-geometry "order corners at" display so they can never disagree.
 // =============================================================
+// Stock buy length (ft) for LF-priced lumber lines, so every lumber item on the
+// Materials list and cut list shows a piece count + length, not just lineal feet.
+const LUMBER_STOCK_FT = {
+  'pt_2x6_plate_lf': 16, '2x6_top_plate_lf': 16, 'pt_2x4_plate_lf': 16, '2x4_top_plate_lf': 16,
+  'purlin_2x4_lf': 16, 'rafter_lumber_lf': 16, 'window_frame_2x6_lf': 16,
+  'gable_ladder_2x4_lf': 16, 'header_cap_2x6': 16, 'header_cap_2x4': 16,
+  'lp_fascia_1x8_lf': 16,
+};
+
+// Per-door header cut breakdown: {cutLength: pieceCount}. plyEach = boards per opening
+// (2 for the doubled 2×12, 1 for an LVL, 2 for caps top+bottom).
+function headerCutBreakdown(type, minW, maxW, plyEach) {
+  const out = {};
+  (openingsState[type] || []).forEach(r => {
+    const w = r.w || 0;
+    if (w <= minW || w > maxW) return;
+    const hdr = (r.headerOverride !== null && r.headerOverride !== undefined)
+      ? r.headerOverride : autoHeaderLF(w, r.doorType);
+    const key = Math.round(hdr * 2) / 2;
+    out[key] = (out[key] || 0) + (r.qty || 0) * plyEach;
+  });
+  return out;
+}
+function fmtBreakdown(groups) {
+  return Object.keys(groups).sort((a, b) => a - b).map(l => `${groups[l]} @ ${l}'`).join(' · ');
+}
+
 const TRIM_STOCK_LENGTHS = [10, 12, 14, 16]; // available corner/rake stick lengths (ft)
 function pickTrimStock(needFt) {
   for (const len of TRIM_STOCK_LENGTHS) { if (len >= needFt - 0.001) return len; }
@@ -10416,6 +10443,30 @@ function materialDetailText(m, i) {
     return checkStr(uom) || checkStr(label);
   };
   
+  // === LF-PRICED LUMBER — always show piece count @ stock buy length ===
+  if (LUMBER_STOCK_FT[m.id]) {
+    const stock = LUMBER_STOCK_FT[m.id];
+    const pcs = Math.ceil(m.qty / stock);
+    return `${pcs} pcs @ ${stock}' (${Math.ceil(m.qty)} LF)`;
+  }
+  // === 2×10 HEADER BOARDS — count @ 12' stock ===
+  if (m.id === 'header_2x10_lf') {
+    return `${m.qty} boards @ 12'`;
+  }
+  // === GARAGE DOOR HEADERS — per-door cut lengths (opening + 2') ===
+  if (m.id === 'header_2x12_doubled_lf') {
+    const t = fmtBreakdown(headerCutBreakdown('garage', 0, 12, 2));
+    return t ? `${t} (2-ply per door)` : '';
+  }
+  if (m.id === 'header_lvl_1_75x11_875_lf') {
+    const t = fmtBreakdown(headerCutBreakdown('garage', 12, 18, 1));
+    return t ? `${t} (1 LVL per door)` : '';
+  }
+  if (m.id === 'header_lvl_1_75x16_lf') {
+    const t = fmtBreakdown(headerCutBreakdown('garage', 18, 999, 1));
+    return t ? `${t} (1 LVL per door)` : '';
+  }
+
   // === PRO ARMOR WRAP — show the area math so the Roof/Roof+walls scope is visible ===
   if (m.id === 'pro_armor_moisture_wrap') {
     const scope = i.proArmorScope || 'roof';
@@ -11810,6 +11861,7 @@ function buildCutList(i, mats) {
       });
       return;
     }
+    if (id === 'header_2x10_lf') { addCut('Headers', label, qty, 12, "12'"); return; }
     if (uom === 'pieces') {
       const len = (id === 'wall_lath_gable_pieces') ? (i.gableBaySpacingFt || 10) : (i.eaveBaySpacingFt || (i.trussSpacing / 12) || 2);
       addCut('Framing — lathing / purlins', label, qty, len, len + "'"); return;
@@ -11818,6 +11870,20 @@ function buildCutList(i, mats) {
 
     const sl = stickLenFromUomLabel(uom, label);
     if (sl > 0 && (uom.indexOf('ea') === 0 || uom === 'sheet')) { addCut(cat, label, qty, sl, sl + "'"); return; }
+
+    // LF-priced lumber → stock-length pieces (count @ buy length)
+    if (LUMBER_STOCK_FT[id]) {
+      const stock = LUMBER_STOCK_FT[id];
+      addCut(cat, label, Math.ceil(qty / stock), stock, stock + "'");
+      return;
+    }
+    // Garage door headers → one row per cut length
+    if (id === 'header_2x12_doubled_lf' || id === 'header_lvl_1_75x11_875_lf' || id === 'header_lvl_1_75x16_lf') {
+      const spec = (id === 'header_2x12_doubled_lf') ? [0, 12, 2] : (id === 'header_lvl_1_75x11_875_lf') ? [12, 18, 1] : [18, 999, 1];
+      const groups = headerCutBreakdown('garage', spec[0], spec[1], spec[2]);
+      Object.keys(groups).sort((a, b) => a - b).forEach(l => addCut('Headers', label, groups[l], parseFloat(l), l + "'"));
+      return;
+    }
 
     if (uom === 'LF') { byFoot.push({ cat, item: label, lf: Math.round(qty) }); return; }
     countOnly.push({ cat, item: label, qty, uom });
