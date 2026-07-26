@@ -4703,9 +4703,9 @@ const MATERIALS = [
     priceCost: 10, priceSell: 13, priceRetail: 17,
     formula: i => {
       // 2 boards of 2×10×12 for every window and door opening.
-      // Post-frame garage doors use the dedicated 2×12 / LVL header lines below, so exclude them there.
-      let openings = i.windows + i.extDoors + i.intDoors;
-      if (i.constructionType !== 'post') openings += i.garageDoors;
+      // Garage doors ALWAYS use the dedicated 2×12-doubled / LVL header lines (both
+      // construction modes) — never 2×10s.
+      const openings = i.windows + i.extDoors + i.intDoors;
       return openings * 2;
     }},
   // Header caps — shop standard: NO plywood spacers. Every header board gets a stud
@@ -4714,10 +4714,9 @@ const MATERIALS = [
   { id: "header_cap_2x6", label: "2×6 header caps (top + bottom of exterior headers)", cat: "Wall framing", uom: "LF", packSize: null,
     priceCost: 1.45, priceSell: 1.85, priceRetail: 2.4,
     formula: i => {
-      // Caps ride the 2×10 header boards: windows + man doors always; garage doors
-      // only in stick frame (post-frame garage headers are 2×12/LVL between jamb posts).
-      let lf = (i.headerLF_windows || 0) + (i.headerLF_extdoors || 0);
-      if (i.constructionType !== 'post') lf += (i.headerLF_garage || 0);
+      // Caps ride EVERY header board — windows, man doors, and garage door headers
+      // (2×12s/LVLs get the same 2×6 cap top + bottom), both construction modes.
+      const lf = (i.headerLF_windows || 0) + (i.headerLF_extdoors || 0) + (i.headerLF_garage || 0);
       return lf > 0 ? Math.ceil(lf * 2 * 1.05) : 0;
     }},
   { id: "header_cap_2x4", label: "2×4 header caps (top + bottom of interior door headers)", cat: "Wall framing", uom: "LF", packSize: null,
@@ -4889,15 +4888,18 @@ const MATERIALS = [
       return Math.ceil(totalLF / 20);
     }},
   // Post-frame garage door headers — width-based selection
-  { id: "header_2x12_doubled_lf", label: "2×12 header (doubled, post-frame garage doors ≤12')", cat: "Post-frame wall", uom: "LF", packSize: null,
+  // Garage door headers — shop standard, BOTH construction modes:
+  //   2 × 2×12 when the opening is ≤ 12', LVL when it exceeds 12'.
+  //   Header cut length = opening width + 2' (autoHeaderLF).
+  { id: "header_2x12_doubled_lf", label: "2×12 header (doubled — garage doors ≤12', cut = opening + 2')", cat: "Wall framing", uom: "LF", packSize: null,
     priceCost: 4.25, priceSell: 5.40, priceRetail: 7,
-    formula: i => i.constructionType === 'post' ? Math.ceil(i.garageHdr_2x12_doubled * 1.05) : 0 },
-  { id: "header_lvl_1_75x11_875_lf", label: "LVL 1.75×11.875 (garage doors 12-18')", cat: "Post-frame wall", uom: "LF", packSize: null,
+    formula: i => Math.ceil((i.garageHdr_2x12_doubled || 0) * 1.05) },
+  { id: "header_lvl_1_75x11_875_lf", label: "LVL 1.75×11.875 (garage doors 12-18', cut = opening + 2')", cat: "Wall framing", uom: "LF", packSize: null,
     priceCost: 11.50, priceSell: 14.50, priceRetail: 19,
-    formula: i => i.constructionType === 'post' ? Math.ceil(i.garageHdr_lvl_small * 1.05) : 0 },
-  { id: "header_lvl_1_75x16_lf", label: "LVL 1.75×16 (garage doors >18')", cat: "Post-frame wall", uom: "LF", packSize: null,
+    formula: i => Math.ceil((i.garageHdr_lvl_small || 0) * 1.05) },
+  { id: "header_lvl_1_75x16_lf", label: "LVL 1.75×16 (garage doors >18', cut = opening + 2')", cat: "Wall framing", uom: "LF", packSize: null,
     priceCost: 16.50, priceSell: 21, priceRetail: 27,
-    formula: i => i.constructionType === 'post' ? Math.ceil(i.garageHdr_lvl_large * 1.05) : 0 },
+    formula: i => Math.ceil((i.garageHdr_lvl_large || 0) * 1.05) },
 
   // ---------------- SIDE SHED ----------------
   // All shed materials only generate when shedActive (checkbox on + length > 0)
