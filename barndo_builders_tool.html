@@ -1590,6 +1590,15 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
             <option value="purlin">Lath / girt only — 2×6 lathing, no sheathing (metal)</option>
           </select>
         </div>
+        <div class="qbs-field">
+          <label>Pro Armor moisture wrap</label>
+          <select id="pro_armor_scope" onchange="recalc()">
+            <option value="roof">Roof only</option>
+            <option value="roof_walls">Roof + walls</option>
+            <option value="none">None (excluded)</option>
+          </select>
+          <div class="qbs-note">Where the Pro Armor / Therma-Guard wrap goes. "Roof + walls" adds the wall area to the roll count.</div>
+        </div>
         <div class="qbs-field" id="wall-lathmember-field" style="display:none;">
           <label>Wall lathing member</label>
           <select id="lath_size" onchange="recalc()">
@@ -2987,6 +2996,24 @@ function splitTrimRun(runFt, wasteFt) {
   return { count, stock, waste: wasteFt };
 }
 
+// Gable-end metal panels step up the pitch: each panel strip is cut to the TALL edge of its
+// strip so the sheet covers the rise across its own width. panelW = coverage (3' TR/PBR, 1' B&B).
+// Returns pieces + total LF for ONE gable triangle (multiply by gable count).
+function gableStepPanels(W, pitch, panelW) {
+  if (!(W > 0) || !(pitch > 0) || !(panelW > 0)) return { count: 0, totalLF: 0 };
+  const slope = pitch / 12, half = W / 2;
+  let count = 0, totalLF = 0;
+  for (let x0 = 0; x0 < W - 1e-9; x0 += panelW) {
+    const x1 = Math.min(W, x0 + panelW);
+    // tallest point of the triangle inside this strip (the end nearest the peak)
+    const d = (x0 <= half && half <= x1) ? 0 : Math.min(Math.abs(half - x0), Math.abs(half - x1));
+    const h = slope * (half - d);
+    if (h <= 0) continue;
+    count++; totalLF += h;
+  }
+  return { count, totalLF };
+}
+
 // Post cut-length description. Dry-set post plates on a slab → posts are cut to wall height.
 // Embedded (in-ground) → posts run wall height + the embedment depth.
 function postCutText(i) {
@@ -3328,15 +3355,17 @@ const MATERIALS = [
   { id: "pro_armor_moisture_wrap", label: "Pro Armor / Therma-Guard moisture barrier wrap (6'2\"×125', 750 sqft/roll)", cat: "Moisture barrier", uom: "roll", packSize: null,
     priceCost: 212, priceSell: 270, priceRetail: 340,
     formula: i => {
+      // Scope selector (Product selections): none / roof only / roof + walls.
+      if (i.proArmorScope === 'none') return 0;
       const metalRoofProducts = ['tuffrib_29', 'pbr_26', 'standing_seam_26'];
-      const hasMetalRoof = metalRoofProducts.includes(i.roofProduct);
-      if (!hasMetalRoof) return 0;
-      let wrapArea = i.roofArea;
-      if (i.shedActive) wrapArea += i.shed.roofArea;
-      return Math.ceil(wrapArea / 750);
-      if (hasMetalSiding) {
+      let wrapArea = 0;
+      if (metalRoofProducts.includes(i.roofProduct)) {
+        wrapArea += i.roofArea;
+        if (i.shedActive) wrapArea += i.shed.roofArea;
+      }
+      if (i.proArmorScope === 'roof_walls') {
         wrapArea += i.wallArea;
-        if (i.shedActive) wrapArea += (i.shed.exteriorWallLF * i.shed.H);
+        if (i.shedActive) wrapArea += ((i.shed.exteriorWallLF || 0) * (i.shed.H || 0));
       }
       return Math.ceil(wrapArea / 750);
     }},
@@ -3609,11 +3638,14 @@ const MATERIALS = [
       const rectArea = i.extWallLF * i.H - (i.area_windows + i.area_extdoors + i.area_garage);
       return Math.ceil(Math.max(0, rectArea) / 3 * 1.05);
     }},
-  { id: "tuffrib_29_gable_lf", label: "Tuff Rib 29 ga wall panel — gable triangles (cut)", cat: "Siding skin", uom: "LF", packSize: null,
+  { id: "tuffrib_29_gable_lf", label: "Tuff Rib 29 ga wall panel — gable triangles (3' panels, stepped to pitch)", cat: "Siding skin", uom: "LF", packSize: null,
     priceCost: 2.58, priceSell: 3.65,
     formula: i => {
       if (i.sidingProduct !== 'tuffrib_29') return 0;
-      return Math.ceil(i.totalGableSidingArea / 3 * 1.05);
+      // Panels ordered per piece: each 3'-wide sheet cut to the tall edge of its strip so it
+      // steps up the pitch. The stepping IS the overage — no extra waste factor on top.
+      const s = gableStepPanels(i.W, i.pitch, 3);
+      return Math.ceil(s.totalLF * (i.gableCountActual || 0));
     }},
   // Metal B&B: breaks at eave-to-gable line. Rectangular pieces below, separate gable triangle pieces above.
   { id: "mbb_26_rect_lf", label: "Metal B&B 26 ga panel — rectangular walls", cat: "Siding skin", uom: "LF", packSize: null,
@@ -3624,11 +3656,13 @@ const MATERIALS = [
       const rectArea = i.extWallLF * i.H - (i.area_windows + i.area_extdoors + i.area_garage);
       return Math.ceil(Math.max(0, rectArea) / 1 * 1.05);
     }},
-  { id: "mbb_26_gable_lf", label: "Metal B&B 26 ga panel — gable triangles (cut)", cat: "Siding skin", uom: "LF", packSize: null,
+  { id: "mbb_26_gable_lf", label: "Metal B&B 26 ga panel — gable triangles (12\" panels, stepped to pitch)", cat: "Siding skin", uom: "LF", packSize: null,
     priceCost: 4.25, priceSell: 5.45,
     formula: i => {
       if (i.sidingProduct !== 'mbb_26') return 0;
-      return Math.ceil(i.totalGableSidingArea / 1 * 1.10); // 10% waste on cut triangles
+      // 12"-wide B&B panels step up the gable pitch; each piece cut to its strip's tall edge.
+      const s = gableStepPanels(i.W, i.pitch, 1);
+      return Math.ceil(s.totalLF * (i.gableCountActual || 0));
     }},
   // LP B&B: breaks at eave-to-gable line as well
   { id: "lp_bb_panel", label: "LP SmartSide B&B panel — rectangular walls (4×9)", cat: "Siding skin", uom: "sheet", packSize: null,
@@ -7661,9 +7695,11 @@ function getInputs() {
   const gableSoffitArea = topChord * 2 * gableCountActual * gableOH;
   const soffitArea = eaveSoffitArea + gableSoffitArea;
   
-  // Fascia LF: both eaves + gable rakes (2 rakes per gable)
-  const fasciaLF = (L * 2) + (topChord * 2 * gableCountActual);
-  
+  // Fascia LF: both eaves + gable rakes (2 rakes per gable).
+  // Zero overhang on a side = no soffit/fascia there — that side contributes nothing
+  // (kills sub-fascia boards, metal fascia trim, and FJ trim for that side).
+  const fasciaLF = (eaveOH > 0 ? L * 2 : 0) + (gableOH > 0 ? topChord * 2 * gableCountActual : 0);
+
   // FJ trim LF (metal siding only): same as fascia perimeter at the wall transition
   const fjLF = fasciaLF;
   
@@ -7823,6 +7859,7 @@ function getInputs() {
     elecManual: num('elec_manual'),
     meterManual: num('meter_manual'),
     roofSystem: document.getElementById('roof_system').value,
+    proArmorScope: (document.getElementById('pro_armor_scope') || {}).value || 'roof',
     wallSystem: (() => { const v = (document.getElementById('wall_system') || {}).value || 'auto'; return v === 'auto' ? (currentConstruction === 'post' ? 'purlin' : 'sheathed') : v; })(),
     lathSize: (document.getElementById('lath_size') || {}).value || '2x6',
     roofProduct: document.getElementById('roof_product').value,
@@ -8728,13 +8765,14 @@ function materialDetailText(m, i) {
       const pieces = Math.ceil(m.qty / pieceLen);
       return `~${pieces} pcs @ ${pieceLen}'`;
     }
-    // Wall panels — gable ends: actual piece count across the gable width (each cut to the slope).
-    // Pieces = ceil(gable width ÷ panel coverage) × number of gables. Coverage: MBB 12", others 36".
+    // Wall panels — gable ends: stepped pieces across the gable width, each cut to the tall
+    // edge of its strip (steps up the pitch). Coverage: MBB 12", others 36".
     if (m.id === 'tuffrib_29_gable_lf' || m.id === 'pbr_26_gable_lf' || m.id === 'ss_26_gable_lf' || m.id === 'mbb_26_gable_lf') {
       const cov = (m.id === 'mbb_26_gable_lf') ? 1 : 3;
       const gables = i.gableCountActual || 0;
-      const pcs = Math.ceil((i.W || 0) / cov) * gables;
-      return pcs > 0 ? `${pcs} pcs across ${gables} gable${gables === 1 ? '' : 's'} (cut to slope)` : '';
+      const s = gableStepPanels(i.W || 0, i.pitch || 0, cov);
+      const pcs = s.count * gables;
+      return pcs > 0 ? `${pcs} stepped pcs across ${gables} gable${gables === 1 ? '' : 's'} (each cut to its step of the pitch)` : '';
     }
     // Soffit panel — typically long continuous runs
     if (m.id && m.id.includes('soffit')) {
@@ -9709,6 +9747,7 @@ async function loadProject(key) {
     if (i.meterPanel) { const _mp = document.getElementById('meter_panel'); if (_mp) _mp.value = i.meterPanel; }
     if (i.roofSystem) document.getElementById('roof_system').value = i.roofSystem;
     if (i.wallSystem) { const ws = document.getElementById('wall_system'); if (ws) ws.value = i.wallSystem; }
+    if (i.proArmorScope) { const pa = document.getElementById('pro_armor_scope'); if (pa) pa.value = i.proArmorScope; }
     if (i.postFoundation) { const pf = document.getElementById('post_foundation'); if (pf) pf.value = i.postFoundation; }
     if (typeof onPostFoundationChange === 'function') onPostFoundationChange();
     if (i.lathSize) { const ls = document.getElementById('lath_size'); if (ls) ls.value = i.lathSize; }
@@ -10071,8 +10110,9 @@ function buildCutList(i, mats) {
     }
     if (id === 'tuffrib_29_gable_lf' || id === 'pbr_26_gable_lf' || id === 'ss_26_gable_lf' || id === 'mbb_26_gable_lf') {
       const cov = (id === 'mbb_26_gable_lf') ? 1 : 3;
-      const pieces = Math.ceil((i.W || 0) / cov) * (i.gableCountActual || 0);
-      addCut('Metal — gable panels', label, pieces, null, 'cut to slope'); return;
+      const s = gableStepPanels(i.W || 0, i.pitch || 0, cov);
+      const pieces = s.count * (i.gableCountActual || 0);
+      addCut('Metal — gable panels', label, pieces, null, 'stepped to pitch'); return;
     }
     if (uom === 'pieces') {
       const len = (id === 'wall_lath_gable_pieces') ? (i.gableBaySpacingFt || 10) : (i.eaveBaySpacingFt || (i.trussSpacing / 12) || 2);
