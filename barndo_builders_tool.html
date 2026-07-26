@@ -2713,6 +2713,23 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
       <div id="sw_results" style="margin-top:12px;"></div>
       <div class="qbs-note" style="margin-top:8px;">Model follows vCalc "Sheathing for a Wall": 4×8 sheets = L × H ÷ 32 ft², rounded up. One wall — multiply or run each wall separately.</div>
     </div>
+
+    <!-- ── Studs for a Wall (vCalc-style) ────────────────────────────── -->
+    <div class="qbs-card" style="max-width:960px; margin-top:16px;">
+      <h3>Studs for a Wall <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field">
+          <label>(L) Length of the wall (ft)</label>
+          <input type="number" id="st_len" value="60" step="0.5" oninput="stCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>(oC) On-center stud spacing (in)</label>
+          <input type="number" id="st_oc" value="16" step="1" oninput="stCalc()" />
+        </div>
+      </div>
+      <div id="st_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">Model follows vCalc "Studs for a Wall": studs = (L ÷ spacing) + 1, rounded up. Field studs for ONE straight wall — corners, T-intersections, and opening king/jack studs are extra. Plate rows shown for convenience (vCalc excludes them).</div>
+    </div>
   </div>
 
   <!-- SETTINGS -->
@@ -3270,6 +3287,24 @@ function swCalc() {
     ['Wall area', `${Math.ceil(area)} ft²`],
     ['4×8 sheets', `${sheets} sheets${waste > 0 ? ` (incl. ${Math.round(waste * 100)}% waste)` : ''}`],
     ['Framing nails', `≈${nails} nails (60/sheet — 6" edge, 12" field)`],
+  ];
+  box.innerHTML = '<table style="width:100%; border-collapse:collapse;">' + rows.map(r =>
+    `<tr><td style="padding:5px 10px; border-bottom:1px solid var(--hairline); color:var(--text-2); white-space:nowrap;">${r[0]}</td>` +
+    `<td style="padding:5px 10px; border-bottom:1px solid var(--hairline); font-variant-numeric:tabular-nums;">${r[1]}</td></tr>`).join('') + '</table>';
+}
+
+// Studs for a Wall (vCalc model): studs = (L / oC) + 1, rounded up. Field studs only.
+function stCalc() {
+  const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+  const L = n('st_len'), oc = (n('st_oc') || 16) / 12;
+  const box = document.getElementById('st_results');
+  if (!box) return;
+  if (L <= 0 || oc <= 0) { box.innerHTML = '<div class="qbs-note">Enter wall length and stud spacing.</div>'; return; }
+  const studs = Math.ceil(L / oc) + 1;
+  const rows = [
+    ['Wall studs', `${studs} studs @ ${Math.round(oc * 12)}" OC`],
+    ['Bottom plate', `${Math.ceil(L)} LF`],
+    ['Double top plate', `${Math.ceil(L * 2)} LF`],
   ];
   box.innerHTML = '<table style="width:100%; border-collapse:collapse;">' + rows.map(r =>
     `<tr><td style="padding:5px 10px; border-bottom:1px solid var(--hairline); color:var(--text-2); white-space:nowrap;">${r[0]}</td>` +
@@ -5701,7 +5736,7 @@ function switchTab(name) {
   }
   if (name === 'flitch') { renderSkuMapping(); if (typeof renderPricingMasterTable === 'function') renderPricingMasterTable(); }
   if (name === 'settings') renderDefaultPrices();
-  if (name === 'calcs') { try { grCalc(); } catch(e) {} try { gsCalc(); } catch(e) {} try { shCalc(); } catch(e) {} try { swCalc(); } catch(e) {} }
+  if (name === 'calcs') { try { grCalc(); } catch(e) {} try { gsCalc(); } catch(e) {} try { shCalc(); } catch(e) {} try { swCalc(); } catch(e) {} try { stCalc(); } catch(e) {} }
   if (name === 'takeoff' && typeof takeoffInit === 'function') takeoffInit();
   if (name === 'subs') {
     try { renderFramingLaborGrid(); } catch(e) { console.error('framing grid', e); }
