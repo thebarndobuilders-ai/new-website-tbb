@@ -4660,14 +4660,14 @@ const MATERIALS = [
       const fieldStuds = Math.ceil(i.extWallLF / (16/12));
       // Corner/intersection studs: ~2 per outside corner + 1 per inside corner (was a flat 8).
       const cornerExtras = (i.outsideCorners || 4) * 2 + (i.insideCorners || 0);
-      return fieldStuds + cornerExtras;
+      return Math.ceil((fieldStuds + cornerExtras) * 1.10);   // shop standard: ×1.1 waste on stud counts
     }},
   { id: "stud_2x4_104pc", label: "2×4 pre-cut studs (auto-sized to wall height)", cat: "Wall framing", uom: "ea", packSize: null,
     priceCost: 5.75, priceSell: 6.25, priceRetail: 8,
     formula: i => {
       const fieldStuds = Math.ceil(i.intWallLF / (16/12));
       const teeBlocking = Math.ceil(i.intWallLF / 10);
-      return fieldStuds + teeBlocking;
+      return Math.ceil((fieldStuds + teeBlocking) * 1.10);   // ×1.1 stud waste
     }},
   { id: "king_jack_2x6", label: "2×6 king & jack studs (exterior openings)", cat: "Wall framing", uom: "ea", packSize: null,
     priceCost: 9.42, priceSell: 9.50, priceRetail: 14,
@@ -4678,13 +4678,13 @@ const MATERIALS = [
       if (i.constructionType === 'post') return 0;
       const winDoor = ((i.windows || 0) + (i.extDoors || 0)) * 4;
       const garage = (i.garageDoors || 0) * 6;
-      return winDoor + garage;
+      return Math.ceil((winDoor + garage) * 1.10);   // ×1.1 stud waste
     },
     labelFn: i => `2×6 king & jack studs (2K+2J per window/door · 2K+4J per garage door)`},
   { id: "king_jack_2x4", label: "2×4 king & jack studs (interior door openings)", cat: "Wall framing", uom: "ea", packSize: null,
     priceCost: 5.75, priceSell: 6.25, priceRetail: 8,
     // Interior walls stay stick-framed even on post-frame builds: 2 kings + 2 jacks per door.
-    formula: i => (i.intDoors || 0) * 4 },
+    formula: i => Math.ceil((i.intDoors || 0) * 4 * 1.10) },   // ×1.1 stud waste
   { id: "gable_stud_2x6", label: "2×6 gable studs (16\" OC · gable triangles)", cat: "Wall framing", uom: "ea", packSize: null,
     priceCost: 7.06, priceSell: 9.50, priceRetail: 12,
     // Plain count + one buy length (no cut-to-slope callout): 16" OC across each gable,
@@ -4693,7 +4693,7 @@ const MATERIALS = [
     formula: i => {
       if (i.constructionType === 'post') return 0;   // post frame gets gable posts + lathing instead
       if ((i.pitch || 0) <= 0) return 0;
-      return gableStudSpec(i).count;
+      return Math.ceil(gableStudSpec(i).count * 1.10);   // ×1.1 stud waste
     },
     labelFn: i => {
       const s = gableStudSpec(i);
@@ -4708,9 +4708,22 @@ const MATERIALS = [
       if (i.constructionType !== 'post') openings += i.garageDoors;
       return openings * 2;
     }},
-  { id: "plywood_half_sheet", label: "1/2\" plywood (header spacers)", cat: "Wall framing", uom: "sheet", packSize: null,
-    priceCost: 28, priceSell: 35, priceRetail: 45,
-    formula: i => i.constructionType === 'post' ? 0 : Math.ceil(i.headerLF_total * 0.5 / 32) },
+  // Header caps — shop standard: NO plywood spacers. Every header board gets a stud
+  // cap flat on top and bottom, matched to the wall: 2×6 caps on 2×6 exterior walls,
+  // 2×4 caps on 2×4 interior walls. Cap LF = 2 × header LF (+5% waste).
+  { id: "header_cap_2x6", label: "2×6 header caps (top + bottom of exterior headers)", cat: "Wall framing", uom: "LF", packSize: null,
+    priceCost: 1.45, priceSell: 1.85, priceRetail: 2.4,
+    formula: i => {
+      // Caps ride the 2×10 header boards: windows + man doors always; garage doors
+      // only in stick frame (post-frame garage headers are 2×12/LVL between jamb posts).
+      let lf = (i.headerLF_windows || 0) + (i.headerLF_extdoors || 0);
+      if (i.constructionType !== 'post') lf += (i.headerLF_garage || 0);
+      return lf > 0 ? Math.ceil(lf * 2 * 1.05) : 0;
+    }},
+  { id: "header_cap_2x4", label: "2×4 header caps (top + bottom of interior door headers)", cat: "Wall framing", uom: "LF", packSize: null,
+    priceCost: 0.95, priceSell: 1.25, priceRetail: 1.5,
+    formula: i => (i.headerLF_intdoors || 0) > 0 ? Math.ceil((i.headerLF_intdoors || 0) * 2 * 1.05) : 0 },
+  // (King/jack + gable stud lines below also carry the ×1.1 shop-standard stud waste.)
 
   // ---------------- POST-FRAME WALL ----------------
   // Only active when constructionType === 'post'
