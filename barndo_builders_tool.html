@@ -4495,6 +4495,38 @@ function postCutText(i) {
   return `cut to ${(H + (i.postDepth || 4))}' (wall ht + ${i.postDepth || 4}' embed)`;
 }
 
+// Gable-end post lengths (post frame). Gable posts run to the TOP OF THE TRUSS at
+// each span position, so each post's length follows the roof pitch across the gable
+// wall: roof height at its position + embed, ordered in 2' increments.
+// Returns lengths for ONE gable wall's interior posts (corners belong to the eave
+// walls) — multiply by 2 walls for totals.
+function gablePostLengths(i) {
+  const spacing = i.gableBaySpacingFt || 10;
+  const bays = i.gableBays || 0;
+  const embed = (i.postFoundation === 'on_slab') ? 0 : (i.postDepth || 4);
+  const out = [];
+  for (let k = 1; k <= bays - 1; k++) {
+    const d = Math.min(k * spacing, Math.max(0, (i.W || 0) - k * spacing));  // distance to nearest corner
+    const hRoof = (i.H || 0) + ((i.pitch || 0) / 12) * Math.max(0, d);        // truss top at this span
+    out.push(Math.max(2, Math.ceil((hRoof + embed) / 2) * 2));                // next 2' increment
+  }
+  return out;
+}
+
+// Gable studs (stick frame): plain count + one buy length for the triangle framing.
+// Count = 16" OC across the gable span (corners excluded), buy length = next even
+// 2' stock that covers the peak rise.
+function gableStudSpec(i) {
+  const spanFt = i.W || 0;
+  const rise = (spanFt / 2) * ((i.pitch || 0) / 12);
+  const perGable = Math.max(0, Math.ceil(spanFt / (16 / 12)) - 1);
+  return {
+    count: perGable * (i.gableCountActual || 0),
+    stock: Math.max(8, Math.ceil(rise / 2) * 2),
+    rise,
+  };
+}
+
 // Dry-set post plates, counted per POST SIZE so each post gets a plate of its own size.
 // Mirrors the post lines exactly: wall posts = the selected post size; garage-door jambs are
 // always 6×6; man-door jambs are always 4×6. Only fires for post-frame on dry-set plates.
@@ -4637,6 +4669,20 @@ const MATERIALS = [
       const teeBlocking = Math.ceil(i.intWallLF / 10);
       return fieldStuds + teeBlocking;
     }},
+  { id: "gable_stud_2x6", label: "2×6 gable studs (16\" OC · gable triangles)", cat: "Wall framing", uom: "ea", packSize: null,
+    priceCost: 7.06, priceSell: 9.50, priceRetail: 12,
+    // Plain count + one buy length (no cut-to-slope callout): 16" OC across each gable,
+    // sticks bought at the stock length that covers the peak rise. Priced by that length.
+    customUnitPrice: i => 0.706 * gableStudSpec(i).stock,
+    formula: i => {
+      if (i.constructionType === 'post') return 0;   // post frame gets gable posts + lathing instead
+      if ((i.pitch || 0) <= 0) return 0;
+      return gableStudSpec(i).count;
+    },
+    labelFn: i => {
+      const s = gableStudSpec(i);
+      return `2×6×${s.stock}' gable studs (16" OC · ${i.gableCountActual || 0} gable${(i.gableCountActual || 0) === 1 ? '' : 's'})`;
+    }},
   { id: "header_2x10_lf", label: "2×10×12 header boards (2 per opening — windows & doors)", cat: "Wall framing", uom: "pieces", packSize: null,
     priceCost: 10, priceSell: 13, priceRetail: 17,
     formula: i => {
@@ -4658,48 +4704,73 @@ const MATERIALS = [
   //   - Man door jambs always 4×6 PT
   // Each post-size line adds wall posts ONLY when that size matches postSize selection.
   // 4×6 line always includes man door jambs; 6×6 line always includes garage door jambs.
-  { id: "post_4x6_pt", label: "4×6 PT post [cut to wall ht + 4'] (walls when 4×6 + man door jambs)", cat: "Post-frame wall", uom: "ea", packSize: null,
+  { id: "post_4x6_pt", label: "4×6 PT post [cut to wall ht + 4'] (eave walls when 4×6 + man door jambs)", cat: "Post-frame wall", uom: "ea", packSize: null,
     priceCost: 25.79, priceSell: 33, priceRetail: 42,
     formula: i => {
       if (i.constructionType !== 'post') return 0;
-      const wallPosts = (i.postSize === '4x6') ? i.wallPostCount : 0;
+      const wallPosts = (i.postSize === '4x6') ? (2 * ((i.eaveBays || 0) + 1)) : 0;   // eave walls only — gable posts have their own stepped line
       const manDoorJambs = i.extDoors * 2;   // man-door jambs
       return wallPosts + manDoorJambs;
     },
-    labelFn: i => `4×6 PT post [${postCutText(i)}] (walls when 4×6 + man door jambs)`},
-  { id: "post_6x6_pt", label: "6×6 PT post [cut to wall ht + 4'] (walls when 6×6 + garage door jambs)", cat: "Post-frame wall", uom: "ea", packSize: null,
+    labelFn: i => `4×6 PT post [${postCutText(i)}] (eave walls when 4×6 + man door jambs)`},
+  { id: "post_6x6_pt", label: "6×6 PT post [cut to wall ht + 4'] (eave walls when 6×6 + garage door jambs)", cat: "Post-frame wall", uom: "ea", packSize: null,
     priceCost: 61.97, priceSell: 78, priceRetail: 95,
     formula: i => {
       if (i.constructionType !== 'post') return 0;
-      const wallPosts = (i.postSize === '6x6') ? i.wallPostCount : 0;
+      const wallPosts = (i.postSize === '6x6') ? (2 * ((i.eaveBays || 0) + 1)) : 0;   // eave walls only — gable posts have their own stepped line
       const garageJambs = i.garageDoors * 2;   // garage-door jambs
       return wallPosts + garageJambs;
     },
-    labelFn: i => `6×6 PT post [${postCutText(i)}] (walls when 6×6 + garage door jambs)`},
-  { id: "post_6x8_pt", label: "6×8 PT post [cut to wall ht + 4'] (wall posts, when 6×8 selected)", cat: "Post-frame wall", uom: "ea", packSize: null,
+    labelFn: i => `6×6 PT post [${postCutText(i)}] (eave walls when 6×6 + garage door jambs)`},
+  { id: "post_6x8_pt", label: "6×8 PT post [cut to wall ht + 4'] (eave wall posts, when 6×8 selected)", cat: "Post-frame wall", uom: "ea", packSize: null,
     priceCost: 82, priceSell: 105, priceRetail: 135,
-    formula: i => (i.constructionType === 'post' && i.postSize === '6x8') ? i.wallPostCount : 0,
-    labelFn: i => `6×8 PT post [${postCutText(i)}] (wall posts, when 6×8 selected)`},
-  { id: "post_6x10_pt", label: "6×10 PT post [cut to wall ht + 4'] (wall posts, when 6×10 selected)", cat: "Post-frame wall", uom: "ea", packSize: null,
+    formula: i => (i.constructionType === 'post' && i.postSize === '6x8') ? (2 * ((i.eaveBays || 0) + 1)) : 0,
+    labelFn: i => `6×8 PT post [${postCutText(i)}] (eave wall posts, when 6×8 selected)`},
+  { id: "post_6x10_pt", label: "6×10 PT post [cut to wall ht + 4'] (eave wall posts, when 6×10 selected)", cat: "Post-frame wall", uom: "ea", packSize: null,
     priceCost: 103, priceSell: 130, priceRetail: 165,
-    formula: i => (i.constructionType === 'post' && i.postSize === '6x10') ? i.wallPostCount : 0,
-    labelFn: i => `6×10 PT post [${postCutText(i)}] (wall posts, when 6×10 selected)`},
-  { id: "post_6x12_pt", label: "6×12 PT post [cut to wall ht + 4'] (wall posts, when 6×12 selected)", cat: "Post-frame wall", uom: "ea", packSize: null,
+    formula: i => (i.constructionType === 'post' && i.postSize === '6x10') ? (2 * ((i.eaveBays || 0) + 1)) : 0,
+    labelFn: i => `6×10 PT post [${postCutText(i)}] (eave wall posts, when 6×10 selected)`},
+  { id: "post_6x12_pt", label: "6×12 PT post [cut to wall ht + 4'] (eave wall posts, when 6×12 selected)", cat: "Post-frame wall", uom: "ea", packSize: null,
     priceCost: 124, priceSell: 158, priceRetail: 200,
-    formula: i => (i.constructionType === 'post' && i.postSize === '6x12') ? i.wallPostCount : 0,
-    labelFn: i => `6×12 PT post [${postCutText(i)}] (wall posts, when 6×12 selected)`},
-  { id: "post_8x8_pt", label: "8×8 PT post [cut to wall ht + 4'] (wall posts, when 8×8 selected)", cat: "Post-frame wall", uom: "ea", packSize: null,
+    formula: i => (i.constructionType === 'post' && i.postSize === '6x12') ? (2 * ((i.eaveBays || 0) + 1)) : 0,
+    labelFn: i => `6×12 PT post [${postCutText(i)}] (eave wall posts, when 6×12 selected)`},
+  { id: "post_8x8_pt", label: "8×8 PT post [cut to wall ht + 4'] (eave wall posts, when 8×8 selected)", cat: "Post-frame wall", uom: "ea", packSize: null,
     priceCost: 110, priceSell: 140, priceRetail: 180,
-    formula: i => (i.constructionType === 'post' && i.postSize === '8x8') ? i.wallPostCount : 0,
-    labelFn: i => `8×8 PT post [${postCutText(i)}] (wall posts, when 8×8 selected)`},
-  { id: "post_10x10_pt", label: "10×10 PT post [cut to wall ht + 4'] (wall posts, when 10×10 selected)", cat: "Post-frame wall", uom: "ea", packSize: null,
+    formula: i => (i.constructionType === 'post' && i.postSize === '8x8') ? (2 * ((i.eaveBays || 0) + 1)) : 0,
+    labelFn: i => `8×8 PT post [${postCutText(i)}] (eave wall posts, when 8×8 selected)`},
+  { id: "post_10x10_pt", label: "10×10 PT post [cut to wall ht + 4'] (eave wall posts, when 10×10 selected)", cat: "Post-frame wall", uom: "ea", packSize: null,
     priceCost: 172, priceSell: 220, priceRetail: 280,
-    formula: i => (i.constructionType === 'post' && i.postSize === '10x10') ? i.wallPostCount : 0,
-    labelFn: i => `10×10 PT post [${postCutText(i)}] (wall posts, when 10×10 selected)`},
-  { id: "post_12x12_pt", label: "12×12 PT post [cut to wall ht + 4'] (wall posts, when 12×12 selected)", cat: "Post-frame wall", uom: "ea", packSize: null,
+    formula: i => (i.constructionType === 'post' && i.postSize === '10x10') ? (2 * ((i.eaveBays || 0) + 1)) : 0,
+    labelFn: i => `10×10 PT post [${postCutText(i)}] (eave wall posts, when 10×10 selected)`},
+  { id: "post_12x12_pt", label: "12×12 PT post [cut to wall ht + 4'] (eave wall posts, when 12×12 selected)", cat: "Post-frame wall", uom: "ea", packSize: null,
     priceCost: 248, priceSell: 315, priceRetail: 400,
-    formula: i => (i.constructionType === 'post' && i.postSize === '12x12') ? i.wallPostCount : 0,
-    labelFn: i => `12×12 PT post [${postCutText(i)}] (wall posts, when 12×12 selected)`},
+    formula: i => (i.constructionType === 'post' && i.postSize === '12x12') ? (2 * ((i.eaveBays || 0) + 1)) : 0,
+    labelFn: i => `12×12 PT post [${postCutText(i)}] (eave wall posts, when 12×12 selected)`},
+  { id: "post_gable_pt", label: "Gable-end PT posts — stepped to truss top per span", cat: "Post-frame wall", uom: "ea", packSize: null,
+    priceCost: 61.97, priceSell: 78, priceRetail: 95,
+    // Gable posts run to the TOP OF THE TRUSS at each span position, so each one is
+    // cut to the roof height at its spot (+ embed), ordered in 2' increments.
+    // Priced per foot off the selected post size's base price.
+    formula: i => {
+      if (i.constructionType !== 'post') return 0;
+      return gablePostLengths(i).length * 2;   // both gable walls
+    },
+    customUnitPrice: i => {
+      const lens = gablePostLengths(i);
+      const base = getPrice('post_' + (i.postSize || '6x6').replace('x', 'x') + '_pt').cost || 61.97;
+      const baseLen = (i.postFoundation === 'on_slab') ? (i.H || 10) : (i.H || 10) + (i.postDepth || 4);
+      const perFt = baseLen > 0 ? base / baseLen : base / 18;
+      if (!lens.length) return base;
+      const avg = lens.reduce((a, b) => a + b, 0) / lens.length;
+      return perFt * avg;
+    },
+    labelFn: i => {
+      const lens = gablePostLengths(i);
+      const groups = {};
+      lens.forEach(l => { groups[l] = (groups[l] || 0) + 2; });   // ×2 gable walls
+      const txt = Object.keys(groups).sort((a, b) => a - b).map(l => `${groups[l]} @ ${l}'`).join(', ');
+      return `${i.postSize || '6x6'} PT gable posts — to truss top per span${txt ? ' (' + txt + ')' : ''}`;
+    }},
   { id: "sakrete_80lb", label: "80 lb Sakrete (post setting)", cat: "Post-frame wall", uom: "bag", packSize: null,
     priceCost: 6.21, priceSell: 7.50, priceRetail: 9,
     formula: i => {
@@ -4738,12 +4809,25 @@ const MATERIALS = [
     }},
   { id: "wall_lath_gable_pieces", label: "Wall lathing — gable walls, SYP 2×6 [cut to 10'] (pieces)", cat: "Post-frame wall", uom: "pieces", packSize: null,
     priceCost: 7.06, priceSell: 9.50, priceRetail: 12,
-    // Gable girts span the 10' OC gable posts.
+    // Gable girts span the 10' OC gable posts. Includes the TRIANGLE rows above eave
+    // height — rows keep climbing at girt spacing, each row shorter as the roof closes in,
+    // so the gable metal always has lathing to fasten to.
     customUnitPrice: i => 0.706 * i.gableBaySpacingFt,
     formula: i => {
       if (i.constructionType !== 'post' || i.wallSystem !== 'purlin') return 0;
       const rows = Math.max(0, Math.ceil(i.H / i.girtSpacing) - 1);
-      return rows * i.gableBays * 2;   // both gable walls
+      const rectPieces = rows * i.gableBays * 2;   // both gable walls, rectangle below eave
+      // Triangle rows above the eave line
+      const slope = (i.pitch || 0) / 12;
+      let triPerGable = 0;
+      if (slope > 0) {
+        for (let r = 1; r < 200; r++) {
+          const width = (i.W || 0) - 2 * ((r * i.girtSpacing) / slope);
+          if (width <= 0) break;
+          triPerGable += Math.ceil(width / (i.gableBaySpacingFt || 10));
+        }
+      }
+      return rectPieces + triPerGable * (i.gableCountActual || 2);
     }},
   { id: "roof_purlin_2x4_lf", label: "2×6 roof purlin [cut to truss spacing] — pieces", cat: "Post-frame wall", uom: "pieces", packSize: null,
     priceCost: 7.06, priceSell: 9.50, priceRetail: 12,
@@ -11697,6 +11781,15 @@ function buildCutList(i, mats) {
     if (!qty || qty <= 0) return;
 
     if (POST_IDS.includes(id)) { addCut('Posts', label, qty, postLen, postLen + "'"); return; }
+    if (id === 'post_gable_pt') {
+      // One cut-list row per stepped length (posts run to the truss top at each span)
+      const lens = gablePostLengths(i);
+      const groups = {};
+      lens.forEach(l => { groups[l] = (groups[l] || 0) + 2; });
+      Object.keys(groups).sort((a, b) => a - b).forEach(l =>
+        addCut('Posts', `${i.postSize || '6x6'} PT gable post (to truss top)`, groups[l], parseFloat(l), l + "'"));
+      return;
+    }
     if (id === 'large_corner_wall_10' || id === 'inside_corner_10') {
       const s = splitTrimRun(i.H, 1); addCut('Trim — corners', label, qty, s.stock, s.stock + "'"); return;
     }
