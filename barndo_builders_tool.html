@@ -2996,22 +2996,32 @@ function splitTrimRun(runFt, wasteFt) {
   return { count, stock, waste: wasteFt };
 }
 
-// Gable-end metal panels step up the pitch: each panel strip is cut to the TALL edge of its
-// strip so the sheet covers the rise across its own width. panelW = coverage (3' TR/PBR, 1' B&B).
-// Returns pieces + total LF for ONE gable triangle (multiply by gable count).
-function gableStepPanels(W, pitch, panelW) {
-  if (!(W > 0) || !(pitch > 0) || !(panelW > 0)) return { count: 0, totalLF: 0 };
-  const slope = pitch / 12, half = W / 2;
-  let count = 0, totalLF = 0;
-  for (let x0 = 0; x0 < W - 1e-9; x0 += panelW) {
-    const x1 = Math.min(W, x0 + panelW);
-    // tallest point of the triangle inside this strip (the end nearest the peak)
-    const d = (x0 <= half && half <= x1) ? 0 : Math.min(Math.abs(half - x0), Math.abs(half - x1));
-    const h = slope * (half - d);
-    if (h <= 0) continue;
-    count++; totalLF += h;
+// Gable-end metal panels step up the pitch, working from each corner toward the peak.
+// Builder's convention: panel k (k = 1..panels per side) is cut to
+//     wallH + k × (panelW × pitch/12) + 6" allowance
+// so each panel steps up by one panel-width of rise. 2 of each size per gable end
+// (one on each side of the peak). wallH > 0 → full-height floor-to-peak panels
+// (Tuff Rib, no horizontal break); wallH = 0 → triangle-only pieces (products that
+// break at the eave line, like Metal B&B). panelW = coverage (3' TR, 1' B&B).
+// Example: 40W × 16' walls, 4/12, 3' panels → 2 each of 17'6, 18'6 … 23'6 per gable.
+function gableStepPanels(W, pitch, panelW, wallH) {
+  if (!(W > 0) || !(pitch > 0) || !(panelW > 0)) return { count: 0, totalLF: 0, sizes: [] };
+  const risePerPanel = panelW * pitch / 12;
+  const perSide = Math.ceil((W / 2) / panelW);
+  const sizes = []; let totalLF = 0;
+  for (let k = 1; k <= perSide; k++) {
+    const len = (wallH || 0) + k * risePerPanel + 0.5;   // +6" cut allowance
+    sizes.push({ len, qtyPerGable: 2 });
+    totalLF += 2 * len;
   }
-  return { count, totalLF };
+  return { count: perSide * 2, totalLF, sizes };
+}
+// Format a panel length in ft-inches for display: 17.5 → 17'6"
+function ftIn(len) {
+  let ft = Math.floor(len);
+  let inches = Math.round((len - ft) * 12);
+  if (inches === 12) { ft += 1; inches = 0; }
+  return inches > 0 ? `${ft}'${inches}"` : `${ft}'`;
 }
 
 // Post cut-length description. Dry-set post plates on a slab → posts are cut to wall height.
@@ -3627,24 +3637,25 @@ const MATERIALS = [
 
   // ---------------- SIDING SKIN ----------------
   // Tuff Rib walls: continuous floor-to-peak panels (no horizontal break)
-  // Long sides: L÷3 panels × wall height
-  // Gable ends: panels of variable length (rectangular + gable triangle), summed
-  { id: "tuffrib_29_wall_lf", label: "Tuff Rib 29 ga wall panel — rectangular walls", cat: "Siding skin", uom: "LF", packSize: null,
+  // Long sides: eave walls only — gable-end walls are carried entirely by the
+  // stepped gable-end panel line below (floor-to-peak pieces, wall + rise).
+  { id: "tuffrib_29_wall_lf", label: "Tuff Rib 29 ga wall panel — eave walls", cat: "Siding skin", uom: "LF", packSize: null,
     priceCost: 2.58, priceSell: 3.65,
     formula: i => {
       if (i.sidingProduct !== 'tuffrib_29') return 0;
-      // Rectangular wall area from MEASURED exterior wall LF (accurate for complex shapes),
-      // minus openings, ÷ 3 ft panel coverage (36" TuffRib).
-      const rectArea = i.extWallLF * i.H - (i.area_windows + i.area_extdoors + i.area_garage);
+      // Eave-wall area = measured exterior wall LF minus the gable-end walls (those are
+      // full-height stepped panels on the gable line), minus openings, ÷ 3' coverage.
+      const eaveWallLF = Math.max(0, i.extWallLF - (i.W * (i.gableCountActual || 0)));
+      const rectArea = eaveWallLF * i.H - (i.area_windows + i.area_extdoors + i.area_garage);
       return Math.ceil(Math.max(0, rectArea) / 3 * 1.05);
     }},
-  { id: "tuffrib_29_gable_lf", label: "Tuff Rib 29 ga wall panel — gable triangles (3' panels, stepped to pitch)", cat: "Siding skin", uom: "LF", packSize: null,
+  { id: "tuffrib_29_gable_lf", label: "Tuff Rib 29 ga wall panel — gable ends, floor-to-peak (3' panels stepped to pitch)", cat: "Siding skin", uom: "LF", packSize: null,
     priceCost: 2.58, priceSell: 3.65,
     formula: i => {
       if (i.sidingProduct !== 'tuffrib_29') return 0;
-      // Panels ordered per piece: each 3'-wide sheet cut to the tall edge of its strip so it
-      // steps up the pitch. The stepping IS the overage — no extra waste factor on top.
-      const s = gableStepPanels(i.W, i.pitch, 3);
+      // Full-height gable-end panels: wall height + stepped rise + 6" allowance per panel,
+      // 2 of each size per gable. The stepping IS the overage — no extra waste factor.
+      const s = gableStepPanels(i.W, i.pitch, 3, i.H);
       return Math.ceil(s.totalLF * (i.gableCountActual || 0));
     }},
   // Metal B&B: breaks at eave-to-gable line. Rectangular pieces below, separate gable triangle pieces above.
@@ -3656,12 +3667,13 @@ const MATERIALS = [
       const rectArea = i.extWallLF * i.H - (i.area_windows + i.area_extdoors + i.area_garage);
       return Math.ceil(Math.max(0, rectArea) / 1 * 1.05);
     }},
-  { id: "mbb_26_gable_lf", label: "Metal B&B 26 ga panel — gable triangles (12\" panels, stepped to pitch)", cat: "Siding skin", uom: "LF", packSize: null,
+  { id: "mbb_26_gable_lf", label: "Metal B&B 26 ga panel — gable triangles (12\" panels stepped to pitch)", cat: "Siding skin", uom: "LF", packSize: null,
     priceCost: 4.25, priceSell: 5.45,
     formula: i => {
       if (i.sidingProduct !== 'mbb_26') return 0;
-      // 12"-wide B&B panels step up the gable pitch; each piece cut to its strip's tall edge.
-      const s = gableStepPanels(i.W, i.pitch, 1);
+      // B&B breaks at the eave line (Z trim), so gable pieces are triangle-only:
+      // 12"-wide panels stepping up the pitch + 6" allowance each, 2 per size per gable.
+      const s = gableStepPanels(i.W, i.pitch, 1, 0);
       return Math.ceil(s.totalLF * (i.gableCountActual || 0));
     }},
   // LP B&B: breaks at eave-to-gable line as well
@@ -8765,14 +8777,15 @@ function materialDetailText(m, i) {
       const pieces = Math.ceil(m.qty / pieceLen);
       return `~${pieces} pcs @ ${pieceLen}'`;
     }
-    // Wall panels — gable ends: stepped pieces across the gable width, each cut to the tall
-    // edge of its strip (steps up the pitch). Coverage: MBB 12", others 36".
+    // Wall panels — gable ends: stepped panel sizes listed out, e.g. "4 @ 17'6″ · 4 @ 18'6″ …"
+    // (qty per size = 2 per gable × gable count). TR = full height; MBB = triangle only.
     if (m.id === 'tuffrib_29_gable_lf' || m.id === 'pbr_26_gable_lf' || m.id === 'ss_26_gable_lf' || m.id === 'mbb_26_gable_lf') {
       const cov = (m.id === 'mbb_26_gable_lf') ? 1 : 3;
+      const wallH = (m.id === 'mbb_26_gable_lf') ? 0 : (i.H || 0);
       const gables = i.gableCountActual || 0;
-      const s = gableStepPanels(i.W || 0, i.pitch || 0, cov);
-      const pcs = s.count * gables;
-      return pcs > 0 ? `${pcs} stepped pcs across ${gables} gable${gables === 1 ? '' : 's'} (each cut to its step of the pitch)` : '';
+      const s = gableStepPanels(i.W || 0, i.pitch || 0, cov, wallH);
+      if (!s.sizes.length || gables <= 0) return '';
+      return s.sizes.map(sz => `${sz.qtyPerGable * gables} @ ${ftIn(sz.len)}`).join(' · ');
     }
     // Soffit panel — typically long continuous runs
     if (m.id && m.id.includes('soffit')) {
@@ -10110,9 +10123,14 @@ function buildCutList(i, mats) {
     }
     if (id === 'tuffrib_29_gable_lf' || id === 'pbr_26_gable_lf' || id === 'ss_26_gable_lf' || id === 'mbb_26_gable_lf') {
       const cov = (id === 'mbb_26_gable_lf') ? 1 : 3;
-      const s = gableStepPanels(i.W || 0, i.pitch || 0, cov);
-      const pieces = s.count * (i.gableCountActual || 0);
-      addCut('Metal — gable panels', label, pieces, null, 'stepped to pitch'); return;
+      const wallH = (id === 'mbb_26_gable_lf') ? 0 : (i.H || 0);
+      const gables = i.gableCountActual || 0;
+      const s = gableStepPanels(i.W || 0, i.pitch || 0, cov, wallH);
+      // One cut-list row per stepped size: "4 @ 17'6"" etc.
+      s.sizes.forEach(sz => {
+        addCut('Metal — gable panels', label, sz.qtyPerGable * gables, sz.len, ftIn(sz.len));
+      });
+      return;
     }
     if (uom === 'pieces') {
       const len = (id === 'wall_lath_gable_pieces') ? (i.gableBaySpacingFt || 10) : (i.eaveBaySpacingFt || (i.trussSpacing / 12) || 2);
