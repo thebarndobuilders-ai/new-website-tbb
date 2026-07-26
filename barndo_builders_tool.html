@@ -1462,10 +1462,13 @@
 
     <div class="qbs-card">
       <h3>Truss configuration <span class="badge">Multi-group · overrides roof math when used</span></h3>
-      <p class="qbs-sub" style="margin-bottom: 14px;">Manually enter the trusses for the roof. When this table has rows, it overrides L×W roof math and drives roof area, ridge LF, gable area, metal LF, lath LF, and screw count. Leave empty to use Building geometry math (simple rectangle).</p>
+      <p class="qbs-sub" style="margin-bottom: 14px;">The first row seeds itself from the building dimensions (span = width, qty on AUTO from length ÷ spacing) so trusses are always figured. Rows override L×W roof math and drive roof area, ridge LF, gable area, metal LF, lath LF, and screw count. Type each row Common / Steel / Attic / Scissor / Mono as built.</p>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <div style="font-family: var(--font-headline); font-size: 16px; color: var(--text);">Truss groups</div>
-        <button onclick="addTrussGroup()" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add truss group</button>
+        <div style="display:flex; gap:8px;">
+          <button onclick="syncTrussGroupsToBuilding()" title="Re-copy span / pitch / overhang / spacing from the building dimensions into every row" style="padding: 6px 14px !important; font-size: 12px !important;">⟳ Sync to building</button>
+          <button onclick="addTrussGroup()" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add truss group</button>
+        </div>
       </div>
       <table class="openings-table" id="truss-table">
         <thead><tr><th style="width: 40px;">#</th><th>Qty</th><th>Type</th><th>Span (ft)</th><th>Pitch (X/12)</th><th>Eave OH (in)</th><th>Spacing (in)</th><th>Label</th><th></th></tr></thead>
@@ -3304,6 +3307,21 @@ function gsCalc() {
     `<td style="padding:5px 10px; border-bottom:1px solid var(--hairline); font-variant-numeric:tabular-nums;">${r[1]}</td></tr>`).join('') + '</table>';
 }
 
+// Rake length for gable rake trim: the FULL rake from the eave corner (outer edge of the
+// eave overhang) to the ridge. Follows the truss table when it's active — uses the longest
+// gable-type group's top chord — so rake trim lays out from the real truss dimensions.
+// splitTrimRun() then splits it into the fewest equal pieces (e.g. 24' rake → 2 @ 14').
+function rakeTrimRunFt(i) {
+  if (i.trussConfigActive && i.trussAgg && i.trussAgg.groups && i.trussAgg.groups.length) {
+    let best = 0;
+    i.trussAgg.groups.forEach(g => {
+      if (g.type !== 'mono' && g.calc && g.calc.topChord > best) best = g.calc.topChord;
+    });
+    if (best > 0) return best;
+  }
+  return i.topChord || 0;
+}
+
 // Post cut-length description. Dry-set post plates on a slab → posts are cut to wall height.
 // Embedded (in-ground) → posts run wall height + the embedment depth.
 function postCutText(i) {
@@ -3585,6 +3603,9 @@ const MATERIALS = [
     priceCost: 24.52, priceSell: 31, priceRetail: 40,
     formula: i => {
       if (i.constructionType !== 'post' || i.trussType !== 'wood') return 0;
+      // All truss rows typed steel → engineered connections, no wood carrier needed.
+      if (i.trussConfigActive && i.trussAgg.groups.length &&
+          i.trussAgg.groups.every(g => g.type === 'steel')) return 0;
       // 2 long walls × 2-ply doubled × waste, divided into 20 ft sticks
       const totalLF = i.L * 2 * 2 * 1.05;
       return Math.ceil(totalLF / 20);
@@ -3810,12 +3831,13 @@ const MATERIALS = [
   { id: "truss_steel_ea", label: "Steel / hybrid post-frame truss (per ea, sits on posts)", cat: "Roof structure", uom: "ea", packSize: null,
     priceCost: 475, priceSell: 615, priceRetail: 745,
     formula: i => {
-      if (i.constructionType !== 'post' || i.trussType !== 'steel') return 0;
-      // Steel selected → ALL trusses are steel/hybrid, counted across every group.
-      if (i.trussConfigActive) {
+      if (!i.trussConfigActive) return 0;
+      // Global wood/steel selector set to steel → ALL groups count as steel/hybrid.
+      if (i.constructionType === 'post' && i.trussType === 'steel') {
         return i.trussAgg.groups.reduce((s, g) => s + g.qty, 0);
       }
-      return 0; // Manual entry only — trusses come solely from the Truss configuration table.
+      // Otherwise count the rows typed as 'Steel / hybrid' in the Truss configuration table.
+      return i.trussAgg.groups.filter(g => g.type === 'steel').reduce((s, g) => s + g.qty, 0);
     }},
   { id: "rafter_lumber_lf", label: "Stick-framed rafter lumber (2×10)", cat: "Roof structure", uom: "LF", packSize: null,
     priceCost: 3.25, priceSell: 4.10, priceRetail: 4.4,
@@ -3907,8 +3929,8 @@ const MATERIALS = [
     priceCost: 16, priceSell: 22,
     formula: i => {
       if (i.roofProduct === 'shingles') return 0;
-      // Rake length = topChord minus the eave overhang stretched along the slope
-      const rakeLength = i.topChord - (i.eaveOH / Math.cos(Math.atan(i.pitch / 12)));
+      // Full rake length (eave corner to ridge), truss-table aware
+      const rakeLength = rakeTrimRunFt(i);
       if (rakeLength <= 0) return 0;
       // 2 rakes per gable end × gable count, 5% waste
       const gableTrimLF = rakeLength * 2 * i.gableCountActual;
@@ -4107,20 +4129,19 @@ const MATERIALS = [
     priceCost: 22, priceSell: 30,
     formula: i => {
       if (i.sidingProduct !== 'tuffrib_29' && i.sidingProduct !== 'mbb_26') return 0;
-      // Rake line = top chord less the eave-overhang run (stretched along the slope).
-      const rakeLength = i.topChord - (i.eaveOH / Math.cos(Math.atan(i.pitch / 12)));
+      // Full rake (eave corner to ridge), truss-table aware; fewest equal pieces.
+      const rakeLength = rakeTrimRunFt(i);
       if (rakeLength <= 0) return 0;
       const s = splitTrimRun(rakeLength, 1);
       return i.gableCountActual * 2 * s.count;
     },
     customUnitPrice: i => {
-      const rakeLength = i.topChord - (i.eaveOH / Math.cos(Math.atan(i.pitch / 12)));
-      const s = splitTrimRun(rakeLength, 1);
+      const s = splitTrimRun(rakeTrimRunFt(i), 1);
       const base = getPrice('large_corner_gable_custom').cost || 22;
       return (base / 10) * s.stock;
     },
     labelFn: i => {
-      const rakeLength = i.topChord - (i.eaveOH / Math.cos(Math.atan(i.pitch / 12)));
+      const rakeLength = rakeTrimRunFt(i);
       const s = splitTrimRun(rakeLength, 1);
       const rakes = i.gableCountActual * 2;
       return `Large outside corner — gable rake (${rakes * s.count} pc @ ${s.stock}′ · ${s.count}/rake, +1′/pc)`;
@@ -5088,6 +5109,7 @@ function clearAllManual() {
   // Trusses
   if (typeof trussGroups !== 'undefined') {
     trussGroups.length = 0;
+    window._trussCleared = false;   // fresh quote → the first row re-seeds from the new dims
     if (typeof renderTrussTable === 'function') renderTrussTable();
   }
   // Roof calculator
@@ -7451,24 +7473,76 @@ let trussGroups = [];
 
 const TRUSS_TYPES = [
   { key: 'common',  label: 'Common gable', hasRidge: true, hasGable: true, slopes: 2 },
+  { key: 'steel',   label: 'Steel / hybrid (post-frame)', hasRidge: true, hasGable: true, slopes: 2 },
   { key: 'mono',    label: 'Mono-slope (lean-to)', hasRidge: false, hasGable: false, slopes: 1 },
   { key: 'attic',   label: 'Attic', hasRidge: true, hasGable: true, slopes: 2 },
   { key: 'scissor', label: 'Scissor (vaulted)', hasRidge: true, hasGable: true, slopes: 2 },
   { key: 'stick',   label: 'Stick frame', hasRidge: true, hasGable: true, slopes: 2 },
 ];
 
-function addTrussGroup(prefill = null) {
-  // Default seed for a new row. Deep-cloned to guarantee independence from any callers.
-  const defaultSeed = {
+// Seed a truss row from the current building dimensions so counts figure themselves:
+// span = building width, pitch/overhang/spacing from the inputs, qty on AUTO
+// (ceil(L / spacing) + 1). Type follows the post-frame wood/steel selector.
+function buildTrussSeedFromBuilding() {
+  const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+  const spacingFt = n('truss_spacing') || 4;
+  const globalSteel = ((document.getElementById('truss_type') || {}).value === 'steel');
+  return {
     qty: 0,
-    type: 'common',
-    span: 30,
-    pitch: 4,
-    eaveOH: 16,    // inches
-    spacing: 48,   // inches OC (post-frame default)
+    type: globalSteel ? 'steel' : 'common',
+    span: n('width') || 30,
+    pitch: n('pitch') || 4,
+    eaveOH: Math.round(n('eave_overhang')) || 16,   // inches
+    spacing: Math.round(spacingFt * 12) || 48,      // inches OC
     label: '',
-    autoQty: false, // manual entry only — user types the truss count for each group
+    autoQty: true,   // auto count from building length — flip to M to type a count
   };
+}
+
+// First truss row seeds itself from the building so trusses are always factored.
+// Only fires when the table is empty, dims exist, and the user hasn't deliberately
+// cleared the table this quote (deleting the last row switches this off).
+function ensureDefaultTrussGroup() {
+  if (window._trussCleared) return;
+  if (trussGroups.length > 0) return;
+  const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+  if (n('length') <= 0 || n('width') <= 0) return;
+  const seed = buildTrussSeedFromBuilding();
+  seed.label = autoLabelForTruss(0);
+  seed.seedSynced = true;   // keep following the building until the user edits the row
+  trussGroups.push(seed);
+  renderTrussTable();
+}
+
+// Auto-seeded rows keep following the building dimensions (span/pitch/overhang/spacing/type)
+// on every recalc until the user edits the row — then their edits win.
+function refreshSyncedTrussRows() {
+  let changed = false;
+  const b = buildTrussSeedFromBuilding();
+  trussGroups.forEach(g => {
+    if (!g.seedSynced) return;
+    if (g.span !== b.span || g.pitch !== b.pitch || g.eaveOH !== b.eaveOH ||
+        g.spacing !== b.spacing || g.type !== b.type) {
+      g.span = b.span; g.pitch = b.pitch; g.eaveOH = b.eaveOH;
+      g.spacing = b.spacing; g.type = b.type;
+      changed = true;
+    }
+  });
+  if (changed) renderTrussTable();
+}
+
+// Re-copy the building dimensions into every truss row (span/pitch/overhang/spacing).
+// Qty mode (A/M) and truss type are left alone.
+function syncTrussGroupsToBuilding() {
+  const b = buildTrussSeedFromBuilding();
+  trussGroups.forEach(g => { g.span = b.span; g.pitch = b.pitch; g.eaveOH = b.eaveOH; g.spacing = b.spacing; });
+  renderTrussTable();
+  recalc();
+}
+
+function addTrussGroup(prefill = null) {
+  // Default seed for a new row: pre-filled from the building dimensions with qty on AUTO.
+  const defaultSeed = buildTrussSeedFromBuilding();
   // Deep-clone whichever source we use, so the new row's object never shares any
   // nested reference with another row or with the caller's prefill object.
   const source = prefill || defaultSeed;
@@ -7485,6 +7559,8 @@ function addTrussGroup(prefill = null) {
 
 function removeTrussGroup(idx) {
   trussGroups.splice(idx, 1);
+  // Deleting the last row is a deliberate "no trusses" choice — don't auto-reseed this quote.
+  if (trussGroups.length === 0) window._trussCleared = true;
   renderTrussTable();
   recalc();
 }
@@ -7492,6 +7568,7 @@ function removeTrussGroup(idx) {
 function updateTrussGroup(idx, field, value) {
   const g = trussGroups[idx];
   if (!g) return;
+  g.seedSynced = false;   // user touched the row — stop auto-following the building dims
   if (field === 'label' || field === 'type') {
     g[field] = value;
   } else {
@@ -7556,46 +7633,53 @@ function calcTrussGroup(g, scissorCeilPitch) {
   const angleRad = Math.atan(pitch / 12);
   
   const cfg = TRUSS_TYPES.find(t => t.key === g.type) || TRUSS_TYPES[0];
-  
+
+  // Building length this group covers. AUTO rows follow the building length exactly,
+  // so roof area / panels / ridge / lath match the real footprint — qty × spacing
+  // overshoots by up to a full bay from the ceil() in the auto truss count.
+  let lengthCovered = qty * spacing_ft;
+  if (g.autoQty) {
+    const lenEl = document.getElementById('length');
+    const bl = lenEl ? (parseFloat(lenEl.value) || 0) : 0;
+    if (bl > 0) lengthCovered = bl;
+  }
+
   let topChord, rise, slopeArea, ridgeLF, gableArea;
-  
+
   if (g.type === 'mono') {
     // Mono-slope: single slope across full span
     rise = span * (pitch / 12);
     topChord = Math.sqrt(span * span + rise * rise) + eaveOH_ft / Math.cos(angleRad);
-    slopeArea = topChord * spacing_ft * qty;  // single slope per truss
+    slopeArea = topChord * lengthCovered;  // single slope
     ridgeLF = 0;
     gableArea = 0;
   } else {
-    // Common / Attic / Stick frame: 2 slopes from peak
+    // Common / Steel / Attic / Scissor / Stick frame: 2 slopes from peak
     rise = run * (pitch / 12);
     topChord = Math.sqrt(run * run + rise * rise) + eaveOH_ft / Math.cos(angleRad);
-    slopeArea = topChord * 2 * spacing_ft * qty;  // 2 slopes per truss × length covered
-    ridgeLF = qty * spacing_ft;
+    slopeArea = topChord * 2 * lengthCovered;  // 2 slopes × length covered
+    ridgeLF = lengthCovered;
     gableArea = (span * rise) / 2 * 2; // 2 gable ends per group
   }
-  
-  // Building length this group covers
-  const lengthCovered = qty * spacing_ft;
   
   // === CEILING AREA (drives sheetrock + insulation) ===
   // Common / Attic / Stick → flat ceiling (bottom chord is horizontal) = footprint covered
   // Scissor → vaulted ceiling at the SCISSOR CEILING PITCH input (user-configurable, default 4/12)
   // Mono → vaulted (follows the single slope)
   let ceilingArea = 0;
-  if (g.type === 'common' || g.type === 'attic' || g.type === 'stick') {
+  if (g.type === 'common' || g.type === 'steel' || g.type === 'attic' || g.type === 'stick') {
     ceilingArea = span * lengthCovered; // flat ceiling = footprint area covered
   } else if (g.type === 'scissor') {
     // Use the user-set scissor ceiling pitch (defaults to half top chord if not provided)
     const ceilPitch = (scissorCeilPitch != null && scissorCeilPitch > 0) ? scissorCeilPitch : (pitch / 2);
     const ceilRise = run * (ceilPitch / 12);
     const ceilChord = Math.sqrt(run * run + ceilRise * ceilRise);
-    ceilingArea = ceilChord * 2 * spacing_ft * qty;
+    ceilingArea = ceilChord * 2 * lengthCovered;
   } else if (g.type === 'mono') {
     // Mono: vaulted, follows the single slope (no overhang on ceiling)
     const ceilRise = span * (pitch / 12);
     const ceilChord = Math.sqrt(span * span + ceilRise * ceilRise);
-    ceilingArea = ceilChord * spacing_ft * qty;
+    ceilingArea = ceilChord * lengthCovered;
   }
   
   // Metal panel LF per group:
@@ -7603,7 +7687,13 @@ function calcTrussGroup(g, scissorCeilPitch) {
   //   number of panels = lengthCovered / 3 ft panel coverage (TR/PBR)
   //   total panel LF = pieces × top chord (length per piece)
   const panelCoverage = 3; // ft
-  const panelPiecesPerSlope = Math.ceil(lengthCovered / panelCoverage);
+  // AUTO rows: roof panels also cover the gable (rake) overhangs beyond the building length.
+  let panelCoverLen = lengthCovered;
+  if (g.autoQty) {
+    const gOHEl = document.getElementById('gable_overhang');
+    if (gOHEl) panelCoverLen += 2 * ((parseFloat(gOHEl.value) || 0) / 12);
+  }
+  const panelPiecesPerSlope = Math.ceil(panelCoverLen / panelCoverage);
   const panelPieces = panelPiecesPerSlope * cfg.slopes;
   const panelLF = panelPieces * topChord;
   
@@ -9042,6 +9132,15 @@ function materialDetailText(m, i) {
     return checkStr(uom) || checkStr(label);
   };
   
+  // === PRO ARMOR WRAP — show the area math so the Roof/Roof+walls scope is visible ===
+  if (m.id === 'pro_armor_moisture_wrap') {
+    const scope = i.proArmorScope || 'roof';
+    const roofSf = Math.ceil(i.roofArea || 0);
+    const wallSf = Math.ceil(i.wallArea || 0);
+    if (scope === 'roof_walls') return `roof ${roofSf} + walls ${wallSf} = ${roofSf + wallSf} ft² ÷ 750/roll`;
+    return `roof ${roofSf} ft² ÷ 750/roll (walls excluded — see Pro Armor selector)`;
+  }
+
   // === METAL PANELS (priced in LF) — show piece count + per-piece length ===
   if (uom === 'LF' && (cat === 'Roof skin' || cat === 'Siding skin')) {
     // Roof panels: use geometry-calculated piece count + per-piece length
@@ -9149,6 +9248,11 @@ function materialDetailText(m, i) {
 }
 
 function recalc() {
+  // Auto-seed the first truss row from the building so trusses are always factored
+  // (skipped once the user deliberately deletes the last row), and keep untouched
+  // seeded rows following the building dimensions.
+  if (typeof ensureDefaultTrussGroup === 'function') { try { ensureDefaultTrussGroup(); } catch (e) {} }
+  if (typeof refreshSyncedTrussRows === 'function') { try { refreshSyncedTrussRows(); } catch (e) {} }
   const i = getInputs();
   // Sync auto-mode framing labor sqft from current project geometry
   if (typeof syncFramingLaborAutoSqft === 'function') syncFramingLaborAutoSqft(i);
@@ -9314,8 +9418,8 @@ function recalc() {
   // Roof geometry display
   const geoEl = document.getElementById('roof-geometry-output');
   if (geoEl) {
-    // Calculate recommended custom corner length
-    const rakeLength = i.topChord - (i.eaveOH / Math.cos(Math.atan(i.pitch / 12)));
+    // Calculate recommended custom corner length (full rake, truss-table aware)
+    const rakeLength = rakeTrimRunFt(i);
     // Same rule as the material line: fewest equal pieces, +1' waste each, nearest stock.
     const rakeSplit = splitTrimRun(rakeLength, 1);
     const customCornerLength = rakeSplit.stock;
@@ -10375,7 +10479,7 @@ function buildCutList(i, mats) {
   const cut = [], byFoot = [], countOnly = [];
   const POST_IDS = ['post_4x6_pt','post_6x6_pt','post_6x8_pt','post_6x10_pt','post_6x12_pt','post_8x8_pt','post_10x10_pt','post_12x12_pt'];
   const postLen = (i.postFoundation === 'on_slab') ? (i.H || 0) : ((i.H || 0) + (i.postDepth || 4));
-  const rakeLength = i.topChord - (i.eaveOH / Math.cos(Math.atan(i.pitch / 12)));
+  const rakeLength = rakeTrimRunFt(i);
   const addCut = (cat, item, pieces, lengthFt, lengthLabel) => {
     if (!pieces || pieces <= 0) return;
     const tl = (typeof lengthFt === 'number' && lengthFt > 0) ? Math.round(pieces * lengthFt) : null;
