@@ -2169,13 +2169,6 @@
     <strong style="color: var(--copper);">⚡ Standalone shed quote mode active.</strong> Main building inputs (length, width, areas) are being skipped — only the side shed dimensions + labor are pricing. Disable on the <strong>Additions tab → Side shed</strong> card when done.
   </div>
 
-  <!-- Category bar — tabs are bunched into 4 groups; each group shows its own sub-tabs -->
-  <div id="qbs-tabgroups" style="display:flex; gap:8px; margin: 0 0 8px 0;">
-    <button data-group="build" class="active" onclick="setTabGroup('build', true)" style="padding: 8px 18px !important; font-weight:600;">🏗 Build</button>
-    <button data-group="quote" onclick="setTabGroup('quote', true)" style="padding: 8px 18px !important; font-weight:600;">💰 Quote</button>
-    <button data-group="sales" onclick="setTabGroup('sales', true)" style="padding: 8px 18px !important; font-weight:600;">📇 Sales</button>
-    <button data-group="setup" onclick="setTabGroup('setup', true)" style="padding: 8px 18px !important; font-weight:600;">⚙ Setup</button>
-  </div>
   <div class="qbs-tabs">
     <div class="qbs-tab" data-tab="leads" onclick="switchTab('leads')">Leads</div>
     <div class="qbs-tab active" data-tab="takeoff" onclick="switchTab('takeoff')">1. Takeoff</div>
@@ -6981,37 +6974,7 @@ function printCounterTicket() {
   w.document.close();
 }
 
-// --- Tab grouping: 14 tabs bunched into 4 categories. Every tab keeps its id,
-// content, and behavior — the groups only control which sub-tabs are visible.
-const TAB_GROUPS = {
-  takeoff: 'build', inputs: 'build', foundation: 'build', audit3d: 'build',
-  materials: 'quote', subs: 'quote', quote: 'quote', proposal: 'quote',
-  leads: 'sales', counter: 'sales', saved: 'sales',
-  flitch: 'setup', calcs: 'setup', settings: 'setup',
-};
-const GROUP_DEFAULT_TAB = { build: 'takeoff', quote: 'materials', sales: 'leads', setup: 'flitch' };
-let _activeTabGroup = 'build';
-function setTabGroup(g, navigate) {
-  _activeTabGroup = g;
-  document.querySelectorAll('#qbs-tabgroups button').forEach(b => {
-    const on = b.dataset.group === g;
-    b.classList.toggle('active', on);
-    b.style.background = on ? 'var(--copper)' : '';
-    b.style.color = on ? 'var(--bg-deep)' : '';
-    b.style.borderColor = on ? 'var(--copper)' : '';
-  });
-  document.querySelectorAll('.qbs-tabs .qbs-tab').forEach(t => {
-    t.style.display = (TAB_GROUPS[t.dataset.tab] === g) ? '' : 'none';
-  });
-  if (navigate) switchTab(GROUP_DEFAULT_TAB[g]);
-}
-// Initial state: Build group open (matches the default active Takeoff tab)
-setTabGroup('build', false);
-
 function switchTab(name) {
-  // Keep the category bar in sync when a tab is opened programmatically
-  const g = TAB_GROUPS[name];
-  if (g && g !== _activeTabGroup) setTabGroup(g, false);
   document.querySelectorAll('.qbs-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.qbs-tab-content').forEach(c => c.style.display = 'none');
   document.getElementById('tab-' + name).style.display = 'block';
