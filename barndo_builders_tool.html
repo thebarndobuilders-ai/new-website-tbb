@@ -2688,6 +2688,28 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
       <div id="sh_results" style="margin-top:12px;"></div>
       <div class="qbs-note" style="margin-top:8px;">Model follows vCalc "Metal Panels for Shed Roof": single slope, panel run = span along the pitch + front &amp; back overhangs + margin of error. Runs longer than max panel length split into equal courses. Angle trim covers the high edge + eave; rake (gable) trim covers the 2 side edges. Screws ≈ 0.75/ft².</div>
     </div>
+
+    <!-- ── Sheathing for a Wall (vCalc-style) ────────────────────────── -->
+    <div class="qbs-card" style="max-width:960px; margin-top:16px;">
+      <h3>Sheathing for a Wall <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field">
+          <label>(L) Length of the wall (ft)</label>
+          <input type="number" id="sw_len" value="60" step="0.5" oninput="swCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>(H) Height of the wall (ft)</label>
+          <input type="number" id="sw_height" value="14" step="0.5" oninput="swCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>Waste (%)</label>
+          <input type="number" id="sw_waste" value="0" step="1" oninput="swCalc()" />
+          <div class="qbs-note">vCalc uses none (straight area ÷ 32). The main takeoff's Zip lines carry 10% — set 10 to compare apples to apples.</div>
+        </div>
+      </div>
+      <div id="sw_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">Model follows vCalc "Sheathing for a Wall": 4×8 sheets = L × H ÷ 32 ft², rounded up. One wall — multiply or run each wall separately.</div>
+    </div>
   </div>
 
   <!-- SETTINGS -->
@@ -3225,6 +3247,26 @@ function shCalc() {
     ['Purlins @ ' + Math.round(purlinSp * 12) + '" OC', `${rowsTotal} rows × ${Math.ceil(L)}' = ${Math.ceil(purlinLF)} LF`],
     ['Metal screws', `${screws} screws (≈0.75/ft²)`],
     ['Roof angle', `${angleDeg.toFixed(1)}°`],
+  ];
+  box.innerHTML = '<table style="width:100%; border-collapse:collapse;">' + rows.map(r =>
+    `<tr><td style="padding:5px 10px; border-bottom:1px solid var(--hairline); color:var(--text-2); white-space:nowrap;">${r[0]}</td>` +
+    `<td style="padding:5px 10px; border-bottom:1px solid var(--hairline); font-variant-numeric:tabular-nums;">${r[1]}</td></tr>`).join('') + '</table>';
+}
+
+// Sheathing for a Wall (vCalc model): 4x8 sheets = L x H / 32 ft², rounded up.
+function swCalc() {
+  const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+  const L = n('sw_len'), H = n('sw_height'), waste = n('sw_waste') / 100;
+  const box = document.getElementById('sw_results');
+  if (!box) return;
+  if (L <= 0 || H <= 0) { box.innerHTML = '<div class="qbs-note">Enter wall length and height.</div>'; return; }
+  const area = L * H;
+  const sheets = Math.ceil(area / 32 * (1 + waste));
+  const nails = Math.ceil(sheets * 60);   // ~60 nails per sheet (6" edges / 12" field on 4x8)
+  const rows = [
+    ['Wall area', `${Math.ceil(area)} ft²`],
+    ['4×8 sheets', `${sheets} sheets${waste > 0 ? ` (incl. ${Math.round(waste * 100)}% waste)` : ''}`],
+    ['Framing nails', `≈${nails} nails (60/sheet — 6" edge, 12" field)`],
   ];
   box.innerHTML = '<table style="width:100%; border-collapse:collapse;">' + rows.map(r =>
     `<tr><td style="padding:5px 10px; border-bottom:1px solid var(--hairline); color:var(--text-2); white-space:nowrap;">${r[0]}</td>` +
@@ -5637,7 +5679,7 @@ function switchTab(name) {
   }
   if (name === 'flitch') { renderSkuMapping(); if (typeof renderPricingMasterTable === 'function') renderPricingMasterTable(); }
   if (name === 'settings') renderDefaultPrices();
-  if (name === 'calcs') { try { grCalc(); } catch(e) {} try { gsCalc(); } catch(e) {} try { shCalc(); } catch(e) {} }
+  if (name === 'calcs') { try { grCalc(); } catch(e) {} try { gsCalc(); } catch(e) {} try { shCalc(); } catch(e) {} try { swCalc(); } catch(e) {} }
   if (name === 'takeoff' && typeof takeoffInit === 'function') takeoffInit();
   if (name === 'subs') {
     try { renderFramingLaborGrid(); } catch(e) { console.error('framing grid', e); }
