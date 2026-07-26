@@ -2,7 +2,7 @@
 
 **Purpose of this file:** Carry the full context of our work to a new computer (or a new Claude session). On the new machine, start a fresh Claude session, **upload `barndo_builders_tool_v127.html`**, and **paste this whole file in**. We'll pick up exactly where we left off.
 
-_Last updated: 2026-07-24_
+_Last updated: 2026-07-26_
 
 ---
 
@@ -10,8 +10,9 @@ _Last updated: 2026-07-24_
 A single, self-contained HTML app — **The Barndo Builders** post-frame / barndominium **estimating + quoting tool**. Tabs: Dimensions, Foundation, Takeoff (blueprint PDF), Materials, Subs & Labor, Quote, Customer Proposal, 3D shell audit, Leads CRM, Pricing master, Counter ticket, Settings. Runs entirely in a browser; data (leads, quotes, settings) saves to the browser's localStorage, with optional Supabase cloud sign-in.
 
 ## 2. Current version
-- **`barndo_builders_tool_v127.html`** — the source of truth. ~2.18 MB (pdf.js bundled inline for offline use).
-- Older on-disk versions exist (v105–v126). **Ignore them.** v127 supersedes everything.
+- **Source of truth is now the git repo:** `thebarndobuilders-ai/new-website-tbb`, file `barndo_builders_tool.html` (branch `claude/new-session-87wo5r`). Git history replaces filename version numbers — no more v-number drift.
+- v128 = v127 + CSV export of the cut list. ~2.18 MB (pdf.js bundled inline for offline use).
+- Older on-disk versions exist (v105–v127). **Ignore them.**
 
 ## 3. How to run / view it
 - **Simplest:** double-click → opens in Edge/Chrome. (If nothing happens, right-click → Open with → Edge → check "always".)
@@ -67,7 +68,8 @@ A single, self-contained HTML app — **The Barndo Builders** post-frame / barnd
 - **Sheet goods** (plywood/OSB/LP panels) don't auto-generate (codes like `S-CDX-12` aren't derivable) — map by hand if needed.
 - **Re-check saved post-frame quotes** — post counts (and plates/Sakrete scaling off them) are now lower and correct.
 - **Trim exact-fit edge case:** a run exactly equal to a stock length splits into 2 pieces (the +1' waste won't fit). Decide if a zero-waste single stick is wanted there.
-- **Not yet built:** CSV export of the cut list; localStorage export/import for moving data between machines.
+- ~~CSV export of the cut list~~ — **built (v128):** "Cut list CSV" header button, same sections as the printable view.
+- ~~localStorage export/import~~ — **already existed in v127:** "⬇ Export full backup (JSON)" / "⬆ Import backup" buttons on the Pricing master tab. Covers all `bb_*`/`barndo_*`/`qbs_*` keys including leads, quotes, price overrides, company info, and the imported master list (`bb_store:app_state`). To move machines: export on the old computer, import on the new one.
 
 ## 8. How to resume on the new computer
 1. Copy `barndo_builders_tool_v127.html` **and** this file to the new machine (cloud/email/USB).
