@@ -1044,6 +1044,7 @@
       <button onclick="exportCSV()">CSV</button>
       <button onclick="exportPDF()">Internal cost sheet</button>
       <button onclick="printCutList()">Cut list</button>
+      <button onclick="exportCutListCSV()" title="Download the cut list as a CSV spreadsheet">Cut list CSV</button>
     </div>
   </div>
 
@@ -10136,6 +10137,36 @@ function printCutList() {
   const w = window.open('', '_blank');
   if (!w) return alert('Pop-up blocked — allow pop-ups to print the cut list.');
   w.document.write(html); w.document.close();
+}
+
+function exportCutListCSV() {
+  const c = window._lastCalc;
+  if (!c) return alert('No calculation yet — enter the building dimensions first.');
+  const i = c.i;
+  const { cut, byFoot, countOnly } = buildCutList(i, c.mats);
+  if (!cut.length && !byFoot.length && !countOnly.length) return alert('Cut list is empty — nothing to export yet.');
+  // Labels can contain quotes (inch marks) — double them per CSV rules.
+  const q = s => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
+  const bldg = `${i.L}' × ${i.W}' × ${i.H}' walls · ${i.pitch}/12`;
+  let csv = `Project,${q(i.project || '')}\nClient,${q(i.client || '')}\nBuilding,${q(bldg)}\nDate,${new Date().toLocaleDateString()}\n\n`;
+  csv += 'Cut to length\nCategory,Item,Pieces,Length each,Total LF\n';
+  cut.forEach(r => { csv += `${q(r.cat)},${q(r.item)},${r.pieces},${q(r.lengthLabel)},${r.totalLF != null ? r.totalLF : ''}\n`; });
+  if (byFoot.length) {
+    csv += '\nBy the foot (order lineal)\nCategory,Item,Lineal LF\n';
+    byFoot.forEach(r => { csv += `${q(r.cat)},${q(r.item)},${r.lf}\n`; });
+  }
+  if (countOnly.length) {
+    csv += '\nCount only (hardware / fasteners / bags / sheets)\nCategory,Item,Qty,UOM\n';
+    countOnly.forEach(r => { csv += `${q(r.cat)},${q(r.item)},${r.qty},${q(r.uom)}\n`; });
+  }
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = (i.project || i.client || 'barndo').replace(/[^a-z0-9]/gi, '_') + '_cut_list.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function exportPDF() {
