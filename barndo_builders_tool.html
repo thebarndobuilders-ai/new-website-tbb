@@ -1069,6 +1069,7 @@
     <div class="qbs-tab" data-tab="audit3d" onclick="switchTab('audit3d')" style="border-left: 1px dashed var(--hairline); margin-left: 4px; padding-left: 12px;">3D audit</div>
     <div class="qbs-tab" data-tab="counter" onclick="switchTab('counter')" style="border-left: 1px dashed var(--hairline); margin-left: 4px; padding-left: 12px;">Counter ticket</div>
     <div class="qbs-tab" data-tab="flitch" onclick="switchTab('flitch')">Pricing master</div>
+    <div class="qbs-tab" data-tab="calcs" onclick="switchTab('calcs')">Calculators</div>
     <div class="qbs-tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
     <div class="qbs-tab" data-tab="saved" onclick="switchTab('saved')">Saved</div>
   </div>
@@ -2563,6 +2564,132 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
     </div>
   </div>
 
+  <!-- CALCULATORS — standalone quick-takeoff calculators (vCalc-style). These are
+       reference calculators only: they don't touch the quote, materials list, or pricing. -->
+  <div class="qbs-tab-content" id="tab-calcs" style="display:none">
+    <div class="qbs-sub" style="margin-bottom:14px;">Standalone takeoff calculators — quick numbers without touching the current quote. More calculators get added here as needed.</div>
+
+    <!-- ── Metal for Gable Roof (vCalc-style) ────────────────────────── -->
+    <div class="qbs-card" style="max-width:960px;">
+      <h3>Metal for Gable Roof <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field">
+          <label>(L) Ridge length — incl. rake overhang (ft)</label>
+          <input type="number" id="gr_ridge_len" value="62" step="0.5" oninput="grCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>(S) Span of roof (ft)</label>
+          <input type="number" id="gr_span" value="40" step="0.5" oninput="grCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>(P) Roof pitch</label>
+          <select id="gr_pitch" onchange="grCalc()">
+            <option value="1">1/12</option><option value="2">2/12</option><option value="3">3/12</option>
+            <option value="4" selected>4/12</option><option value="5">5/12</option><option value="6">6/12</option>
+            <option value="7">7/12</option><option value="8">8/12</option><option value="9">9/12</option>
+            <option value="10">10/12</option><option value="12">12/12</option><option value="14">14/12</option>
+          </select>
+        </div>
+        <div class="qbs-field">
+          <label>(oH) Rafter overhang (in)</label>
+          <input type="number" id="gr_overhang" value="12" step="1" oninput="grCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>(PW) Panel width — coverage (in)</label>
+          <input type="number" id="gr_panel_w" value="36" step="1" oninput="grCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>Purlin spacing (in)</label>
+          <input type="number" id="gr_purlin_sp" value="24" step="1" oninput="grCalc()" />
+        </div>
+      </div>
+      <div id="gr_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">Model follows vCalc "Metal for Gable Roof": panels cut to the slope + overhang, foam closure = 4 × ridge (both sides of ridge + both eaves), snow guard = 2 × ridge, screws ≈ 0.75/ft². Confirm against a professional estimate and local code.</div>
+    </div>
+
+    <!-- ── Metal Siding for Gable Ends (vCalc-style) ─────────────────── -->
+    <div class="qbs-card" style="max-width:960px; margin-top:16px;">
+      <h3>Metal Siding for Gable Ends <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field">
+          <label>(H) Height of building — wall height (ft)</label>
+          <input type="number" id="gs_height" value="16" step="0.5" oninput="gsCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>(P) Pitch of roof</label>
+          <select id="gs_pitch" onchange="gsCalc()">
+            <option value="1">1/12</option><option value="2">2/12</option><option value="3">3/12</option>
+            <option value="4" selected>4/12</option><option value="5">5/12</option><option value="6">6/12</option>
+            <option value="7">7/12</option><option value="8">8/12</option><option value="9">9/12</option>
+            <option value="10">10/12</option><option value="12">12/12</option><option value="14">14/12</option>
+          </select>
+        </div>
+        <div class="qbs-field">
+          <label>(S) Roof span — gable wall width (ft)</label>
+          <input type="number" id="gs_span" value="40" step="0.5" oninput="gsCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>(PW) Panel width — coverage (in)</label>
+          <input type="number" id="gs_panel_w" value="36" step="1" oninput="gsCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>Cut allowance per panel (in)</label>
+          <input type="number" id="gs_allow" value="6" step="1" oninput="gsCalc()" />
+          <div class="qbs-note">Shop standard: 6" per panel (vCalc's own default is 3"). Matches the main takeoff.</div>
+        </div>
+      </div>
+      <div id="gs_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">Model follows vCalc "Metal Siding for Gable Ends" with the shop panel layout: stepped pairs from both corners to the peak (matches the Materials list), 6" cut allowance standard. Screws at 75 per 100 ft². Doors/windows not deducted.</div>
+    </div>
+
+    <!-- ── Metal Panels for Shed Roof (vCalc-style) ──────────────────── -->
+    <div class="qbs-card" style="max-width:960px; margin-top:16px;">
+      <h3>Metal Panels for Shed Roof <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field">
+          <label>(L) Ridge length — incl. rakes (ft)</label>
+          <input type="number" id="sh_ridge_len" value="62" step="0.5" oninput="shCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>(S) Roof span (ft)</label>
+          <input type="number" id="sh_span" value="20" step="0.5" oninput="shCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>(P) Pitch</label>
+          <select id="sh_pitch" onchange="shCalc()">
+            <option value="0">flat</option>
+            <option value="1">1/12</option><option value="2" selected>2/12</option><option value="3">3/12</option>
+            <option value="4">4/12</option><option value="5">5/12</option><option value="6">6/12</option>
+            <option value="7">7/12</option><option value="8">8/12</option><option value="9">9/12</option>
+            <option value="10">10/12</option><option value="12">12/12</option><option value="14">14/12</option>
+          </select>
+        </div>
+        <div class="qbs-field">
+          <label>(oH) Overhang — front &amp; back, each (in)</label>
+          <input type="number" id="sh_overhang" value="12" step="1" oninput="shCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>(MoE) Margin of error — added to panel length (in)</label>
+          <input type="number" id="sh_moe" value="6" step="1" oninput="shCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>(maxLen) Max panel length (ft)</label>
+          <input type="number" id="sh_maxlen" value="24" step="1" oninput="shCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>(PW) Panel width — coverage (in)</label>
+          <input type="number" id="sh_panel_w" value="36" step="1" oninput="shCalc()" />
+        </div>
+        <div class="qbs-field">
+          <label>Purlin spacing (in)</label>
+          <input type="number" id="sh_purlin_sp" value="24" step="1" oninput="shCalc()" />
+        </div>
+      </div>
+      <div id="sh_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">Model follows vCalc "Metal Panels for Shed Roof": single slope, panel run = span along the pitch + front &amp; back overhangs + margin of error. Runs longer than max panel length split into equal courses. Angle trim covers the high edge + eave; rake (gable) trim covers the 2 side edges. Screws ≈ 0.75/ft².</div>
+    </div>
+  </div>
+
   <!-- SETTINGS -->
   <div class="qbs-tab-content" id="tab-settings" style="display:none">
     <div style="position:sticky; top:0; z-index:5; display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px; padding:10px 12px; background:var(--bg-2,#161616); border:1px solid var(--copper); border-radius:8px;">
@@ -3004,13 +3131,14 @@ function splitTrimRun(runFt, wasteFt) {
 // (Tuff Rib, no horizontal break); wallH = 0 → triangle-only pieces (products that
 // break at the eave line, like Metal B&B). panelW = coverage (3' TR, 1' B&B).
 // Example: 40W × 16' walls, 4/12, 3' panels → 2 each of 17'6, 18'6 … 23'6 per gable.
-function gableStepPanels(W, pitch, panelW, wallH) {
+function gableStepPanels(W, pitch, panelW, wallH, allowFt) {
   if (!(W > 0) || !(pitch > 0) || !(panelW > 0)) return { count: 0, totalLF: 0, sizes: [] };
+  const allow = (allowFt == null) ? 0.5 : allowFt;      // shop standard: 6" cut allowance
   const risePerPanel = panelW * pitch / 12;
   const perSide = Math.ceil((W / 2) / panelW);
   const sizes = []; let totalLF = 0;
   for (let k = 1; k <= perSide; k++) {
-    const len = (wallH || 0) + k * risePerPanel + 0.5;   // +6" cut allowance
+    const len = (wallH || 0) + k * risePerPanel + allow;
     sizes.push({ len, qtyPerGable: 2 });
     totalLF += 2 * len;
   }
@@ -3022,6 +3150,116 @@ function ftIn(len) {
   let inches = Math.round((len - ft) * 12);
   if (inches === 12) { ft += 1; inches = 0; }
   return inches > 0 ? `${ft}'${inches}"` : `${ft}'`;
+}
+
+// =============================================================
+// CALCULATORS TAB — standalone vCalc-style reference calculators.
+// Display-only: nothing here feeds the quote, materials list, or pricing.
+// =============================================================
+// Metal for Gable Roof (vCalc model): panels cut to slope + overhang, trim,
+// closures, snow guard, purlins, screws ≈ 0.75/ft².
+function grCalc() {
+  const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+  const L = n('gr_ridge_len'), S = n('gr_span'), P = n('gr_pitch');
+  const oH = n('gr_overhang') / 12, PW = n('gr_panel_w') / 12, purlinSp = (n('gr_purlin_sp') || 24) / 12;
+  const box = document.getElementById('gr_results');
+  if (!box) return;
+  if (L <= 0 || S <= 0 || P <= 0 || PW <= 0) { box.innerHTML = '<div class="qbs-note">Enter ridge length, span, pitch and panel width.</div>'; return; }
+  const p = P / 12, run = S / 2, rise = run * p;
+  const slope = Math.sqrt(run * run + rise * rise);
+  const panelLen = slope + oH * Math.sqrt(1 + p * p);   // overhang stretched along the slope
+  const perSide = Math.ceil(L / PW);
+  const panels = perSide * 2;
+  const area = 2 * L * panelLen;
+  const rowsPerSlope = Math.ceil(panelLen / purlinSp) + 1;   // row at eave and ridge
+  const purlinLF = rowsPerSlope * 2 * L;
+  const screws = Math.ceil(area * 0.75);
+  const angleDeg = Math.atan(p) * 180 / Math.PI;
+  const rows = [
+    ['Metal panels', `${panels} pcs @ ${ftIn(panelLen)} (${perSide}/side) — ${Math.ceil(panels * panelLen)} LF total`],
+    ['Roof area', `${Math.ceil(area)} ft²`],
+    ['Ridge cap', `${Math.ceil(L)} LF`],
+    ['Foam closure', `${Math.ceil(L * 4)} LF (2 ridge + 2 eave)`],
+    ['Gable (rake) trim', `${Math.ceil(panelLen * 4)} LF (4 rakes)`],
+    ['Angle trim (fascia)', `${Math.ceil(L * 2)} LF (both eaves)`],
+    ['Snow guard', `${Math.ceil(L * 2)} LF (2 × ridge)`],
+    ['Purlins @ ' + Math.round(purlinSp * 12) + '" OC', `${rowsPerSlope} rows/slope × 2 × ${Math.ceil(L)}' = ${Math.ceil(purlinLF)} LF`],
+    ['Metal screws', `${screws} screws (≈0.75/ft²)`],
+    ['Roof angle', `${angleDeg.toFixed(1)}°`],
+  ];
+  box.innerHTML = '<table style="width:100%; border-collapse:collapse;">' + rows.map(r =>
+    `<tr><td style="padding:5px 10px; border-bottom:1px solid var(--hairline); color:var(--text-2); white-space:nowrap;">${r[0]}</td>` +
+    `<td style="padding:5px 10px; border-bottom:1px solid var(--hairline); font-variant-numeric:tabular-nums;">${r[1]}</td></tr>`).join('') + '</table>';
+}
+
+// Metal Panels for Shed Roof (vCalc model): single-slope roof — panel run = span along
+// the pitch + front & back overhangs + margin of error; splits into equal courses when
+// the run exceeds the max panel length.
+function shCalc() {
+  const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+  const L = n('sh_ridge_len'), S = n('sh_span'), P = n('sh_pitch');
+  const oH = n('sh_overhang') / 12, moe = n('sh_moe') / 12;
+  const maxLen = n('sh_maxlen') || 24, PW = (n('sh_panel_w') || 36) / 12, purlinSp = (n('sh_purlin_sp') || 24) / 12;
+  const box = document.getElementById('sh_results');
+  if (!box) return;
+  if (L <= 0 || S <= 0 || PW <= 0) { box.innerHTML = '<div class="qbs-note">Enter ridge length, span and panel width.</div>'; return; }
+  const p = P / 12, slopeFactor = Math.sqrt(1 + p * p);
+  const runLen = S * slopeFactor + 2 * oH * slopeFactor + moe;   // slope + both overhangs + MoE
+  const courses = Math.max(1, Math.ceil(runLen / maxLen));
+  const courseLen = runLen / courses;
+  const perCourse = Math.ceil(L / PW);
+  const panels = perCourse * courses;
+  const area = L * (runLen - moe);
+  const rowsTotal = Math.ceil((runLen - moe) / purlinSp) + 1;
+  const purlinLF = rowsTotal * L;
+  const screws = Math.ceil(area * 0.75);
+  const angleDeg = Math.atan(p) * 180 / Math.PI;
+  const rows = [
+    ['Metal panels', courses === 1
+      ? `${panels} pcs @ ${ftIn(courseLen)} — ${Math.ceil(panels * courseLen)} LF total`
+      : `${panels} pcs @ ${ftIn(courseLen)} (${courses} courses of ${perCourse}) — ${Math.ceil(panels * courseLen)} LF total`],
+    ['Roof area', `${Math.ceil(area)} ft²`],
+    ['Angle trim (high edge + eave)', `${Math.ceil(L * 2)} LF`],
+    ['Rake (gable) trim', `${Math.ceil(runLen - moe) * 2} LF (2 side edges)`],
+    ['Snow guard', `${Math.ceil(L * 2)} LF (2 × ridge)`],
+    ['Purlins @ ' + Math.round(purlinSp * 12) + '" OC', `${rowsTotal} rows × ${Math.ceil(L)}' = ${Math.ceil(purlinLF)} LF`],
+    ['Metal screws', `${screws} screws (≈0.75/ft²)`],
+    ['Roof angle', `${angleDeg.toFixed(1)}°`],
+  ];
+  box.innerHTML = '<table style="width:100%; border-collapse:collapse;">' + rows.map(r =>
+    `<tr><td style="padding:5px 10px; border-bottom:1px solid var(--hairline); color:var(--text-2); white-space:nowrap;">${r[0]}</td>` +
+    `<td style="padding:5px 10px; border-bottom:1px solid var(--hairline); font-variant-numeric:tabular-nums;">${r[1]}</td></tr>`).join('') + '</table>';
+}
+
+// Metal Siding for Gable Ends (vCalc model): vertical panels floor-to-roofline on ONE
+// gable-end wall, each squared to the tall edge of its strip + cut allowance, left to right.
+function gsCalc() {
+  const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+  const H = n('gs_height'), P = n('gs_pitch'), S = n('gs_span');
+  const PW = n('gs_panel_w') / 12, allow = n('gs_allow') / 12;
+  const box = document.getElementById('gs_results');
+  if (!box) return;
+  if (H <= 0 || P <= 0 || S <= 0 || PW <= 0) { box.innerHTML = '<div class="qbs-note">Enter height, pitch, span and panel width.</div>'; return; }
+  const p = P / 12, half = S / 2;
+  // Shop convention (same as the main takeoff): panels stepped from BOTH corners toward
+  // the peak — 2 of each size per gable — rather than vCalc's strict left-to-right layout.
+  const s = gableStepPanels(S, P, PW, H, allow);
+  const nP = s.count;
+  const totalLF = s.totalLF;
+  const area = S * H + (S * half * p) / 2;   // rectangle + gable triangle
+  const screws = Math.ceil(area * 0.75);
+  const angleDeg = Math.atan(p) * 180 / Math.PI;
+  const rows = [
+    ['Number of panels', `${nP} panels (one gable end) — ${Math.ceil(totalLF)} LF total`],
+    ['Panel lengths', s.sizes.map(g => `${g.qtyPerGable} @ ${ftIn(g.len)}`).join(' · ')],
+    ['Wall area', `${Math.ceil(area)} ft²`],
+    ['Metal screws', `${screws} screws (75 per 100 ft²)`],
+    ['(α) Cut angle', `${angleDeg.toFixed(1)}° off square (the panel-top cut)`],
+    ['Both gable ends', `${nP * 2} panels — ${Math.ceil(totalLF * 2)} LF · ${Math.ceil(area * 2)} ft² · ${Math.ceil(area * 2 * 0.75)} screws`],
+  ];
+  box.innerHTML = '<table style="width:100%; border-collapse:collapse;">' + rows.map(r =>
+    `<tr><td style="padding:5px 10px; border-bottom:1px solid var(--hairline); color:var(--text-2); white-space:nowrap;">${r[0]}</td>` +
+    `<td style="padding:5px 10px; border-bottom:1px solid var(--hairline); font-variant-numeric:tabular-nums;">${r[1]}</td></tr>`).join('') + '</table>';
 }
 
 // Post cut-length description. Dry-set post plates on a slab → posts are cut to wall height.
@@ -5399,6 +5637,7 @@ function switchTab(name) {
   }
   if (name === 'flitch') { renderSkuMapping(); if (typeof renderPricingMasterTable === 'function') renderPricingMasterTable(); }
   if (name === 'settings') renderDefaultPrices();
+  if (name === 'calcs') { try { grCalc(); } catch(e) {} try { gsCalc(); } catch(e) {} try { shCalc(); } catch(e) {} }
   if (name === 'takeoff' && typeof takeoffInit === 'function') takeoffInit();
   if (name === 'subs') {
     try { renderFramingLaborGrid(); } catch(e) { console.error('framing grid', e); }
