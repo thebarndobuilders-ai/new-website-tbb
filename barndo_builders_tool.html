@@ -2169,6 +2169,13 @@
     <strong style="color: var(--copper);">⚡ Standalone shed quote mode active.</strong> Main building inputs (length, width, areas) are being skipped — only the side shed dimensions + labor are pricing. Disable on the <strong>Additions tab → Side shed</strong> card when done.
   </div>
 
+  <!-- Category bar — tabs are bunched into 4 groups; each group shows its own sub-tabs -->
+  <div id="qbs-tabgroups" style="display:flex; gap:8px; margin: 0 0 8px 0;">
+    <button data-group="build" class="active" onclick="setTabGroup('build', true)" style="padding: 8px 18px !important; font-weight:600;">🏗 Build</button>
+    <button data-group="quote" onclick="setTabGroup('quote', true)" style="padding: 8px 18px !important; font-weight:600;">💰 Quote</button>
+    <button data-group="sales" onclick="setTabGroup('sales', true)" style="padding: 8px 18px !important; font-weight:600;">📇 Sales</button>
+    <button data-group="setup" onclick="setTabGroup('setup', true)" style="padding: 8px 18px !important; font-weight:600;">⚙ Setup</button>
+  </div>
   <div class="qbs-tabs">
     <div class="qbs-tab" data-tab="leads" onclick="switchTab('leads')">Leads</div>
     <div class="qbs-tab active" data-tab="takeoff" onclick="switchTab('takeoff')">1. Takeoff</div>
@@ -2293,6 +2300,175 @@
           <div class="qbs-note">Only for Shop/Barn tier or as add-on</div>
         </div>
         <div class="qbs-field"><label>Interior wall LF</label><input type="number" id="int_wall_lf" value="0" oninput="recalc()" /><div class="qbs-note">Rough estimate: living × 0.09</div></div>
+      </div>
+    </div>
+    <div class="qbs-card">
+      <h3>Truss configuration <span class="badge">Multi-group · overrides roof math when used</span></h3>
+      <p class="qbs-sub" style="margin-bottom: 14px;">The first row seeds itself from the building dimensions (span = width, qty on AUTO from length ÷ spacing) so trusses are always figured. Rows override L×W roof math and drive roof area, ridge LF, gable area, metal LF, lath LF, and screw count. Type each row Common / Steel / Attic / Scissor / Mono as built.</p>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <div style="font-family: var(--font-headline); font-size: 16px; color: var(--text);">Truss groups</div>
+        <div style="display:flex; gap:8px;">
+          <button onclick="syncTrussGroupsToBuilding()" title="Re-copy span / pitch / overhang / spacing from the building dimensions into every row" style="padding: 6px 14px !important; font-size: 12px !important;">⟳ Sync to building</button>
+          <button onclick="addTrussGroup()" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add truss group</button>
+        </div>
+      </div>
+      <table class="openings-table" id="truss-table">
+        <thead><tr><th style="width: 40px;">#</th><th>Qty</th><th>Type</th><th>Span (ft)</th><th>Pitch (X/12)</th><th>Eave OH (in)</th><th>Spacing (in)</th><th>Label</th><th></th></tr></thead>
+        <tbody id="truss-tbody"></tbody>
+      </table>
+      <div id="truss-summary" style="margin-top: 14px; padding: 12px; background: var(--surface-2); border-radius: 6px; font-family: var(--font-mono); font-size: 11px; color: var(--text-2);">
+        Add a truss group above to see calculated totals.
+      </div>
+    </div>
+
+    <div class="qbs-card">
+      <h3>Openings <span class="badge">Enter sizes per row · header LF auto = width + 2 ft</span></h3>
+      <p class="qbs-sub" style="margin-bottom: 16px;">Add a row for each window, door, or garage door size group. Tool calculates header LF, opening area, and J channel automatically from the dimensions.</p>
+      
+      <!-- BULK IMPORT FROM SCHEDULE -->
+      <div style="margin-bottom: 16px;">
+        <button id="bulk-import-toggle" onclick="toggleBulkImport()" style="padding: 6px 12px !important; font-size: 12px !important; background: transparent; color: var(--text-2); border: 1px dashed var(--hairline);">
+          <span style="color: var(--copper);">+</span> Bulk import from schedule (optional)
+        </button>
+        <div id="bulk-import-panel" style="display: none; margin-top: 10px; padding: 12px 14px; background: var(--copper-soft); border: 1px solid rgba(251, 146, 60, 0.3); border-radius: 6px;">
+          <div class="qbs-note" style="margin-bottom: 10px;">Paste CSV-style text below (one opening per line). Screenshot your plan's schedule, paste it in chat, ask Claude to extract it in this format, paste here. For bids without blueprints, just use the manual entry tables below.</div>
+          <textarea id="bulk-import-text" placeholder="type, width_in, height_in, qty, style, label
+window, 36, 60, 9, DOUBLE HUNG, W03
+window, 72, 60, 3, MULLED UNIT, W04
+window, 48, 48, 1, FIXED GLASS, W06
+extdoor, 38, 83, 1, EXT HINGED SLAB, D05
+extdoor, 74, 83, 1, EXT DOUBLE HINGED DOOR, D07
+garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180px; font-family: var(--font-mono); font-size: 12px; padding: 10px; background: var(--bg-deep); border: 1px solid var(--hairline); border-radius: 4px; color: var(--text); resize: vertical;"></textarea>
+          <div style="display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap;">
+            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); cursor: pointer;">
+              <input type="checkbox" id="bulk-import-replace" style="width: 14px; height: 14px;">
+              <span>Replace existing openings (otherwise append)</span>
+            </label>
+            <div style="flex: 1;"></div>
+            <button onclick="parseBulkImport()" style="padding: 6px 14px !important; font-size: 12px !important;">Parse &amp; preview</button>
+            <button id="bulk-import-confirm" onclick="confirmBulkImport()" style="padding: 6px 14px !important; font-size: 12px !important; display: none; background: var(--copper); color: var(--bg-deep); border-color: var(--copper);">Confirm &amp; load</button>
+          </div>
+          <div id="bulk-import-preview" style="margin-top: 10px; font-family: var(--font-mono); font-size: 11px; color: var(--text-2); line-height: 1.6;"></div>
+        </div>
+      </div>
+      
+      <!-- WINDOWS TABLE -->
+      <div class="openings-section" style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <div style="font-family: var(--font-headline); font-size: 16px; color: var(--text);">Windows</div>
+          <button onclick="addOpeningRow('window')" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add window</button>
+        </div>
+        <table class="openings-table" id="windows-table">
+          <thead><tr><th>Qty</th><th>Width (ft)</th><th>Height (ft)</th><th>Label</th><th>Header LF</th><th></th></tr></thead>
+          <tbody id="windows-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- EXT DOORS TABLE -->
+      <div class="openings-section" style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <div style="font-family: var(--font-headline); font-size: 16px; color: var(--text);">Exterior doors</div>
+          <button onclick="addOpeningRow('extdoor')" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add ext door</button>
+        </div>
+        <table class="openings-table" id="extdoors-table">
+          <thead><tr><th>Qty</th><th>Size · Style</th><th>Cost $</th><th>Sell $</th><th>Label</th><th>Header LF</th><th></th></tr></thead>
+          <tbody id="extdoors-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- INTERIOR DOORS TABLE -->
+      <div class="openings-section" style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <div style="font-family: var(--font-headline); font-size: 16px; color: var(--text);">Interior doors</div>
+          <button onclick="addOpeningRow('intdoor')" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add interior door</button>
+        </div>
+        <table class="openings-table" id="intdoors-table">
+          <thead><tr><th>Qty</th><th>Size</th><th>Type</th><th>Label</th><th>Header LF</th><th></th></tr></thead>
+          <tbody id="intdoors-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- GARAGE DOORS TABLE -->
+      <div class="openings-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <div style="font-family: var(--font-headline); font-size: 16px; color: var(--text);">Garage / OH doors</div>
+          <button onclick="addOpeningRow('garage')" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add garage door</button>
+        </div>
+        <table class="openings-table" id="garage-table">
+          <thead><tr><th>Qty</th><th>Size · Style</th><th>Cost $</th><th>Sell $</th><th>Label</th><th>Header LF</th><th></th></tr></thead>
+          <tbody id="garage-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="qbs-card">
+      <h3>Product selections <span class="badge">Drives material & color dropdowns</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field">
+          <label>Roof system</label>
+          <select id="roof_system" onchange="onRoofSystemChange(); recalc()">
+            <option value="sheathed">Sheathed (1/2" Zip + metal/shingles)</option>
+            <option value="purlin">Purlin-only (2×4 lath, no sheathing) — metal only</option>
+            <option value="lath_2x6">2×6 roof lathing (post-frame) — cut to truss spacing, metal only</option>
+          </select>
+        </div>
+        <div class="qbs-field">
+          <label>Wall system</label>
+          <select id="wall_system" onchange="updateWallSystemUI(); recalc()">
+            <option value="auto">Auto — follow construction</option>
+            <option value="sheathed">Sheathed (7/16" Zip + skin)</option>
+            <option value="purlin">Lath / girt only — 2×6 lathing, no sheathing (metal)</option>
+          </select>
+        </div>
+        <div class="qbs-field">
+          <label>Pro Armor moisture wrap</label>
+          <select id="pro_armor_scope" onchange="recalc()">
+            <option value="roof">Roof only</option>
+            <option value="roof_walls">Roof + walls</option>
+            <option value="none">None (excluded)</option>
+          </select>
+          <div class="qbs-note">Where the Pro Armor / Therma-Guard wrap goes. "Roof + walls" adds the wall area to the roll count.</div>
+        </div>
+        <div class="qbs-field" id="wall-lathmember-field" style="display:none;">
+          <label>Wall lathing member</label>
+          <select id="lath_size" onchange="recalc()">
+            <option value="2x6">2×6 SYP girt</option>
+            <option value="1x4">1×4 lath / strapping</option>
+          </select>
+          <div class="qbs-note">2×6 girts, or lighter 1×4 strapping on stud-framed shops.</div>
+        </div>
+        <div class="qbs-field" id="wall-lathing-field" style="display:none;">
+          <label>Wall lathing / girt spacing (ft)</label>
+          <input type="number" id="girt_spacing" value="2" step="0.5" oninput="recalc()" />
+          <div class="qbs-note">2 ft = 24" OC. Lath/girt vertical spacing — works on stud-framed or post-frame.</div>
+        </div>
+        <div class="qbs-field">
+          <label>Roof product</label>
+          <select id="roof_product" onchange="onRoofProductChange(); recalc()">
+            <option value="tuffrib_29">Tuff Rib — 29 ga exposed fastener</option>
+            <option value="pbr_26">PBR Panel — 26 ga exposed fastener</option>
+            <option value="standing_seam_26">Standing Seam — 26 ga concealed fastener</option>
+            <option value="shingles">Architectural Shingles (sheathed only)</option>
+          </select>
+        </div>
+        <div class="qbs-field">
+          <label>Roof color</label>
+          <select id="roof_color"></select>
+        </div>
+        <div class="qbs-field">
+          <label>Siding product</label>
+          <select id="siding_product" onchange="onSidingProductChange(); recalc()">
+            <option value="tuffrib_29">Tuff Rib — 29 ga exposed fastener</option>
+            <option value="mbb_26">Metal Board & Batten — 26 ga (12" panels)</option>
+            <option value="lp_bb">LP SmartSide Board & Batten</option>
+            <option value="brick">Brick veneer (you supply, mason installs)</option>
+            <option value="stone">Stone veneer (you supply, mason installs)</option>
+          </select>
+        </div>
+        <div class="qbs-field">
+          <label>Siding color</label>
+          <select id="siding_color"></select>
+        </div>
       </div>
     </div>
 
@@ -2572,104 +2748,7 @@
     
     <!-- PORCH CONSTRUCTION moved to Additions tab — see "Porches / timber porches" card there -->
 
-    <div class="qbs-card">
-      <h3>Truss configuration <span class="badge">Multi-group · overrides roof math when used</span></h3>
-      <p class="qbs-sub" style="margin-bottom: 14px;">The first row seeds itself from the building dimensions (span = width, qty on AUTO from length ÷ spacing) so trusses are always figured. Rows override L×W roof math and drive roof area, ridge LF, gable area, metal LF, lath LF, and screw count. Type each row Common / Steel / Attic / Scissor / Mono as built.</p>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <div style="font-family: var(--font-headline); font-size: 16px; color: var(--text);">Truss groups</div>
-        <div style="display:flex; gap:8px;">
-          <button onclick="syncTrussGroupsToBuilding()" title="Re-copy span / pitch / overhang / spacing from the building dimensions into every row" style="padding: 6px 14px !important; font-size: 12px !important;">⟳ Sync to building</button>
-          <button onclick="addTrussGroup()" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add truss group</button>
-        </div>
-      </div>
-      <table class="openings-table" id="truss-table">
-        <thead><tr><th style="width: 40px;">#</th><th>Qty</th><th>Type</th><th>Span (ft)</th><th>Pitch (X/12)</th><th>Eave OH (in)</th><th>Spacing (in)</th><th>Label</th><th></th></tr></thead>
-        <tbody id="truss-tbody"></tbody>
-      </table>
-      <div id="truss-summary" style="margin-top: 14px; padding: 12px; background: var(--surface-2); border-radius: 6px; font-family: var(--font-mono); font-size: 11px; color: var(--text-2);">
-        Add a truss group above to see calculated totals.
-      </div>
-    </div>
 
-    <div class="qbs-card">
-      <h3>Openings <span class="badge">Enter sizes per row · header LF auto = width + 2 ft</span></h3>
-      <p class="qbs-sub" style="margin-bottom: 16px;">Add a row for each window, door, or garage door size group. Tool calculates header LF, opening area, and J channel automatically from the dimensions.</p>
-      
-      <!-- BULK IMPORT FROM SCHEDULE -->
-      <div style="margin-bottom: 16px;">
-        <button id="bulk-import-toggle" onclick="toggleBulkImport()" style="padding: 6px 12px !important; font-size: 12px !important; background: transparent; color: var(--text-2); border: 1px dashed var(--hairline);">
-          <span style="color: var(--copper);">+</span> Bulk import from schedule (optional)
-        </button>
-        <div id="bulk-import-panel" style="display: none; margin-top: 10px; padding: 12px 14px; background: var(--copper-soft); border: 1px solid rgba(251, 146, 60, 0.3); border-radius: 6px;">
-          <div class="qbs-note" style="margin-bottom: 10px;">Paste CSV-style text below (one opening per line). Screenshot your plan's schedule, paste it in chat, ask Claude to extract it in this format, paste here. For bids without blueprints, just use the manual entry tables below.</div>
-          <textarea id="bulk-import-text" placeholder="type, width_in, height_in, qty, style, label
-window, 36, 60, 9, DOUBLE HUNG, W03
-window, 72, 60, 3, MULLED UNIT, W04
-window, 48, 48, 1, FIXED GLASS, W06
-extdoor, 38, 83, 1, EXT HINGED SLAB, D05
-extdoor, 74, 83, 1, EXT DOUBLE HINGED DOOR, D07
-garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180px; font-family: var(--font-mono); font-size: 12px; padding: 10px; background: var(--bg-deep); border: 1px solid var(--hairline); border-radius: 4px; color: var(--text); resize: vertical;"></textarea>
-          <div style="display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap;">
-            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); cursor: pointer;">
-              <input type="checkbox" id="bulk-import-replace" style="width: 14px; height: 14px;">
-              <span>Replace existing openings (otherwise append)</span>
-            </label>
-            <div style="flex: 1;"></div>
-            <button onclick="parseBulkImport()" style="padding: 6px 14px !important; font-size: 12px !important;">Parse &amp; preview</button>
-            <button id="bulk-import-confirm" onclick="confirmBulkImport()" style="padding: 6px 14px !important; font-size: 12px !important; display: none; background: var(--copper); color: var(--bg-deep); border-color: var(--copper);">Confirm &amp; load</button>
-          </div>
-          <div id="bulk-import-preview" style="margin-top: 10px; font-family: var(--font-mono); font-size: 11px; color: var(--text-2); line-height: 1.6;"></div>
-        </div>
-      </div>
-      
-      <!-- WINDOWS TABLE -->
-      <div class="openings-section" style="margin-bottom: 24px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <div style="font-family: var(--font-headline); font-size: 16px; color: var(--text);">Windows</div>
-          <button onclick="addOpeningRow('window')" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add window</button>
-        </div>
-        <table class="openings-table" id="windows-table">
-          <thead><tr><th>Qty</th><th>Width (ft)</th><th>Height (ft)</th><th>Label</th><th>Header LF</th><th></th></tr></thead>
-          <tbody id="windows-tbody"></tbody>
-        </table>
-      </div>
-
-      <!-- EXT DOORS TABLE -->
-      <div class="openings-section" style="margin-bottom: 24px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <div style="font-family: var(--font-headline); font-size: 16px; color: var(--text);">Exterior doors</div>
-          <button onclick="addOpeningRow('extdoor')" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add ext door</button>
-        </div>
-        <table class="openings-table" id="extdoors-table">
-          <thead><tr><th>Qty</th><th>Size · Style</th><th>Cost $</th><th>Sell $</th><th>Label</th><th>Header LF</th><th></th></tr></thead>
-          <tbody id="extdoors-tbody"></tbody>
-        </table>
-      </div>
-
-      <!-- INTERIOR DOORS TABLE -->
-      <div class="openings-section" style="margin-bottom: 24px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <div style="font-family: var(--font-headline); font-size: 16px; color: var(--text);">Interior doors</div>
-          <button onclick="addOpeningRow('intdoor')" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add interior door</button>
-        </div>
-        <table class="openings-table" id="intdoors-table">
-          <thead><tr><th>Qty</th><th>Size</th><th>Type</th><th>Label</th><th>Header LF</th><th></th></tr></thead>
-          <tbody id="intdoors-tbody"></tbody>
-        </table>
-      </div>
-
-      <!-- GARAGE DOORS TABLE -->
-      <div class="openings-section">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <div style="font-family: var(--font-headline); font-size: 16px; color: var(--text);">Garage / OH doors</div>
-          <button onclick="addOpeningRow('garage')" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add garage door</button>
-        </div>
-        <table class="openings-table" id="garage-table">
-          <thead><tr><th>Qty</th><th>Size · Style</th><th>Cost $</th><th>Sell $</th><th>Label</th><th>Header LF</th><th></th></tr></thead>
-          <tbody id="garage-tbody"></tbody>
-        </table>
-      </div>
-    </div>
 
     <div class="qbs-card">
       <h3>Custom trim orders <span class="badge">Premium per-LF · auto +3" waste added to each order</span></h3>
@@ -2687,76 +2766,6 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
       </div>
     </div>
 
-    <div class="qbs-card">
-      <h3>Product selections <span class="badge">Drives material & color dropdowns</span></h3>
-      <div class="qbs-grid-2">
-        <div class="qbs-field">
-          <label>Roof system</label>
-          <select id="roof_system" onchange="onRoofSystemChange(); recalc()">
-            <option value="sheathed">Sheathed (1/2" Zip + metal/shingles)</option>
-            <option value="purlin">Purlin-only (2×4 lath, no sheathing) — metal only</option>
-            <option value="lath_2x6">2×6 roof lathing (post-frame) — cut to truss spacing, metal only</option>
-          </select>
-        </div>
-        <div class="qbs-field">
-          <label>Wall system</label>
-          <select id="wall_system" onchange="updateWallSystemUI(); recalc()">
-            <option value="auto">Auto — follow construction</option>
-            <option value="sheathed">Sheathed (7/16" Zip + skin)</option>
-            <option value="purlin">Lath / girt only — 2×6 lathing, no sheathing (metal)</option>
-          </select>
-        </div>
-        <div class="qbs-field">
-          <label>Pro Armor moisture wrap</label>
-          <select id="pro_armor_scope" onchange="recalc()">
-            <option value="roof">Roof only</option>
-            <option value="roof_walls">Roof + walls</option>
-            <option value="none">None (excluded)</option>
-          </select>
-          <div class="qbs-note">Where the Pro Armor / Therma-Guard wrap goes. "Roof + walls" adds the wall area to the roll count.</div>
-        </div>
-        <div class="qbs-field" id="wall-lathmember-field" style="display:none;">
-          <label>Wall lathing member</label>
-          <select id="lath_size" onchange="recalc()">
-            <option value="2x6">2×6 SYP girt</option>
-            <option value="1x4">1×4 lath / strapping</option>
-          </select>
-          <div class="qbs-note">2×6 girts, or lighter 1×4 strapping on stud-framed shops.</div>
-        </div>
-        <div class="qbs-field" id="wall-lathing-field" style="display:none;">
-          <label>Wall lathing / girt spacing (ft)</label>
-          <input type="number" id="girt_spacing" value="2" step="0.5" oninput="recalc()" />
-          <div class="qbs-note">2 ft = 24" OC. Lath/girt vertical spacing — works on stud-framed or post-frame.</div>
-        </div>
-        <div class="qbs-field">
-          <label>Roof product</label>
-          <select id="roof_product" onchange="onRoofProductChange(); recalc()">
-            <option value="tuffrib_29">Tuff Rib — 29 ga exposed fastener</option>
-            <option value="pbr_26">PBR Panel — 26 ga exposed fastener</option>
-            <option value="standing_seam_26">Standing Seam — 26 ga concealed fastener</option>
-            <option value="shingles">Architectural Shingles (sheathed only)</option>
-          </select>
-        </div>
-        <div class="qbs-field">
-          <label>Roof color</label>
-          <select id="roof_color"></select>
-        </div>
-        <div class="qbs-field">
-          <label>Siding product</label>
-          <select id="siding_product" onchange="onSidingProductChange(); recalc()">
-            <option value="tuffrib_29">Tuff Rib — 29 ga exposed fastener</option>
-            <option value="mbb_26">Metal Board & Batten — 26 ga (12" panels)</option>
-            <option value="lp_bb">LP SmartSide Board & Batten</option>
-            <option value="brick">Brick veneer (you supply, mason installs)</option>
-            <option value="stone">Stone veneer (you supply, mason installs)</option>
-          </select>
-        </div>
-        <div class="qbs-field">
-          <label>Siding color</label>
-          <select id="siding_color"></select>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- TAB 2: FOUNDATION -->
@@ -6857,7 +6866,37 @@ function printCounterTicket() {
   w.document.close();
 }
 
+// --- Tab grouping: 14 tabs bunched into 4 categories. Every tab keeps its id,
+// content, and behavior — the groups only control which sub-tabs are visible.
+const TAB_GROUPS = {
+  takeoff: 'build', inputs: 'build', foundation: 'build', audit3d: 'build',
+  materials: 'quote', subs: 'quote', quote: 'quote', proposal: 'quote',
+  leads: 'sales', counter: 'sales', saved: 'sales',
+  flitch: 'setup', calcs: 'setup', settings: 'setup',
+};
+const GROUP_DEFAULT_TAB = { build: 'takeoff', quote: 'materials', sales: 'leads', setup: 'flitch' };
+let _activeTabGroup = 'build';
+function setTabGroup(g, navigate) {
+  _activeTabGroup = g;
+  document.querySelectorAll('#qbs-tabgroups button').forEach(b => {
+    const on = b.dataset.group === g;
+    b.classList.toggle('active', on);
+    b.style.background = on ? 'var(--copper)' : '';
+    b.style.color = on ? 'var(--bg-deep)' : '';
+    b.style.borderColor = on ? 'var(--copper)' : '';
+  });
+  document.querySelectorAll('.qbs-tabs .qbs-tab').forEach(t => {
+    t.style.display = (TAB_GROUPS[t.dataset.tab] === g) ? '' : 'none';
+  });
+  if (navigate) switchTab(GROUP_DEFAULT_TAB[g]);
+}
+// Initial state: Build group open (matches the default active Takeoff tab)
+setTabGroup('build', false);
+
 function switchTab(name) {
+  // Keep the category bar in sync when a tab is opened programmatically
+  const g = TAB_GROUPS[name];
+  if (g && g !== _activeTabGroup) setTabGroup(g, false);
   document.querySelectorAll('.qbs-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.qbs-tab-content').forEach(c => c.style.display = 'none');
   document.getElementById('tab-' + name).style.display = 'block';
