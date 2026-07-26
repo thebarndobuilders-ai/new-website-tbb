@@ -2462,6 +2462,18 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           <label>Siding color</label>
           <select id="siding_color"></select>
         </div>
+        <div class="qbs-field">
+          <label>Wainscot</label>
+          <select id="wainscot_on" onchange="recalc()">
+            <option value="none">None</option>
+            <option value="36">36" wainscot — Z bar trim on top</option>
+          </select>
+          <div class="qbs-note">Standard 36" tall band around the walls. Upper wall panels shorten by 3'; Z bar caps the top.</div>
+        </div>
+        <div class="qbs-field">
+          <label>Wainscot color</label>
+          <select id="wainscot_color"></select>
+        </div>
       </div>
     </div>
 
@@ -2712,6 +2724,28 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         </div>
         <div id="shed-summary" style="margin-top: 14px; padding: 12px; background: var(--surface-2); border-radius: 6px; font-family: var(--font-mono); font-size: 11px; color: var(--text-2);">
           Calculating shed totals...
+        </div>
+      </div>
+    </div>
+
+    <div class="qbs-card">
+      <h3>Cupolas <span class="badge">Ridge accents · priced per unit on Pricing master</span></h3>
+      <div class="qbs-grid-3">
+        <div class="qbs-field">
+          <label>Cupola size</label>
+          <select id="cupola_size" onchange="recalc()">
+            <option value="none">None</option>
+            <option value="3">3' cupola</option>
+            <option value="4">4' cupola</option>
+            <option value="5">5' cupola</option>
+          </select>
+        </div>
+        <div class="qbs-field">
+          <label>Quantity</label>
+          <input type="number" id="cupola_qty" value="1" min="0" step="1" oninput="recalc()" />
+        </div>
+        <div class="qbs-field">
+          <div class="qbs-note" style="margin-top:22px;">Louvered cupola with metal roof cap, set on the ridge. Edit the three per-size prices on the Pricing master tab.</div>
         </div>
       </div>
     </div>
@@ -5247,8 +5281,17 @@ const MATERIALS = [
       if (i.sidingProduct !== 'tuffrib_29') return 0;
       // Eave-wall area = measured exterior wall LF minus the gable-end walls (those are
       // full-height stepped panels on the gable line), minus openings, ÷ 3' coverage.
+      // With wainscot: upper panels start at 36", and only the opening portion ABOVE
+      // the wainscot deducts here (the wainscot line handles the band).
       const eaveWallLF = Math.max(0, i.extWallLF - (i.W * (i.gableCountActual || 0)));
-      const rectArea = eaveWallLF * i.H - (i.area_windows + i.area_extdoors + i.area_garage);
+      const hEff = i.wainscotOn ? Math.max(0, i.H - 3) : i.H;
+      let deduct = i.area_windows + i.area_extdoors + i.area_garage;
+      if (i.wainscotOn) {
+        deduct = i.area_windows
+          + Math.max(0, i.area_extdoors - 3 * (i.doorWidthExt || 0))
+          + Math.max(0, i.area_garage - 3 * (i.doorWidthGar || 0));
+      }
+      const rectArea = eaveWallLF * hEff - deduct;
       return Math.ceil(Math.max(0, rectArea) / 3 * 1.05);
     }},
   { id: "tuffrib_29_gable_lf", label: "Tuff Rib 29 ga wall panel — gable ends, floor-to-peak (3' panels stepped to pitch)", cat: "Siding skin", uom: "LF", packSize: null,
@@ -5257,16 +5300,57 @@ const MATERIALS = [
       if (i.sidingProduct !== 'tuffrib_29') return 0;
       // Full-height gable-end panels: wall height + stepped rise + 6" allowance per panel,
       // 2 of each size per gable. The stepping IS the overage — no extra waste factor.
-      const s = gableStepPanels(i.W, i.pitch, 3, i.H);
+      // With wainscot the panels start at the top of the 36" band.
+      const baseH = i.wainscotOn ? Math.max(0, i.H - 3) : i.H;
+      const s = gableStepPanels(i.W, i.pitch, 3, baseH);
       return Math.ceil(s.totalLF * (i.gableCountActual || 0));
     }},
+  // Wainscot — 36" band around the walls in its own color, Z bar trim on top.
+  { id: "wainscot_panel_lf", label: "Wainscot 36\" — metal panels", cat: "Siding skin", uom: "LF", packSize: null,
+    priceCost: 2.58, priceSell: 3.65,
+    formula: i => {
+      if (!i.wainscotOn) return 0;
+      if (i.sidingProduct !== 'tuffrib_29' && i.sidingProduct !== 'mbb_26') return 0;
+      const cov = (i.sidingProduct === 'mbb_26') ? 1 : 3;
+      const pieces = Math.ceil(i.wainscotRunLF / cov);
+      return pieces * 3;   // every piece cut 3' tall
+    },
+    customUnitPrice: i => getPrice(i.sidingProduct === 'mbb_26' ? 'mbb_26_rect_lf' : 'tuffrib_29_wall_lf').cost,
+    labelFn: i => `Wainscot 36" — ${i.sidingProduct === 'mbb_26' ? 'Metal B&B' : 'Tuff Rib'} panels (${i.wainscotColor || 'color TBD'})`},
+  { id: "wainscot_z_trim_10", label: "Z bar trim — top of wainscot (10' sticks)", cat: "Metal wall trim", uom: "ea", packSize: null,
+    priceCost: 16, priceSell: 22,
+    formula: i => {
+      if (!i.wainscotOn) return 0;
+      if (i.sidingProduct !== 'tuffrib_29' && i.sidingProduct !== 'mbb_26') return 0;
+      return Math.ceil(i.wainscotRunLF * 1.05 / 10);
+    }},
+
+  // Cupolas — louvered w/ metal roof cap, priced per unit by size (edit on Pricing master).
+  { id: "cupola_3ft_ea", label: "Cupola 3' — louvered, metal cap", cat: "Roof skin", uom: "ea", packSize: null,
+    priceCost: 795, priceSell: 1050, priceRetail: 1300,
+    formula: i => (i.cupolaSize === '3') ? (i.cupolaQty || 0) : 0 },
+  { id: "cupola_4ft_ea", label: "Cupola 4' — louvered, metal cap", cat: "Roof skin", uom: "ea", packSize: null,
+    priceCost: 1195, priceSell: 1550, priceRetail: 1950,
+    formula: i => (i.cupolaSize === '4') ? (i.cupolaQty || 0) : 0 },
+  { id: "cupola_5ft_ea", label: "Cupola 5' — louvered, metal cap", cat: "Roof skin", uom: "ea", packSize: null,
+    priceCost: 1695, priceSell: 2200, priceRetail: 2750,
+    formula: i => (i.cupolaSize === '5') ? (i.cupolaQty || 0) : 0 },
+
   // Metal B&B: breaks at eave-to-gable line. Rectangular pieces below, separate gable triangle pieces above.
   { id: "mbb_26_rect_lf", label: "Metal B&B 26 ga panel — rectangular walls", cat: "Siding skin", uom: "LF", packSize: null,
     priceCost: 4.25, priceSell: 5.45,
     formula: i => {
       if (i.sidingProduct !== 'mbb_26') return 0;
-      // Perimeter ÷ 1 ft × wall height (12" coverage), minus openings
-      const rectArea = i.extWallLF * i.H - (i.area_windows + i.area_extdoors + i.area_garage);
+      // Perimeter ÷ 1 ft × wall height (12" coverage), minus openings.
+      // With wainscot: panels start at 36", opening deduction adjusted like Tuff Rib.
+      const hEffB = i.wainscotOn ? Math.max(0, i.H - 3) : i.H;
+      let deductB = i.area_windows + i.area_extdoors + i.area_garage;
+      if (i.wainscotOn) {
+        deductB = i.area_windows
+          + Math.max(0, i.area_extdoors - 3 * (i.doorWidthExt || 0))
+          + Math.max(0, i.area_garage - 3 * (i.doorWidthGar || 0));
+      }
+      const rectArea = i.extWallLF * hEffB - deductB;
       return Math.ceil(Math.max(0, rectArea) / 1 * 1.05);
     }},
   { id: "mbb_26_gable_lf", label: "Metal B&B 26 ga panel — gable triangles (12\" panels stepped to pitch)", cat: "Siding skin", uom: "LF", packSize: null,
@@ -6209,6 +6293,7 @@ function onRoofProductChange() {
 }
 function onSidingProductChange() {
   populateColors('siding_color', document.getElementById('siding_product').value);
+  populateColors('wainscot_color', document.getElementById('siding_product').value);
 }
 function onRoofSystemChange() {
   const sys = document.getElementById('roof_system').value;
@@ -9267,6 +9352,12 @@ function getInputs() {
   const wrap_extdoors = sumOpeningsWrap3('extdoor');
   const wrap_garage = sumOpeningsWrap3('garage');
   
+  // Wainscot: 36" band around the walls, interrupted by door/garage openings.
+  // Door width sums also adjust the upper-panel deduction (only the opening portion
+  // ABOVE the wainscot comes out of the upper panels).
+  const doorWidthExt = openingsState.extdoor.reduce((s, r) => s + (r.qty || 0) * (r.w || 0), 0);
+  const doorWidthGar = openingsState.garage.reduce((s, r) => s + (r.qty || 0) * (r.w || 0), 0);
+
   const wallGross = extWallLF * H;
   const openings = area_windows + area_extdoors + area_garage;
   const wallRectArea = Math.max(0, wallGross - openings);
@@ -9559,6 +9650,12 @@ function getInputs() {
     roofProduct: document.getElementById('roof_product').value,
     roofColor: document.getElementById('roof_color').value,
     sidingProduct: document.getElementById('siding_product').value,
+    wainscotOn: ((document.getElementById('wainscot_on') || {}).value === '36'),
+    wainscotColor: (document.getElementById('wainscot_color') || {}).value || '',
+    wainscotRunLF: Math.max(0, extWallLF - doorWidthExt - doorWidthGar),
+    doorWidthExt, doorWidthGar,
+    cupolaSize: (document.getElementById('cupola_size') || {}).value || 'none',
+    cupolaQty: (function(){ const el = document.getElementById('cupola_qty'); return el ? (parseFloat(el.value) || 0) : 0; })(),
     sidingColor: document.getElementById('siding_color').value,
     markupMaterial: num('markup_material'),
     markupSub: num('markup_sub'),
@@ -10443,6 +10540,16 @@ function materialDetailText(m, i) {
     return checkStr(uom) || checkStr(label);
   };
   
+  // Cupolas are each-priced units — no stick/LF detail
+  if (m.id === 'cupola_3ft_ea' || m.id === 'cupola_4ft_ea' || m.id === 'cupola_5ft_ea') return '';
+
+  // === WAINSCOT — piece count @ 3' tall ===
+  if (m.id === 'wainscot_panel_lf') {
+    const cov = (i.sidingProduct === 'mbb_26') ? 1 : 3;
+    const pieces = Math.ceil((i.wainscotRunLF || 0) / cov);
+    return `${pieces} pcs @ 3' tall (${cov * 12}" coverage each) · Z bar on top`;
+  }
+
   // === LF-PRICED LUMBER — always show piece count @ stock buy length ===
   if (LUMBER_STOCK_FT[m.id]) {
     const stock = LUMBER_STOCK_FT[m.id];
@@ -10486,11 +10593,11 @@ function materialDetailText(m, i) {
         : 0;
       return pieces > 0 ? `${pieces} pcs @ ${pieceLen.toFixed(1)}'` : '';
     }
-    // Wall panels — long sides: pieces are full wall height
+    // Wall panels — long sides: pieces are full wall height (less the wainscot band when on)
     if (m.id === 'tuffrib_29_wall_lf' || m.id === 'pbr_26_wall_lf' || m.id === 'ss_26_wall_lf') {
-      const pieceLen = i.H || 8;
+      const pieceLen = Math.max(1, (i.wainscotOn ? (i.H || 8) - 3 : (i.H || 8)));
       const pieces = Math.ceil(m.qty / pieceLen);
-      return `~${pieces} pcs @ ${pieceLen}'`;
+      return `~${pieces} pcs @ ${pieceLen}'${i.wainscotOn ? ' (above wainscot)' : ''}`;
     }
     // Wall panels — gable ends: stepped panel sizes listed out, e.g. "4 @ 17'6″ · 4 @ 18'6″ …"
     // (qty per size = 2 per gable × gable count). TR = full height; MBB = triangle only.
@@ -11481,6 +11588,9 @@ async function loadProject(key) {
     if (i.roofSystem) document.getElementById('roof_system').value = i.roofSystem;
     if (i.wallSystem) { const ws = document.getElementById('wall_system'); if (ws) ws.value = i.wallSystem; }
     if (i.proArmorScope) { const pa = document.getElementById('pro_armor_scope'); if (pa) pa.value = i.proArmorScope; }
+    { const wo = document.getElementById('wainscot_on'); if (wo) wo.value = i.wainscotOn ? '36' : 'none'; }
+    if (i.cupolaSize) { const cs = document.getElementById('cupola_size'); if (cs) cs.value = i.cupolaSize; }
+    if (i.cupolaQty != null) { const cq = document.getElementById('cupola_qty'); if (cq) cq.value = i.cupolaQty; }
     if (i.postFoundation) { const pf = document.getElementById('post_foundation'); if (pf) pf.value = i.postFoundation; }
     if (typeof onPostFoundationChange === 'function') onPostFoundationChange();
     if (i.lathSize) { const ls = document.getElementById('lath_size'); if (ls) ls.value = i.lathSize; }
@@ -11491,6 +11601,7 @@ async function loadProject(key) {
     onSidingProductChange();
     document.getElementById('roof_color').value = i.roofColor;
     document.getElementById('siding_color').value = i.sidingColor;
+    if (i.wainscotColor) { const wcEl = document.getElementById('wainscot_color'); if (wcEl) wcEl.value = i.wainscotColor; }
     setTier(p.tier);
     switchTab('inputs');
   } catch(e) { alert('Load failed'); }
@@ -13641,7 +13752,13 @@ function bb3dMetalHex(name, fallback) {
 function bb3dSelectedColors() {
   const rc = (document.getElementById('roof_color') || {}).value || '';
   const sc = (document.getElementById('siding_color') || {}).value || '';
-  return { roof: bb3dMetalHex(rc, 0x1a1a1a), siding: bb3dMetalHex(sc, 0xeae6dc) };
+  const wc = (document.getElementById('wainscot_color') || {}).value || '';
+  return {
+    roof: bb3dMetalHex(rc, 0x1a1a1a),
+    siding: bb3dMetalHex(sc, 0xeae6dc),
+    wainscot: bb3dMetalHex(wc, 0x4a3f33),
+    wainscotOn: ((document.getElementById('wainscot_on') || {}).value === '36'),
+  };
 }
 
 // Shade a hex color by factor f (>1 lighter, <1 darker) → css string
@@ -13823,26 +13940,92 @@ function init3D() {
   const H = canvasWrap.clientHeight || 600;
   
   scene = new THREE.Scene();
-  // Bright daylight sky — vertical gradient (blue at top → near-white at horizon),
-  // matching the SmartBuild outdoor studio look.
+  // Countryside backdrop — painted like a meadow photo: cloudy blue sky, hazy blue
+  // mountain ridges, a dark treeline, and wildflower meadow below the horizon.
   (function buildSky() {
     const c = document.createElement('canvas');
-    c.width = 16; c.height = 256;
+    c.width = 1024; c.height = 512;
     const g = c.getContext('2d');
-    const grad = g.createLinearGradient(0, 0, 0, 256);
-    grad.addColorStop(0.0, '#7ba7d4');   // upper sky
-    grad.addColorStop(0.45, '#a9c6e3');
-    grad.addColorStop(0.78, '#d8e6f0');
-    grad.addColorStop(1.0, '#eef4f8');   // horizon haze
-    g.fillStyle = grad;
-    g.fillRect(0, 0, 16, 256);
+    const HZN = 0.46 * 512;   // horizon line — high enough that the mountain ridges
+                              // and treeline peek above the 3D ground plane in normal views
+
+    // Sky gradient
+    const sky = g.createLinearGradient(0, 0, 0, HZN);
+    sky.addColorStop(0.0, '#6f9bd0');
+    sky.addColorStop(0.55, '#a9c6e3');
+    sky.addColorStop(1.0, '#dfe9f2');
+    g.fillStyle = sky;
+    g.fillRect(0, 0, 1024, HZN + 2);
+
+    // Puffy clouds — layered soft blobs, bigger/lower ones get gray undersides
+    const cloud = (cx, cy, r, a) => {
+      for (let b = 0; b < 5; b++) {
+        const bx = cx + (b - 2) * r * 0.55, by = cy + (b % 2 ? r * 0.12 : -r * 0.1);
+        const rr = r * (0.55 + 0.5 * Math.abs(2 - b) * 0.35);
+        const rg = g.createRadialGradient(bx, by, rr * 0.15, bx, by, rr);
+        rg.addColorStop(0, `rgba(255,255,255,${a})`);
+        rg.addColorStop(0.7, `rgba(248,250,252,${a * 0.6})`);
+        rg.addColorStop(1, 'rgba(248,250,252,0)');
+        g.fillStyle = rg;
+        g.beginPath(); g.arc(bx, by, rr, 0, Math.PI * 2); g.fill();
+        const ug = g.createRadialGradient(bx, by + rr * 0.4, rr * 0.1, bx, by + rr * 0.4, rr * 0.8);
+        ug.addColorStop(0, `rgba(175,188,200,${a * 0.30})`);
+        ug.addColorStop(1, 'rgba(175,188,200,0)');
+        g.fillStyle = ug;
+        g.beginPath(); g.arc(bx, by + rr * 0.4, rr * 0.8, 0, Math.PI * 2); g.fill();
+      }
+    };
+    cloud(140, 60, 46, 0.95); cloud(430, 45, 38, 0.9); cloud(720, 70, 52, 0.95);
+    cloud(940, 40, 34, 0.85); cloud(280, 140, 42, 0.8); cloud(600, 155, 48, 0.85);
+    cloud(870, 170, 36, 0.75); cloud(60, 190, 30, 0.7); cloud(520, 230, 40, 0.6);
+
+    // Mountain ridges — far hazy layer then nearer blue layer
+    const ridge = (baseY, amp, color, seed) => {
+      g.fillStyle = color;
+      g.beginPath();
+      g.moveTo(0, baseY);
+      for (let x = 0; x <= 1024; x += 16) {
+        const y = baseY - amp * (0.55 + 0.45 * Math.sin(seed + x / 90)) * (0.6 + 0.4 * Math.sin(seed * 2 + x / 37));
+        g.lineTo(x, y);
+      }
+      g.lineTo(1024, HZN + 40); g.lineTo(0, HZN + 40); g.closePath(); g.fill();
+    };
+    ridge(HZN - 10, 46, '#8b9cb8', 1.7);   // far ridge (hazy)
+    ridge(HZN - 2, 30, '#63769b', 4.2);    // near ridge (bluer)
+
+    // Treeline — dark green bumpy strip at the horizon
+    g.fillStyle = '#2e4a2c';
+    g.beginPath();
+    g.moveTo(0, HZN + 16);
+    for (let x = 0; x <= 1024; x += 8) {
+      g.lineTo(x, HZN + 4 - 7 * Math.abs(Math.sin(x / 23 + 2)) - 4 * Math.abs(Math.sin(x / 7)));
+    }
+    g.lineTo(1024, HZN + 18); g.closePath(); g.fill();
+
+    // Meadow below the horizon — green gradient + wildflower speckles
+    const meadow = g.createLinearGradient(0, HZN + 10, 0, 512);
+    meadow.addColorStop(0, '#88ab5d');
+    meadow.addColorStop(0.5, '#7fa854');
+    meadow.addColorStop(1, '#6d9a49');
+    g.fillStyle = meadow;
+    g.fillRect(0, HZN + 14, 1024, 512 - HZN - 14);
+    for (let i = 0; i < 900; i++) {
+      const fy = HZN + 22 + Math.pow(Math.random(), 0.6) * (512 - HZN - 24);
+      const fx = Math.random() * 1024;
+      const s = 0.6 + ((fy - HZN) / (512 - HZN)) * 2.2;
+      const r = Math.random();
+      g.fillStyle = r < 0.45 ? 'rgba(246,246,238,0.85)' : r < 0.75 ? 'rgba(240,214,90,0.9)' : 'rgba(96,128,60,0.9)';
+      g.fillRect(fx, fy, s, s);
+    }
+
     const tex = new THREE.CanvasTexture(c);
     tex.magFilter = THREE.LinearFilter;
     tex.minFilter = THREE.LinearFilter;
+    if (THREE.sRGBEncoding !== undefined) tex.encoding = THREE.sRGBEncoding;
     scene.background = tex;
   })();
-  // Light atmospheric haze near the horizon (matches sky), pushed far so it never darkens the model.
-  scene.fog = new THREE.Fog(0xdfeaf2, 220, 460);
+  // Soft green-tinted haze so the far ground blends into the meadow backdrop.
+  scene.fog = new THREE.Fog(0xd3e0c4, 220, 460);
   
   camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 500);
   camera.position.set(60, 35, 60);
@@ -13911,20 +14094,27 @@ function init3D() {
   fill.position.set(35, 28, -30);
   scene.add(fill);
   
-  // Ground plane — green grass with subtle mottling so it doesn't read as flat felt.
+  // Ground plane — wildflower meadow: mottled grass with scattered white/yellow blooms.
   (function buildGround() {
     const gc = document.createElement('canvas');
-    gc.width = 128; gc.height = 128;
+    gc.width = 256; gc.height = 256;
     const gx = gc.getContext('2d');
-    gx.fillStyle = '#6f8f4e';
-    gx.fillRect(0, 0, 128, 128);
-    for (let i = 0; i < 1600; i++) {
+    gx.fillStyle = '#79a24e';
+    gx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 5200; i++) {
       const shade = Math.random();
       gx.fillStyle = shade > 0.5
-        ? 'rgba(120,150,80,0.35)'
-        : 'rgba(85,112,58,0.35)';
-      const x = Math.random() * 128, y = Math.random() * 128;
+        ? 'rgba(136,170,88,0.35)'
+        : 'rgba(92,124,60,0.35)';
+      const x = Math.random() * 256, y = Math.random() * 256;
       gx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+    }
+    // Wildflowers — small white and yellow blooms like the photo
+    for (let i = 0; i < 130; i++) {
+      const r = Math.random();
+      gx.fillStyle = r < 0.55 ? 'rgba(248,248,240,0.9)' : 'rgba(242,214,80,0.95)';
+      const x = Math.random() * 256, y = Math.random() * 256;
+      gx.fillRect(x, y, 1.6, 1.6);
     }
     const gtex = new THREE.CanvasTexture(gc);
     gtex.wrapS = gtex.wrapT = THREE.RepeatWrapping;
@@ -14162,6 +14352,82 @@ function generateModel() {
     const m = makeSiding(side);
     buildingGroup.add(m); allMeshes.push(m);
   });
+
+  // === WAINSCOT — 36" band in its own color + Z bar line on top ===
+  (function buildWainscot() {
+    const cw = bb3dSelectedColors();
+    if (!cw.wainscotOn) return;
+    const bandH = 3, zH = 0.07;
+    ['front', 'back', 'left', 'right'].forEach(side => {
+      if (openWalls[side]) return;
+      const wallWidth = (side === 'front' || side === 'back') ? L : (W - 2 * sheathThick);
+      const tex = makeTuffRibTexture(false, cw.wainscot);
+      tex.repeat.set(wallWidth / 3, 1);
+      const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: tex, roughness: 0.38, metalness: 0.45 });
+      const zMat = new THREE.MeshStandardMaterial({ color: 0x111114, roughness: 0.45, metalness: 0.5 });
+      let band, zbar;
+      if (side === 'front' || side === 'back') {
+        band = new THREE.Mesh(new THREE.BoxGeometry(L, bandH, sidingThick + 0.03), mat);
+        band.position.set(0, wallBase + bandH / 2, (side === 'front' ? 1 : -1) * (W / 2 + sheathThick + sidingThick / 2));
+        zbar = new THREE.Mesh(new THREE.BoxGeometry(L, zH, sidingThick + 0.05), zMat);
+        zbar.position.set(0, wallBase + bandH + zH / 2, band.position.z);
+      } else {
+        band = new THREE.Mesh(new THREE.BoxGeometry(sidingThick + 0.03, bandH, W - 2 * sheathThick), mat);
+        band.position.set((side === 'left' ? -1 : 1) * (L / 2 + sheathThick + sidingThick / 2), wallBase + bandH / 2, 0);
+        zbar = new THREE.Mesh(new THREE.BoxGeometry(sidingThick + 0.05, zH, W - 2 * sheathThick), zMat);
+        zbar.position.set(band.position.x, wallBase + bandH + zH / 2, 0);
+      }
+      [band, zbar].forEach(msh => {
+        msh.castShadow = msh.receiveShadow = true;
+        msh.userData = { categoryKey: 'siding', label: 'Wainscot — ' + side };
+        buildingGroup.add(msh); allMeshes.push(msh);
+      });
+    });
+  })();
+
+  // === CUPOLAS — square base, louvered mid, copper pyramid cap + finial (photo look) ===
+  (function buildCupolas() {
+    const sizeSel = document.getElementById('cupola_size');
+    const qtyEl = document.getElementById('cupola_qty');
+    const sz = sizeSel ? parseFloat(sizeSel.value) : NaN;
+    const qty = qtyEl ? (parseInt(qtyEl.value, 10) || 0) : 0;
+    if (!sz || isNaN(sz) || qty <= 0) return;
+    const ridgeY = wallBase + H + rise;
+    const ud2 = { categoryKey: 'roof_skin', label: `Cupola ${sz}'` };
+    for (let n = 0; n < qty; n++) {
+      const grpC = new THREE.Group();
+      const cx = (qty === 1) ? 0 : (-L / 2 + (n + 1) * (L / (qty + 1)));
+      const s = sz;                                     // footprint (ft)
+      const add = m => { m.castShadow = m.receiveShadow = true; m.userData = ud2; grpC.add(m); allMeshes.push(m); };
+      // base box (tan like the photo)
+      const base = new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.5, s),
+        new THREE.MeshStandardMaterial({ color: 0x8a5730, roughness: 0.75 }));
+      base.position.set(0, s * 0.25, 0); add(base);
+      // louvered mid-section — slightly inset, darker slat texture feel
+      const mid = new THREE.Mesh(new THREE.BoxGeometry(s * 0.86, s * 0.45, s * 0.86),
+        new THREE.MeshStandardMaterial({ color: 0x74471f, roughness: 0.85 }));
+      mid.position.set(0, s * 0.5 + s * 0.225, 0); add(mid);
+      for (let sl = 0; sl < 4; sl++) {   // louver slat lines
+        const slat = new THREE.Mesh(new THREE.BoxGeometry(s * 0.87, 0.02 * s + 0.02, s * 0.87),
+          new THREE.MeshStandardMaterial({ color: 0x4e2f15, roughness: 0.9 }));
+        slat.position.set(0, s * 0.5 + s * 0.09 * (sl + 1), 0); add(slat);
+      }
+      // copper pyramid roof
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(s * 0.78, s * 0.5, 4),
+        new THREE.MeshStandardMaterial({ color: 0xa85a1e, roughness: 0.22, metalness: 0.9 }));
+      cone.rotation.y = Math.PI / 4;
+      cone.position.set(0, s * 0.95 + s * 0.25, 0); add(cone);
+      // finial: ball + spike
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(s * 0.06, 10, 10),
+        new THREE.MeshStandardMaterial({ color: 0xa85a1e, roughness: 0.22, metalness: 0.9 }));
+      ball.position.set(0, s * 1.24, 0); add(ball);
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(s * 0.035, s * 0.3, 8),
+        new THREE.MeshStandardMaterial({ color: 0xa85a1e, roughness: 0.22, metalness: 0.9 }));
+      spike.position.set(0, s * 1.42, 0); add(spike);
+      grpC.position.set(cx, ridgeY - 0.15, 0);
+      buildingGroup.add(grpC);
+    }
+  })();
   
   // === GABLE TRIANGLES (on short sides for gable roof) ===
   if (roofShape === 'gable' || roofShape === 'gambrel') {
@@ -14598,45 +14864,113 @@ function buildOpeningInstance(dims, wallBase, type, wall, posFrac, sill, w, h, m
 
   // Face
   if (type === 'window') {
-    const glass = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.86, h * 0.86),
-      new THREE.MeshStandardMaterial({ color: 0x26323c, roughness: 0.08, metalness: 0.6, side: THREE.DoubleSide }));
+    // BLACK SINGLE-HUNG — heavy black frame, bright glass, one meeting rail across
+    // the middle, lower sash framed slightly heavier (matches the reference photo).
+    const wMat = () => new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 0.45, metalness: 0.4 });
+    const gw = w * 0.88, gh = h * 0.88;
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(gw, gh),
+      new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.06, metalness: 0.35,
+        transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
     glass.position.set(0, 0, 0.15);
     glass.userData = ud('Window glass');
     grp.add(glass); allMeshes.push(glass);
-    // mullion cross
-    const mMat = () => new THREE.MeshStandardMaterial({ color: 0x101014, roughness: 0.5 });
-    const vbar = new THREE.Mesh(new THREE.BoxGeometry(0.06, h * 0.86, 0.04), mMat());
-    vbar.position.set(0, 0, 0.17); grp.add(vbar); allMeshes.push(vbar);
-    const hbar = new THREE.Mesh(new THREE.BoxGeometry(w * 0.86, 0.06, 0.04), mMat());
-    hbar.position.set(0, 0, 0.17); grp.add(hbar); allMeshes.push(hbar);
+    const wf = 0.12;   // black frame width (ft)
+    const wbar = (bw, bh, x, y) => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.05), wMat());
+      b.position.set(x, y, 0.17);
+      b.userData = ud('Window frame');
+      grp.add(b); allMeshes.push(b);
+    };
+    // outer black frame
+    wbar(gw, wf, 0, gh / 2 - wf / 2);
+    wbar(gw, wf, 0, -gh / 2 + wf / 2);
+    wbar(wf, gh, -gw / 2 + wf / 2, 0);
+    wbar(wf, gh, gw / 2 - wf / 2, 0);
+    // meeting rail — single-hung split
+    wbar(gw, wf * 1.2, 0, 0);
+    // lower sash side frames read a touch heavier (inset operating sash)
+    wbar(wf * 0.7, gh / 2, -gw / 2 + wf + wf * 0.35, -gh / 4);
+    wbar(wf * 0.7, gh / 2, gw / 2 - wf - wf * 0.35, -gh / 4);
   } else if (type === 'garage') {
-    const tex = makeTuffRibTexture(true);
-    tex.repeat.set(1, 4); tex.rotation = Math.PI / 2; tex.center.set(0.5, 0.5);
-    const panel = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.94, h * 0.94),
-      new THREE.MeshStandardMaterial({ color: 0xd2d2cf, roughness: 0.5, metalness: 0.25, side: THREE.DoubleSide }));
-    panel.position.set(0, 0, 0.14);
-    panel.userData = ud('Garage door'); grp.add(panel); allMeshes.push(panel);
-    // horizontal section seams
+    // FULL-VIEW GLASS DOOR — black aluminum frame grid with big glass lites
+    // (reflects the scene's sky environment like real glass).
+    const dw = w * 0.94, dh = h * 0.94;
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(dw, dh),
+      new THREE.MeshStandardMaterial({
+        color: 0x2a3a44, roughness: 0.04, metalness: 1.0,
+        transparent: true, opacity: 0.55, side: THREE.DoubleSide,
+      }));
+    glass.position.set(0, 0, 0.14);
+    glass.userData = ud('Garage door (full-view glass)'); grp.add(glass); allMeshes.push(glass);
+
+    const alu = () => new THREE.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 0.45, metalness: 0.6 });
+    const barD = 0.05;                                  // frame depth
+    const frame = (bw, bh, x, y) => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, barD), alu());
+      b.position.set(x, y, 0.16);
+      b.userData = ud('Garage door (full-view glass)');
+      grp.add(b); allMeshes.push(b);
+    };
+    const railT = 0.18;                                 // rail/stile thickness (ft)
+    // outer frame
+    frame(dw, railT, 0, dh / 2 - railT / 2);
+    frame(dw, railT, 0, -dh / 2 + railT / 2);
+    frame(railT, dh, -dw / 2 + railT / 2, 0);
+    frame(railT, dh, dw / 2 - railT / 2, 0);
+    // horizontal rails — one per section joint (~2' sections like a real door)
     const sections = Math.max(3, Math.round(h / 2));
     for (let s = 1; s < sections; s++) {
-      const seam = new THREE.Mesh(new THREE.BoxGeometry(w * 0.94, 0.05, 0.03),
-        new THREE.MeshStandardMaterial({ color: 0x9a9a96, roughness: 0.6 }));
-      seam.position.set(0, -h * 0.47 + (s / sections) * h * 0.94, 0.16);
-      grp.add(seam); allMeshes.push(seam);
+      frame(dw, railT * 0.7, 0, -dh / 2 + (s / sections) * dh);
+    }
+    // vertical mullions — lites ~5' wide (a 10' door gets 2 columns like the photo)
+    const cols = Math.max(1, Math.round(w / 5));
+    for (let cIdx = 1; cIdx < cols; cIdx++) {
+      frame(railT * 0.7, dh, -dw / 2 + (cIdx / cols) * dw, 0);
     }
   } else {
-    const panel = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.92, h * 0.94),
-      new THREE.MeshStandardMaterial({ color: 0xe9e9e6, roughness: 0.6, side: THREE.DoubleSide }));
-    panel.position.set(0, 0, 0.14);
-    panel.userData = ud('Man door'); grp.add(panel); allMeshes.push(panel);
-    // top lite
-    const lite = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.5, h * 0.22),
-      new THREE.MeshStandardMaterial({ color: 0x26323c, roughness: 0.1, metalness: 0.5, side: THREE.DoubleSide }));
-    lite.position.set(0, h * 0.28, 0.16); grp.add(lite); allMeshes.push(lite);
-    // knob
-    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8),
-      new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.7, roughness: 0.3 }));
-    knob.position.set(w * 0.36, -h * 0.05, 0.18); grp.add(knob); allMeshes.push(knob);
+    // CRAFTSMAN MAN DOOR — white slab, 6-lite (3×2) glass grid up top, two tall
+    // recessed panels below, handle + deadbolt on the latch side (reference photo).
+    const dw = w * 0.92, dh = h * 0.94;
+    const slab = new THREE.Mesh(new THREE.PlaneGeometry(dw, dh),
+      new THREE.MeshStandardMaterial({ color: 0xebebe7, roughness: 0.55, side: THREE.DoubleSide }));
+    slab.position.set(0, 0, 0.14);
+    slab.userData = ud('Man door'); grp.add(slab); allMeshes.push(slab);
+    const dAdd = (mesh, lbl) => { mesh.userData = ud(lbl || 'Man door'); grp.add(mesh); allMeshes.push(mesh); };
+    // 6-lite glass block: top ~30% of the slab
+    const liteW = dw * 0.72, liteH = dh * 0.26, liteY = dh * 0.28;
+    const dGlass = new THREE.Mesh(new THREE.PlaneGeometry(liteW, liteH),
+      new THREE.MeshStandardMaterial({ color: 0xf3f6f8, roughness: 0.06, metalness: 0.3,
+        transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
+    dGlass.position.set(0, liteY, 0.155);
+    dAdd(dGlass, 'Man door glass');
+    // white muntin grid — 3 cols × 2 rows
+    const mnt = () => new THREE.MeshStandardMaterial({ color: 0xdededa, roughness: 0.5 });
+    const mBar = (bw, bh, x, y) => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.03), mnt());
+      b.position.set(x, y, 0.165); dAdd(b);
+    };
+    mBar(liteW, 0.06, 0, liteY + liteH / 2); mBar(liteW, 0.06, 0, liteY - liteH / 2);
+    mBar(liteW, 0.045, 0, liteY);                                     // row split
+    mBar(0.06, liteH, -liteW / 2, liteY); mBar(0.06, liteH, liteW / 2, liteY);
+    mBar(0.045, liteH, -liteW / 6, liteY); mBar(0.045, liteH, liteW / 6, liteY);  // col splits
+    // two tall recessed panels below
+    [-1, 1].forEach(sx => {
+      const pnl = new THREE.Mesh(new THREE.PlaneGeometry(dw * 0.30, dh * 0.52),
+        new THREE.MeshStandardMaterial({ color: 0xdfdfd9, roughness: 0.6, side: THREE.DoubleSide }));
+      pnl.position.set(sx * dw * 0.19, -dh * 0.13, 0.155);
+      dAdd(pnl);
+      const shadow = new THREE.Mesh(new THREE.PlaneGeometry(dw * 0.30, 0.035),
+        new THREE.MeshStandardMaterial({ color: 0xbdbdb6, roughness: 0.7 }));
+      shadow.position.set(sx * dw * 0.19, -dh * 0.13 + dh * 0.26, 0.158);
+      dAdd(shadow);
+    });
+    // handle + deadbolt, latch side
+    const hw = () => new THREE.MeshStandardMaterial({ color: 0x3a3a3e, metalness: 0.8, roughness: 0.25 });
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), hw());
+    knob.position.set(-dw * 0.40, -dh * 0.04, 0.18); dAdd(knob);
+    const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.02, 8), hw());
+    bolt.rotation.x = Math.PI / 2;
+    bolt.position.set(-dw * 0.40, dh * 0.035, 0.18); dAdd(bolt);
   }
 
   // Trim frame (4 sides) — copper-highlighted when selected
