@@ -17,7 +17,7 @@ A single, self-contained HTML app — **The Barndo Builders** post-frame / barnd
 ## 3. How to run / view it
 - **Simplest:** double-click → opens in Edge/Chrome. (If nothing happens, right-click → Open with → Edge → check "always".)
 - **Saved dev server:** `.claude/launch.json` has a config named **`barndo-tool`** (PowerShell static server → port 8770). It runs `C:\Users\stone\Downloads\serve-barndo.ps1`, which now points at **v127**. Claude can launch it with preview_start and view at `localhost:8770`.
-- Needs internet the **first time** for Three.js + fonts (3D viewer, cloud sync). The quoting/takeoff math works offline.
+- Three.js is now **bundled inline** (like pdf.js) — the 3D viewer works fully offline. Internet is only needed for web fonts and Supabase cloud sync.
 
 ## 4. ⚠️ Critical warnings
 - **VERSION DRIFT:** Work has been lost twice by editing across two different chats (v105→v115, then v117→v123 silently re-broke fixes). **Always start the next session from v127.** If you go back to any old chat, upload v127 there FIRST.
