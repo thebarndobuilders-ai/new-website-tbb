@@ -7340,6 +7340,29 @@ function schedNewBuildFromQuote() {
   if (!nm) { alert('No client/project on the current quote yet — use "+ New build" and type a name.'); return; }
   schedNewBuild(nm);
 }
+// Old phase labels → their closest phase in the current template, so an
+// upgraded build keeps contractor/status/notes wherever they carry over.
+const SCHED_LABEL_MIGRATE = {
+  'posts / framing': 'Framing', 'drywall & finish': 'Drywall',
+  'electrical': 'Electrical rough-in', 'plumbing': 'Plumbing rough-in',
+  'hvac': 'HVAC rough-in',
+};
+function schedApplyTemplate(id) {
+  const b = schedBuilds.find(x => x.id === id); if (!b) return;
+  if (!confirm('Replace the phase list on "' + b.name + '" with the latest ' + SCHED_PHASES_DEFAULT.length + '-phase template?\n\nContractor, status, and notes carry over on phases with matching names; phases that only exist in the old list are dropped. Dates re-cascade from the build start.')) return;
+  const old = {};
+  b.phases.forEach(p => {
+    const key = (SCHED_LABEL_MIGRATE[(p.label || '').toLowerCase()] || p.label || '').toLowerCase();
+    if (key && !old[key]) old[key] = p;
+  });
+  b.phases = SCHED_PHASES_DEFAULT.map(([lbl, dd], idx) => {
+    const o = old[lbl.toLowerCase()];
+    return { label: lbl, contractor: o ? o.contractor : '', start: '', days: dd, dep: idx > 0,
+             status: o ? o.status : 'pending', notes: o ? o.notes : '', blStart: '', blDays: 0 };
+  });
+  if (b.start) { b.phases[0].start = b.start; b.phases[0].dep = false; schedCascade(b); }
+  schedSave(); renderSchedule();
+}
 function schedDeleteBuild(id) {
   const b = schedBuilds.find(x => x.id === id); if (!b) return;
   if (!confirm('Delete build "' + b.name + '" and its whole schedule?')) return;
@@ -7647,6 +7670,7 @@ function renderSchedule() {
         </select>
         <label style="font-size:11px;">Build start <input type="date" value="${b.start || ''}" onchange="schedSet('${b.id}','start',this.value)"></label>
         <button onclick="schedSetBaseline('${b.id}')" title="Snapshot today's plan — the Gantt then shows planned vs actual and slips" style="font-size:11px;">📌 Set baseline</button>
+        ${b.phases.length !== SCHED_PHASES_DEFAULT.length ? `<button onclick="schedApplyTemplate('${b.id}')" title="Replace this build's phase list with the latest ${SCHED_PHASES_DEFAULT.length}-phase template (keeps contractor/status/notes on matching phases)" style="font-size:11px; background:#2a2015; color:var(--copper); border-color:var(--copper);">↻ Update to ${SCHED_PHASES_DEFAULT.length} phases</button>` : ''}
         <div style="flex:1; min-width:120px; height:8px; background:var(--surface-2); border-radius:4px; overflow:hidden;">
           <div style="width:${pct}%; height:100%; background:${pct === 100 ? '#5aa24a' : 'var(--copper)'};"></div>
         </div>
