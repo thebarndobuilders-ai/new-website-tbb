@@ -2463,6 +2463,15 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           <select id="siding_color"></select>
         </div>
         <div class="qbs-field">
+          <label>Soffit product</label>
+          <select id="soffit_product" onchange="recalc()">
+            <option value="tr">Tuff Rib metal — 3' pieces</option>
+            <option value="mbb">Board &amp; batten metal — 12" pieces</option>
+            <option value="lp">LP SmartSide — 16' pieces</option>
+          </select>
+          <div class="qbs-note">Run = eaves (incl. gable overhangs) + rakes, split by the piece coverage, +9' waste.</div>
+        </div>
+        <div class="qbs-field">
           <label>Wainscot</label>
           <select id="wainscot_on" onchange="recalc()">
             <option value="none">None</option>
@@ -4342,7 +4351,7 @@ const LUMBER_STOCK_FT = {
   'pt_2x6_plate_lf': 16, '2x6_top_plate_lf': 16, 'pt_2x4_plate_lf': 16, '2x4_top_plate_lf': 16,
   'purlin_2x4_lf': 16, 'rafter_lumber_lf': 16, 'window_frame_2x6_lf': 16,
   'gable_ladder_2x4_lf': 16, 'header_cap_2x6': 16, 'header_cap_2x4': 16,
-  'tr_soffit_panel_lf': 3, 'bb_soffit_panel_lf': 3,
+  'tr_soffit_panel_lf': 3, 'bb_soffit_panel_lf': 1,
   'lp_fascia_1x8_lf': 16,
 };
 
@@ -5557,28 +5566,41 @@ const MATERIALS = [
   { id: "tr_soffit_panel_lf", label: "Tuff Rib soffit (3' pieces · eaves + rakes ÷ 3 + 9' waste)", cat: "Soffit & fascia", uom: "LF", packSize: null,
     priceCost: 2.85, priceSell: 3.65,
     formula: i => {
-      if (i.sidingProduct !== 'tuffrib_29') return 0;
+      if (i.soffitProduct !== 'tr') return 0;
       const eaveRun = (i.eaveOH > 0) ? (i.L + 2 * i.gableOH) * 2 : 0;
       const rakeRun = (i.gableOH > 0) ? i.topChord * 2 * i.gableCountActual : 0;
-      const run = eaveRun + rakeRun;
+      let run = eaveRun + rakeRun;
+      // Side shed soffit: outboard eave + both slope-side rakes (when the shed has an overhang)
+      if (i.shedActive && i.shed && (i.shed.eaveOH_ft || 0) > 0) run += i.shed.L + 2 * i.shed.topChord;
       if (run <= 0) return 0;
       const pieces = Math.ceil(run / 3) + 3;   // +9' waste, always
       return pieces * 3;
     }},
-  { id: "bb_soffit_panel_lf", label: "Metal B&B soffit (3' pieces · eaves + rakes ÷ 3 + 9' waste)", cat: "Soffit & fascia", uom: "LF", packSize: null,
+  { id: "bb_soffit_panel_lf", label: "Metal B&B soffit (12\" pieces · eaves + rakes + 9' waste)", cat: "Soffit & fascia", uom: "LF", packSize: null,
     priceCost: 4.25, priceSell: 5.45,
     formula: i => {
-      if (i.sidingProduct !== 'mbb_26') return 0;
+      if (i.soffitProduct !== 'mbb') return 0;
       const eaveRun = (i.eaveOH > 0) ? (i.L + 2 * i.gableOH) * 2 : 0;
       const rakeRun = (i.gableOH > 0) ? i.topChord * 2 * i.gableCountActual : 0;
-      const run = eaveRun + rakeRun;
+      let run = eaveRun + rakeRun;
+      // Side shed soffit: outboard eave + both slope-side rakes (when the shed has an overhang)
+      if (i.shedActive && i.shed && (i.shed.eaveOH_ft || 0) > 0) run += i.shed.L + 2 * i.shed.topChord;
       if (run <= 0) return 0;
-      const pieces = Math.ceil(run / 3) + 3;   // +9' waste, always
-      return pieces * 3;
+      // 12" coverage per piece → one piece per LF, +9 pieces (9') waste
+      return Math.ceil(run) + 9;
     }},
-  { id: "lp_soffit_panel", label: "LP SmartSide soffit panel (4×8)", cat: "Soffit & fascia", uom: "sheet", packSize: null,
-    priceCost: 48, priceSell: 62, priceRetail: 58,
-    formula: i => i.sidingProduct === 'lp_bb' ? Math.ceil(i.soffitArea / 32 * 1.10) : 0 },
+  { id: "lp_soffit_panel", label: "LP SmartSide soffit — 16' pieces", cat: "Soffit & fascia", uom: "ea (16')", packSize: null,
+    priceCost: 24, priceSell: 32, priceRetail: 40,
+    formula: i => {
+      if (i.soffitProduct !== 'lp') return 0;
+      const eaveRun = (i.eaveOH > 0) ? (i.L + 2 * i.gableOH) * 2 : 0;
+      const rakeRun = (i.gableOH > 0) ? i.topChord * 2 * i.gableCountActual : 0;
+      let run = eaveRun + rakeRun;
+      // Side shed soffit: outboard eave + both slope-side rakes (when the shed has an overhang)
+      if (i.shedActive && i.shed && (i.shed.eaveOH_ft || 0) > 0) run += i.shed.L + 2 * i.shed.topChord;
+      if (run <= 0) return 0;
+      return Math.ceil((run + 9) / 16);   // 16' coverage per piece, +9' waste in the run
+    }},
   // Fascia backer 1×6 — for metal siding builds
   { id: "fascia_2x6x12", label: "2×6×12 sub-fascia board (nailed to truss tails · eave + rake length)", cat: "Soffit & fascia", uom: "ea (12')", packSize: null,
     priceCost: 8.47, priceSell: 11, priceRetail: 14,
@@ -9802,6 +9824,7 @@ function getInputs() {
     wainscotOn: ((document.getElementById('wainscot_on') || {}).value === '36'),
     wainscotColor: (document.getElementById('wainscot_color') || {}).value || '',
     trimColor: (document.getElementById('trim_color') || {}).value || '',
+    soffitProduct: (document.getElementById('soffit_product') || {}).value || 'tr',
     guttersOn: ((document.getElementById('gutters_on') || {}).value === 'yes'),
     gutterColor: (document.getElementById('gutter_color') || {}).value || '',
     downspoutQty: (function(){ const el = document.getElementById('downspout_qty'); return el ? (parseFloat(el.value) || 0) : 0; })(),
@@ -11748,6 +11771,7 @@ async function loadProject(key) {
     if (i.proArmorScope) { const pa = document.getElementById('pro_armor_scope'); if (pa) pa.value = i.proArmorScope; }
     { const wo = document.getElementById('wainscot_on'); if (wo) wo.value = i.wainscotOn ? '36' : 'none'; }
     { const gu = document.getElementById('gutters_on'); if (gu) gu.value = i.guttersOn ? 'yes' : 'none'; }
+    if (i.soffitProduct) { const sp = document.getElementById('soffit_product'); if (sp) sp.value = i.soffitProduct; }
     if (i.downspoutQty != null) { const dq = document.getElementById('downspout_qty'); if (dq) dq.value = i.downspoutQty; }
     ['3', '4', '5'].forEach(sz => {
       const cq = document.getElementById('cupola_qty_' + sz);
