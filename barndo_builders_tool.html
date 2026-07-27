@@ -7252,35 +7252,59 @@ function printCounterTicket() {
 
 
 // =============================================================
-// BUILD SCHEDULE — phases, contractors, material orders & deliveries.
+// BUILD SCHEDULE v2 — Buildertrend-style: duration-based tasks, waterfall
+// dependencies with auto-shift, Gantt timeline, baseline vs actual.
 // Stored in localStorage under bb_schedule_v1 (rides in the full backup).
 // =============================================================
 const SCHED_KEY = 'bb_schedule_v1';
+// Default post-frame phase chain: [label, working-day duration]
 const SCHED_PHASES_DEFAULT = [
-  'Permits / site prep', 'Pad & grade', 'Concrete slab', 'Posts / framing',
-  'Trusses set', 'Roof metal', 'Wall metal & trim', 'Doors & windows',
-  'Gutters', 'Electrical', 'Plumbing', 'HVAC', 'Insulation', 'Drywall & finish',
-  'Final walkthrough',
+  ['Permits / site prep', 5], ['Pad & grade', 2], ['Concrete slab', 3],
+  ['Posts / framing', 10], ['Trusses set', 2], ['Roof metal', 4],
+  ['Wall metal & trim', 4], ['Doors & windows', 2], ['Gutters', 1],
+  ['Electrical', 5], ['Plumbing', 5], ['HVAC', 3], ['Insulation', 2],
+  ['Drywall & finish', 10], ['Final walkthrough', 1],
 ];
 const SCHED_PHASE_STATUS = ['pending', 'scheduled', 'in progress', 'done'];
 const SCHED_MAT_STATUS = ['to order', 'ordered', 'delivered'];
 let schedBuilds = [];
+let schedView = 'gantt';   // 'gantt' | 'list'
+
+// ---- date helpers (ISO yyyy-mm-dd strings, calendar days) ----
+function sdParse(iso) { return iso ? new Date(iso + 'T00:00') : null; }
+function sdISO(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function sdAdd(iso, days) { const d = sdParse(iso); if (!d) return ''; d.setDate(d.getDate() + days); return sdISO(d); }
+function sdEnd(p) { return p.start ? sdAdd(p.start, Math.max(1, p.days || 1) - 1) : ''; }
+function sdDiff(a, b) { const da = sdParse(a), db = sdParse(b); if (!da || !db) return 0; return Math.round((db - da) / 86400000); }
+
 function schedLoad() {
   try { schedBuilds = JSON.parse(localStorage.getItem(SCHED_KEY) || '[]'); } catch (e) { schedBuilds = []; }
+  // migrate v1 phases ({date}) → v2 tasks ({start, days, dep})
+  schedBuilds.forEach(b => {
+    (b.phases || []).forEach(p => {
+      if (p.days == null) p.days = 1;
+      if (p.start == null) { p.start = p.date || ''; delete p.date; }
+      if (p.dep == null) p.dep = !p.start;   // undated old rows join the waterfall
+    });
+  });
 }
-function schedSave() {
-  try { localStorage.setItem(SCHED_KEY, JSON.stringify(schedBuilds)); } catch (e) {}
+function schedSave() { try { localStorage.setItem(SCHED_KEY, JSON.stringify(schedBuilds)); } catch (e) {} }
+
+// Waterfall: every task with dep=true starts the day after the previous task ends.
+function schedCascade(b) {
+  let prevEnd = null;
+  b.phases.forEach(p => {
+    if (p.dep && prevEnd) p.start = sdAdd(prevEnd, 1);
+    const e = sdEnd(p);
+    if (e) prevEnd = e;
+  });
 }
 function schedNewBuild(name) {
   const nm = (typeof name === 'string' && name) ? name : (prompt('Build name (client / project):') || '').trim();
   if (!nm) return;
   schedBuilds.unshift({
-    id: 'bld_' + Date.now(),
-    name: nm,
-    status: 'planned',
-    start: '', target: '', notes: '',
-    collapsed: false,
-    phases: SCHED_PHASES_DEFAULT.map(p => ({ label: p, contractor: '', date: '', status: 'pending', notes: '' })),
+    id: 'bld_' + Date.now(), name: nm, status: 'planned', start: '', notes: '', collapsed: false,
+    phases: SCHED_PHASES_DEFAULT.map(([lbl, dd], idx) => ({ label: lbl, contractor: '', start: '', days: dd, dep: idx > 0, status: 'pending', notes: '', blStart: '', blDays: 0 })),
     materials: [],
   });
   schedSave(); renderSchedule();
@@ -7293,31 +7317,51 @@ function schedNewBuildFromQuote() {
   schedNewBuild(nm);
 }
 function schedDeleteBuild(id) {
-  const b = schedBuilds.find(x => x.id === id);
-  if (!b) return;
+  const b = schedBuilds.find(x => x.id === id); if (!b) return;
   if (!confirm('Delete build "' + b.name + '" and its whole schedule?')) return;
   schedBuilds = schedBuilds.filter(x => x.id !== id);
   schedSave(); renderSchedule();
 }
 function schedSet(id, field, value) {
   const b = schedBuilds.find(x => x.id === id); if (!b) return;
-  b[field] = value; schedSave();
-  if (field === 'status' || field === 'collapsed') renderSchedule(); else renderScheduleDigest();
+  b[field] = value;
+  if (field === 'start' && value && b.phases.length) {
+    // kick off the waterfall from the build start date
+    if (!b.phases[0].start || b.phases[0].dep) { b.phases[0].start = value; b.phases[0].dep = false; }
+    schedCascade(b);
+  }
+  schedSave(); renderSchedule();
 }
 function schedPhaseSet(id, pi, field, value) {
   const b = schedBuilds.find(x => x.id === id); if (!b || !b.phases[pi]) return;
-  b.phases[pi][field] = value; schedSave();
-  if (field === 'status') renderSchedule(); else renderScheduleDigest();
+  const p = b.phases[pi];
+  if (field === 'days') { p.days = Math.max(1, parseInt(value, 10) || 1); }
+  else if (field === 'start') { p.start = value; if (value) p.dep = false; }
+  else if (field === 'dep') { p.dep = !!value; }
+  else p[field] = value;
+  schedCascade(b);
+  schedSave(); renderSchedule();
 }
 function schedPhaseAdd(id) {
   const b = schedBuilds.find(x => x.id === id); if (!b) return;
   const nm = (prompt('Phase name:') || '').trim(); if (!nm) return;
-  b.phases.push({ label: nm, contractor: '', date: '', status: 'pending', notes: '' });
-  schedSave(); renderSchedule();
+  b.phases.push({ label: nm, contractor: '', start: '', days: 1, dep: true, status: 'pending', notes: '', blStart: '', blDays: 0 });
+  schedCascade(b); schedSave(); renderSchedule();
 }
 function schedPhaseDel(id, pi) {
   const b = schedBuilds.find(x => x.id === id); if (!b) return;
-  b.phases.splice(pi, 1); schedSave(); renderSchedule();
+  b.phases.splice(pi, 1); schedCascade(b); schedSave(); renderSchedule();
+}
+function schedPhaseMove(id, pi, dir) {
+  const b = schedBuilds.find(x => x.id === id); if (!b) return;
+  const ni = pi + dir; if (ni < 0 || ni >= b.phases.length) return;
+  const [p] = b.phases.splice(pi, 1); b.phases.splice(ni, 0, p);
+  schedCascade(b); schedSave(); renderSchedule();
+}
+function schedSetBaseline(id) {
+  const b = schedBuilds.find(x => x.id === id); if (!b) return;
+  b.phases.forEach(p => { p.blStart = p.start || ''; p.blDays = p.days || 1; });
+  schedSave(); renderSchedule();
 }
 function schedMatAdd(id) {
   const b = schedBuilds.find(x => x.id === id); if (!b) return;
@@ -7333,14 +7377,22 @@ function schedMatDel(id, mi) {
   const b = schedBuilds.find(x => x.id === id); if (!b) return;
   b.materials.splice(mi, 1); schedSave(); renderSchedule();
 }
+function schedSetView(v) { schedView = v; renderSchedule(); }
 function _schedPct(b) {
   if (!b.phases.length) return 0;
   return Math.round(100 * b.phases.filter(p => p.status === 'done').length / b.phases.length);
 }
 function _schedStatusColor(st) {
-  return { 'pending': 'var(--text-3)', 'scheduled': '#3a7bd6', 'in progress': 'var(--copper)', 'done': '#5aa24a',
+  return { 'pending': '#8a8a92', 'scheduled': '#3a7bd6', 'in progress': '#d98a3a', 'done': '#5aa24a',
            'to order': '#d64545', 'ordered': '#3a7bd6', 'delivered': '#5aa24a',
-           'planned': '#3a7bd6', 'in_progress': 'var(--copper)', 'complete': '#5aa24a', 'on_hold': '#d64545' }[st] || 'var(--text-3)';
+           'planned': '#3a7bd6', 'in_progress': '#d98a3a', 'complete': '#5aa24a', 'on_hold': '#d64545' }[st] || '#8a8a92';
+}
+// stable color per contractor name (for Gantt bars)
+function _schedTradeColor(name) {
+  if (!name) return '#7a7f8a';
+  const pal = ['#d98a3a', '#3a7bd6', '#5aa24a', '#9a5bd0', '#c95b8e', '#2fa39a', '#d9bf3a', '#d64545'];
+  let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return pal[h % pal.length];
 }
 function renderScheduleDigest() {
   const el = document.getElementById('sched-digest'); if (!el) return;
@@ -7350,33 +7402,122 @@ function renderScheduleDigest() {
   schedBuilds.forEach(b => {
     if (b.status === 'complete') return;
     b.phases.forEach(p => {
-      if (p.date && p.status !== 'done') {
-        const d = new Date(p.date + 'T00:00');
-        if (d <= horizon) items.push({ d, txt: `${p.label} — ${b.name}${p.contractor ? ' · ' + p.contractor : ''}`, late: d < today, kind: 'phase' });
+      if (p.start && p.status !== 'done') {
+        const d = sdParse(p.start);
+        if (d <= horizon) items.push({ d, txt: `${p.label} — ${b.name}${p.contractor ? ' · ' + p.contractor : ''} (${p.days || 1}d)`, late: d < today });
       }
     });
     b.materials.forEach(m => {
       if (m.deliveryDate && m.status !== 'delivered') {
-        const d = new Date(m.deliveryDate + 'T00:00');
-        if (d <= horizon) items.push({ d, txt: `Delivery: ${m.label || 'material'} — ${b.name}${m.supplier ? ' · ' + m.supplier : ''}`, late: d < today, kind: 'delivery' });
+        const d = sdParse(m.deliveryDate);
+        if (d <= horizon) items.push({ d, txt: `Delivery: ${m.label || 'material'} — ${b.name}${m.supplier ? ' · ' + m.supplier : ''}`, late: d < today });
       }
-      if (m.status === 'to order') items.push({ d: today, txt: `NEEDS ORDER: ${m.label || 'material'} — ${b.name}`, late: true, kind: 'order' });
+      if (m.status === 'to order') items.push({ d: today, txt: `NEEDS ORDER: ${m.label || 'material'} — ${b.name}`, late: true, order: true });
     });
   });
   items.sort((a, b2) => a.d - b2.d);
   if (!items.length) { el.innerHTML = '<div class="qbs-note">Nothing scheduled in the next 14 days.</div>'; return; }
   el.innerHTML = '<div style="font-family:var(--font-headline); font-size:13px; color:var(--copper); font-weight:600; margin-bottom:6px;">Coming up (next 14 days)</div>'
-    + items.slice(0, 20).map(it => {
-      const ds = it.kind === 'order' ? '—' : it.d.toLocaleDateString();
-      return `<div style="display:flex; gap:10px; padding:4px 8px; font-size:12px; ${it.late ? 'color:#ff9b9b;' : ''}">
-        <span style="font-family:var(--font-mono); min-width:86px;">${ds}</span><span>${it.txt}${it.late && it.kind !== 'order' ? ' ⚠ past due' : ''}</span></div>`;
-    }).join('');
+    + items.slice(0, 24).map(it => `<div style="display:flex; gap:10px; padding:3px 8px; font-size:12px; ${it.late ? 'color:#ff9b9b;' : ''}">
+        <span style="font-family:var(--font-mono); min-width:86px;">${it.order ? '—' : it.d.toLocaleDateString()}</span><span>${it.txt}${it.late && !it.order ? ' ⚠ past due' : ''}</span></div>`).join('');
 }
+
+// ---- Gantt ----
+const GANTT_PX_DAY = 16;
+function _ganttRange(b) {
+  let min = null, max = null;
+  b.phases.forEach(p => {
+    if (!p.start) return;
+    const s2 = sdParse(p.start), e = sdParse(sdEnd(p));
+    if (!min || s2 < min) min = s2;
+    if (!max || e > max) max = e;
+    if (p.blStart) { const bs = sdParse(p.blStart), be = sdParse(sdAdd(p.blStart, (p.blDays || 1) - 1)); if (bs < min) min = bs; if (be > max) max = be; }
+  });
+  if (!min) return null;
+  min = new Date(min.getTime() - 2 * 86400000);
+  max = new Date(max.getTime() + 5 * 86400000);
+  return { min, max, days: Math.round((max - min) / 86400000) + 1 };
+}
+function renderGantt(b) {
+  const r = _ganttRange(b);
+  if (!r) return '<div class="qbs-note" style="padding:8px;">Set the build start date (or a phase date) and the timeline appears — every dependent phase chains after it automatically.</div>';
+  const W = r.days * GANTT_PX_DAY;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  // header: week labels + weekend shading + today line
+  let bg = '';
+  for (let d = 0; d < r.days; d++) {
+    const dt = new Date(r.min.getTime() + d * 86400000);
+    const dow = dt.getDay();
+    if (dow === 0 || dow === 6) bg += `<div style="position:absolute; left:${d * GANTT_PX_DAY}px; top:0; bottom:0; width:${GANTT_PX_DAY}px; background:rgba(255,255,255,0.04);"></div>`;
+    if (dow === 1) bg += `<div style="position:absolute; left:${d * GANTT_PX_DAY}px; top:0; bottom:0; width:1px; background:var(--hairline);"></div>
+      <div style="position:absolute; left:${d * GANTT_PX_DAY + 3}px; top:0; font-size:9px; color:var(--text-3); font-family:var(--font-mono);">${dt.getMonth() + 1}/${dt.getDate()}</div>`;
+  }
+  const tOff = Math.round((today - r.min) / 86400000);
+  if (tOff >= 0 && tOff < r.days) bg += `<div style="position:absolute; left:${tOff * GANTT_PX_DAY + GANTT_PX_DAY / 2}px; top:0; bottom:0; width:2px; background:#ff3b30; opacity:0.8;" title="Today"></div>`;
+  const ROW = 26;
+  const rows = b.phases.map((p, pi) => {
+    let bar = '', ghost = '';
+    if (p.blStart) {
+      const bo = Math.round((sdParse(p.blStart) - r.min) / 86400000);
+      ghost = `<div style="position:absolute; left:${bo * GANTT_PX_DAY}px; top:17px; width:${(p.blDays || 1) * GANTT_PX_DAY - 2}px; height:4px; background:rgba(255,255,255,0.25); border-radius:2px;" title="Baseline"></div>`;
+    }
+    if (p.start) {
+      const off = Math.round((sdParse(p.start) - r.min) / 86400000);
+      const col = p.status === 'done' ? '#5aa24a' : _schedTradeColor(p.contractor);
+      const slip = p.blStart ? sdDiff(p.blStart, p.start) : 0;
+      bar = `<div class="gantt-bar" data-bid="${b.id}" data-pi="${pi}"
+        style="position:absolute; left:${off * GANTT_PX_DAY}px; top:3px; width:${Math.max(1, p.days || 1) * GANTT_PX_DAY - 2}px; height:13px; background:${col}; border-radius:3px; cursor:grab; opacity:${p.status === 'done' ? 0.65 : 0.95};"
+        title="${p.label} · ${p.start} · ${p.days || 1}d${p.contractor ? ' · ' + p.contractor : ''}${slip ? ' · slip ' + (slip > 0 ? '+' : '') + slip + 'd' : ''}"></div>`;
+    }
+    return `<div style="display:flex; align-items:center; height:${ROW}px;">
+      <div style="width:210px; min-width:210px; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:6px; ${p.status === 'done' ? 'color:var(--text-3); text-decoration:line-through;' : ''}">
+        ${p.label}${p.contractor ? ` <span style="color:${_schedTradeColor(p.contractor)};">· ${p.contractor}</span>` : ''}</div>
+      <div style="position:relative; height:${ROW - 6}px; width:${W}px; flex:none;">${ghost}${bar}</div>
+    </div>`;
+  }).join('');
+  return `<div style="overflow-x:auto; border:1px solid var(--hairline); border-radius:6px; padding:6px 4px;">
+    <div style="position:relative; min-width:${210 + W}px;">
+      <div style="position:absolute; left:210px; top:0; bottom:0; width:${W}px;">${bg}</div>
+      <div style="position:relative; padding-top:14px;">${rows}</div>
+    </div>
+  </div>
+  <div class="qbs-note" style="margin-top:4px;">Drag a bar to move its start — everything chained after it shifts too (waterfall). Gray dash under a bar = baseline; hover a bar for slip.</div>`;
+}
+// drag-to-move Gantt bars (delegated)
+(function ganttDrag() {
+  let drag = null;
+  document.addEventListener('pointerdown', ev => {
+    const bar = ev.target.closest && ev.target.closest('.gantt-bar');
+    if (!bar) return;
+    const b = schedBuilds.find(x => x.id === bar.dataset.bid); if (!b) return;
+    const p = b.phases[parseInt(bar.dataset.pi, 10)]; if (!p || !p.start) return;
+    drag = { b, p, x0: ev.clientX, start0: p.start, bar };
+    bar.style.cursor = 'grabbing';
+    ev.preventDefault();
+  });
+  document.addEventListener('pointermove', ev => {
+    if (!drag) return;
+    const dd = Math.round((ev.clientX - drag.x0) / GANTT_PX_DAY);
+    const ns = sdAdd(drag.start0, dd);
+    if (ns !== drag.p.start) {
+      drag.p.start = ns; drag.p.dep = false;
+      schedCascade(drag.b);
+      renderSchedule();  // re-render; keep dragging on the fresh bar
+      const nb = document.querySelector(`.gantt-bar[data-bid="${drag.b.id}"][data-pi="${drag.bar.dataset.pi}"]`);
+      if (nb) drag.bar = nb;
+    }
+  });
+  document.addEventListener('pointerup', () => { if (drag) { schedSave(); drag = null; } });
+})();
+
 function renderSchedule() {
   const wrap = document.getElementById('sched-builds'); if (!wrap) return;
   renderScheduleDigest();
+  const viewBtns = `<div style="display:flex; gap:6px; margin-bottom:10px;">
+    ${['gantt', 'list'].map(v => `<button onclick="schedSetView('${v}')" style="font-size:11px; ${schedView === v ? 'background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600;' : ''}">${v === 'gantt' ? '📊 Gantt' : '☰ List'}</button>`).join('')}
+  </div>`;
   if (!schedBuilds.length) { wrap.innerHTML = '<div class="qbs-note">No builds yet — hit "+ New build" to start tracking one.</div>'; return; }
-  wrap.innerHTML = schedBuilds.map(b => {
+  wrap.innerHTML = viewBtns + schedBuilds.map(b => {
     const pct = _schedPct(b);
     const head = `
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -7385,8 +7526,8 @@ function renderSchedule() {
         <select onchange="schedSet('${b.id}','status',this.value)" style="color:${_schedStatusColor(b.status)};">
           ${['planned', 'in_progress', 'complete', 'on_hold'].map(st => `<option value="${st}" ${b.status === st ? 'selected' : ''}>${st.replace('_', ' ')}</option>`).join('')}
         </select>
-        <label style="font-size:11px;">Start <input type="date" value="${b.start || ''}" onchange="schedSet('${b.id}','start',this.value)"></label>
-        <label style="font-size:11px;">Target <input type="date" value="${b.target || ''}" onchange="schedSet('${b.id}','target',this.value)"></label>
+        <label style="font-size:11px;">Build start <input type="date" value="${b.start || ''}" onchange="schedSet('${b.id}','start',this.value)"></label>
+        <button onclick="schedSetBaseline('${b.id}')" title="Snapshot today's plan — the Gantt then shows planned vs actual and slips" style="font-size:11px;">📌 Set baseline</button>
         <div style="flex:1; min-width:120px; height:8px; background:var(--surface-2); border-radius:4px; overflow:hidden;">
           <div style="width:${pct}%; height:100%; background:${pct === 100 ? '#5aa24a' : 'var(--copper)'};"></div>
         </div>
@@ -7394,17 +7535,27 @@ function renderSchedule() {
         <button onclick="schedDeleteBuild('${b.id}')" style="background:#3a1414; color:#ff9b9b; border-color:#5a1f1f;">✕</button>
       </div>`;
     if (b.collapsed) return `<div style="border:1px solid var(--hairline); border-radius:8px; padding:10px 12px; margin-bottom:10px;">${head}</div>`;
-    const phases = b.phases.map((p, pi) => `
-      <tr>
-        <td style="min-width:150px;">${p.label}</td>
-        <td><input value="${(p.contractor || '').replace(/"/g, '&quot;')}" placeholder="contractor" onchange="schedPhaseSet('${b.id}',${pi},'contractor',this.value)" style="width:130px; font-size:11px;"></td>
-        <td><input type="date" value="${p.date || ''}" onchange="schedPhaseSet('${b.id}',${pi},'date',this.value)" style="font-size:11px;"></td>
-        <td><select onchange="schedPhaseSet('${b.id}',${pi},'status',this.value)" style="color:${_schedStatusColor(p.status)}; font-size:11px;">
-          ${SCHED_PHASE_STATUS.map(st => `<option value="${st}" ${p.status === st ? 'selected' : ''}>${st}</option>`).join('')}
-        </select></td>
-        <td><input value="${(p.notes || '').replace(/"/g, '&quot;')}" placeholder="notes" onchange="schedPhaseSet('${b.id}',${pi},'notes',this.value)" style="width:100%; min-width:110px; font-size:11px;"></td>
-        <td><button onclick="schedPhaseDel('${b.id}',${pi})" style="padding:2px 7px !important; background:#3a1414; color:#ff9b9b; border-color:#5a1f1f;">✕</button></td>
-      </tr>`).join('');
+    const body = (schedView === 'gantt') ? renderGantt(b) : `
+      <table class="qbs-table" style="width:100%; font-size:12px;">
+        <thead><tr><th></th><th>Phase</th><th>Contractor</th><th>Start</th><th>Days</th><th title="Chained: starts right after the previous phase ends">Chain</th><th>Status</th><th>Slip</th><th>Notes</th><th></th></tr></thead>
+        <tbody>${b.phases.map((p, pi) => {
+          const slip = p.blStart && p.start ? sdDiff(p.blStart, p.start) : 0;
+          return `<tr>
+            <td style="white-space:nowrap;"><button onclick="schedPhaseMove('${b.id}',${pi},-1)" style="padding:1px 5px !important;">↑</button><button onclick="schedPhaseMove('${b.id}',${pi},1)" style="padding:1px 5px !important;">↓</button></td>
+            <td style="min-width:140px;">${p.label}</td>
+            <td><input value="${(p.contractor || '').replace(/"/g, '&quot;')}" placeholder="contractor" onchange="schedPhaseSet('${b.id}',${pi},'contractor',this.value)" style="width:120px; font-size:11px; border-left:3px solid ${_schedTradeColor(p.contractor)};"></td>
+            <td><input type="date" value="${p.start || ''}" onchange="schedPhaseSet('${b.id}',${pi},'start',this.value)" style="font-size:11px;"></td>
+            <td><input type="number" min="1" value="${p.days || 1}" onchange="schedPhaseSet('${b.id}',${pi},'days',this.value)" style="width:48px; font-size:11px;"></td>
+            <td style="text-align:center;"><input type="checkbox" ${p.dep ? 'checked' : ''} onchange="schedPhaseSet('${b.id}',${pi},'dep',this.checked)" title="Starts right after the previous phase ends"></td>
+            <td><select onchange="schedPhaseSet('${b.id}',${pi},'status',this.value)" style="color:${_schedStatusColor(p.status)}; font-size:11px;">
+              ${SCHED_PHASE_STATUS.map(st => `<option value="${st}" ${p.status === st ? 'selected' : ''}>${st}</option>`).join('')}
+            </select></td>
+            <td style="font-family:var(--font-mono); font-size:11px; color:${slip > 0 ? '#ff9b9b' : slip < 0 ? '#5aa24a' : 'var(--text-3)'};">${slip ? (slip > 0 ? '+' : '') + slip + 'd' : '—'}</td>
+            <td><input value="${(p.notes || '').replace(/"/g, '&quot;')}" placeholder="notes" onchange="schedPhaseSet('${b.id}',${pi},'notes',this.value)" style="width:100%; min-width:90px; font-size:11px;"></td>
+            <td><button onclick="schedPhaseDel('${b.id}',${pi})" style="padding:2px 7px !important; background:#3a1414; color:#ff9b9b; border-color:#5a1f1f;">✕</button></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
     const mats = b.materials.map((m, mi) => `
       <tr>
         <td><input value="${(m.label || '').replace(/"/g, '&quot;')}" placeholder="material / package" onchange="schedMatSet('${b.id}',${mi},'label',this.value)" style="width:100%; min-width:140px; font-size:11px;"></td>
@@ -7420,14 +7571,8 @@ function renderSchedule() {
     return `
       <div style="border:1px solid var(--hairline); border-radius:8px; padding:12px; margin-bottom:14px;">
         ${head}
-        <div style="margin-top:10px;">
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--copper); margin-bottom:4px;">Phases &amp; contractors</div>
-          <table class="qbs-table" style="width:100%; font-size:12px;">
-            <thead><tr><th>Phase</th><th>Contractor</th><th>Date</th><th>Status</th><th>Notes</th><th></th></tr></thead>
-            <tbody>${phases}</tbody>
-          </table>
-          <button onclick="schedPhaseAdd('${b.id}')" style="margin-top:4px; font-size:11px;">+ Add phase</button>
-        </div>
+        <div style="margin-top:10px;">${body}</div>
+        ${schedView === 'list' ? `<button onclick="schedPhaseAdd('${b.id}')" style="margin-top:4px; font-size:11px;">+ Add phase</button>` : ''}
         <div style="margin-top:12px;">
           <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--copper); margin-bottom:4px;">Material orders &amp; deliveries</div>
           <table class="qbs-table" style="width:100%; font-size:12px;">
