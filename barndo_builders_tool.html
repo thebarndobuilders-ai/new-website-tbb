@@ -16843,7 +16843,7 @@ if (typeof origSwitchTab === 'function') {
   }
   function onDblClick(ev) { if (TO.tool !== 'pan' && TO.tool !== 'scale') takeoffFinish(); }
   function onMove(ev) {
-    if (TO.tool !== 'scale' && TO.tool !== 'measure') return;
+    if (TO.tool !== 'scale' && TO.tool !== 'measure' && TO.tool !== 'edit') return;
     TO.mouseBase = toBase(ev); redraw();
   }
   function zoomAt(factor, clientX, clientY) {
@@ -16969,6 +16969,23 @@ if (typeof origSwitchTab === 'function') {
         ctx.fillStyle = vi === TO.selVertex ? '#ff3b30' : '#1e7bff';
         ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
       });
+    }
+    // Crosshair guide lines in scale/measure/edit modes — full-canvas hairlines that
+    // follow the pointer, so you always see exactly where you're clicking even when
+    // the OS hides the custom cursor (common with Windows display scaling).
+    if (TO.mouseBase && (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit')) {
+      const mx = TO.mouseBase.x * S, my = TO.mouseBase.y * S;
+      ctx.save();
+      ctx.strokeStyle = (TO.tool === 'scale') ? 'rgba(255,210,127,0.85)' : 'rgba(30,123,255,0.75)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.moveTo(mx, 0); ctx.lineTo(mx, dc.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(dc.width, my); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(mx, my, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#ff3b30'; ctx.fill();
+      ctx.lineWidth = 1; ctx.strokeStyle = '#fff'; ctx.stroke();
+      ctx.restore();
     }
   }
   function drawMeasure(ctx, m, S, color, draft) {
