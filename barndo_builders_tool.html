@@ -2180,6 +2180,7 @@
     <div class="qbs-tab" data-tab="proposal" onclick="switchTab('proposal')">7. Proposal</div>
     <div class="qbs-tab" data-tab="audit3d" onclick="switchTab('audit3d')" style="border-left: 1px dashed var(--hairline); margin-left: 4px; padding-left: 12px;">3D audit</div>
     <div class="qbs-tab" data-tab="counter" onclick="switchTab('counter')" style="border-left: 1px dashed var(--hairline); margin-left: 4px; padding-left: 12px;">Counter ticket</div>
+    <div class="qbs-tab" data-tab="schedule" onclick="switchTab('schedule')">Schedule</div>
     <div class="qbs-tab" data-tab="flitch" onclick="switchTab('flitch')">Pricing master</div>
     <div class="qbs-tab" data-tab="calcs" onclick="switchTab('calcs')">Calculators</div>
     <div class="qbs-tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
@@ -3762,6 +3763,20 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
           </table>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- SCHEDULE — build progression tracker: phases, contractors, material orders/deliveries -->
+  <div class="qbs-tab-content" id="tab-schedule" style="display:none">
+    <div class="qbs-card">
+      <h3>Build schedule <span class="badge">Phases · contractors · material orders &amp; deliveries</span></h3>
+      <p class="qbs-sub" style="margin-bottom:12px;">One card per build. Track each phase's contractor, date, and status, plus material orders and deliveries. Everything saves in this browser (and rides along in the full backup).</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+        <button onclick="schedNewBuild()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600;">+ New build</button>
+        <button onclick="schedNewBuildFromQuote()" title="Uses the client/project on the current quote">+ New build from current quote</button>
+      </div>
+      <div id="sched-digest" style="margin-bottom:14px;"></div>
+      <div id="sched-builds"></div>
     </div>
   </div>
 
@@ -7235,6 +7250,198 @@ function printCounterTicket() {
   w.document.close();
 }
 
+
+// =============================================================
+// BUILD SCHEDULE — phases, contractors, material orders & deliveries.
+// Stored in localStorage under bb_schedule_v1 (rides in the full backup).
+// =============================================================
+const SCHED_KEY = 'bb_schedule_v1';
+const SCHED_PHASES_DEFAULT = [
+  'Permits / site prep', 'Pad & grade', 'Concrete slab', 'Posts / framing',
+  'Trusses set', 'Roof metal', 'Wall metal & trim', 'Doors & windows',
+  'Gutters', 'Electrical', 'Plumbing', 'HVAC', 'Insulation', 'Drywall & finish',
+  'Final walkthrough',
+];
+const SCHED_PHASE_STATUS = ['pending', 'scheduled', 'in progress', 'done'];
+const SCHED_MAT_STATUS = ['to order', 'ordered', 'delivered'];
+let schedBuilds = [];
+function schedLoad() {
+  try { schedBuilds = JSON.parse(localStorage.getItem(SCHED_KEY) || '[]'); } catch (e) { schedBuilds = []; }
+}
+function schedSave() {
+  try { localStorage.setItem(SCHED_KEY, JSON.stringify(schedBuilds)); } catch (e) {}
+}
+function schedNewBuild(name) {
+  const nm = (typeof name === 'string' && name) ? name : (prompt('Build name (client / project):') || '').trim();
+  if (!nm) return;
+  schedBuilds.unshift({
+    id: 'bld_' + Date.now(),
+    name: nm,
+    status: 'planned',
+    start: '', target: '', notes: '',
+    collapsed: false,
+    phases: SCHED_PHASES_DEFAULT.map(p => ({ label: p, contractor: '', date: '', status: 'pending', notes: '' })),
+    materials: [],
+  });
+  schedSave(); renderSchedule();
+}
+function schedNewBuildFromQuote() {
+  const client = ((document.getElementById('client_name') || {}).value || '').trim();
+  const project = ((document.getElementById('project_name') || {}).value || '').trim();
+  const nm = [client, project].filter(Boolean).join(' — ');
+  if (!nm) { alert('No client/project on the current quote yet — use "+ New build" and type a name.'); return; }
+  schedNewBuild(nm);
+}
+function schedDeleteBuild(id) {
+  const b = schedBuilds.find(x => x.id === id);
+  if (!b) return;
+  if (!confirm('Delete build "' + b.name + '" and its whole schedule?')) return;
+  schedBuilds = schedBuilds.filter(x => x.id !== id);
+  schedSave(); renderSchedule();
+}
+function schedSet(id, field, value) {
+  const b = schedBuilds.find(x => x.id === id); if (!b) return;
+  b[field] = value; schedSave();
+  if (field === 'status' || field === 'collapsed') renderSchedule(); else renderScheduleDigest();
+}
+function schedPhaseSet(id, pi, field, value) {
+  const b = schedBuilds.find(x => x.id === id); if (!b || !b.phases[pi]) return;
+  b.phases[pi][field] = value; schedSave();
+  if (field === 'status') renderSchedule(); else renderScheduleDigest();
+}
+function schedPhaseAdd(id) {
+  const b = schedBuilds.find(x => x.id === id); if (!b) return;
+  const nm = (prompt('Phase name:') || '').trim(); if (!nm) return;
+  b.phases.push({ label: nm, contractor: '', date: '', status: 'pending', notes: '' });
+  schedSave(); renderSchedule();
+}
+function schedPhaseDel(id, pi) {
+  const b = schedBuilds.find(x => x.id === id); if (!b) return;
+  b.phases.splice(pi, 1); schedSave(); renderSchedule();
+}
+function schedMatAdd(id) {
+  const b = schedBuilds.find(x => x.id === id); if (!b) return;
+  b.materials.push({ label: '', supplier: '', status: 'to order', orderDate: '', deliveryDate: '', notes: '' });
+  schedSave(); renderSchedule();
+}
+function schedMatSet(id, mi, field, value) {
+  const b = schedBuilds.find(x => x.id === id); if (!b || !b.materials[mi]) return;
+  b.materials[mi][field] = value; schedSave();
+  if (field === 'status') renderSchedule(); else renderScheduleDigest();
+}
+function schedMatDel(id, mi) {
+  const b = schedBuilds.find(x => x.id === id); if (!b) return;
+  b.materials.splice(mi, 1); schedSave(); renderSchedule();
+}
+function _schedPct(b) {
+  if (!b.phases.length) return 0;
+  return Math.round(100 * b.phases.filter(p => p.status === 'done').length / b.phases.length);
+}
+function _schedStatusColor(st) {
+  return { 'pending': 'var(--text-3)', 'scheduled': '#3a7bd6', 'in progress': 'var(--copper)', 'done': '#5aa24a',
+           'to order': '#d64545', 'ordered': '#3a7bd6', 'delivered': '#5aa24a',
+           'planned': '#3a7bd6', 'in_progress': 'var(--copper)', 'complete': '#5aa24a', 'on_hold': '#d64545' }[st] || 'var(--text-3)';
+}
+function renderScheduleDigest() {
+  const el = document.getElementById('sched-digest'); if (!el) return;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const horizon = new Date(today.getTime() + 14 * 86400000);
+  const items = [];
+  schedBuilds.forEach(b => {
+    if (b.status === 'complete') return;
+    b.phases.forEach(p => {
+      if (p.date && p.status !== 'done') {
+        const d = new Date(p.date + 'T00:00');
+        if (d <= horizon) items.push({ d, txt: `${p.label} — ${b.name}${p.contractor ? ' · ' + p.contractor : ''}`, late: d < today, kind: 'phase' });
+      }
+    });
+    b.materials.forEach(m => {
+      if (m.deliveryDate && m.status !== 'delivered') {
+        const d = new Date(m.deliveryDate + 'T00:00');
+        if (d <= horizon) items.push({ d, txt: `Delivery: ${m.label || 'material'} — ${b.name}${m.supplier ? ' · ' + m.supplier : ''}`, late: d < today, kind: 'delivery' });
+      }
+      if (m.status === 'to order') items.push({ d: today, txt: `NEEDS ORDER: ${m.label || 'material'} — ${b.name}`, late: true, kind: 'order' });
+    });
+  });
+  items.sort((a, b2) => a.d - b2.d);
+  if (!items.length) { el.innerHTML = '<div class="qbs-note">Nothing scheduled in the next 14 days.</div>'; return; }
+  el.innerHTML = '<div style="font-family:var(--font-headline); font-size:13px; color:var(--copper); font-weight:600; margin-bottom:6px;">Coming up (next 14 days)</div>'
+    + items.slice(0, 20).map(it => {
+      const ds = it.kind === 'order' ? '—' : it.d.toLocaleDateString();
+      return `<div style="display:flex; gap:10px; padding:4px 8px; font-size:12px; ${it.late ? 'color:#ff9b9b;' : ''}">
+        <span style="font-family:var(--font-mono); min-width:86px;">${ds}</span><span>${it.txt}${it.late && it.kind !== 'order' ? ' ⚠ past due' : ''}</span></div>`;
+    }).join('');
+}
+function renderSchedule() {
+  const wrap = document.getElementById('sched-builds'); if (!wrap) return;
+  renderScheduleDigest();
+  if (!schedBuilds.length) { wrap.innerHTML = '<div class="qbs-note">No builds yet — hit "+ New build" to start tracking one.</div>'; return; }
+  wrap.innerHTML = schedBuilds.map(b => {
+    const pct = _schedPct(b);
+    const head = `
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <button onclick="schedSet('${b.id}','collapsed',${!b.collapsed})" style="padding:2px 8px !important;">${b.collapsed ? '▸' : '▾'}</button>
+        <input value="${(b.name || '').replace(/"/g, '&quot;')}" onchange="schedSet('${b.id}','name',this.value)" style="font-weight:600; font-size:14px; min-width:220px;">
+        <select onchange="schedSet('${b.id}','status',this.value)" style="color:${_schedStatusColor(b.status)};">
+          ${['planned', 'in_progress', 'complete', 'on_hold'].map(st => `<option value="${st}" ${b.status === st ? 'selected' : ''}>${st.replace('_', ' ')}</option>`).join('')}
+        </select>
+        <label style="font-size:11px;">Start <input type="date" value="${b.start || ''}" onchange="schedSet('${b.id}','start',this.value)"></label>
+        <label style="font-size:11px;">Target <input type="date" value="${b.target || ''}" onchange="schedSet('${b.id}','target',this.value)"></label>
+        <div style="flex:1; min-width:120px; height:8px; background:var(--surface-2); border-radius:4px; overflow:hidden;">
+          <div style="width:${pct}%; height:100%; background:${pct === 100 ? '#5aa24a' : 'var(--copper)'};"></div>
+        </div>
+        <span style="font-family:var(--font-mono); font-size:11px; min-width:36px;">${pct}%</span>
+        <button onclick="schedDeleteBuild('${b.id}')" style="background:#3a1414; color:#ff9b9b; border-color:#5a1f1f;">✕</button>
+      </div>`;
+    if (b.collapsed) return `<div style="border:1px solid var(--hairline); border-radius:8px; padding:10px 12px; margin-bottom:10px;">${head}</div>`;
+    const phases = b.phases.map((p, pi) => `
+      <tr>
+        <td style="min-width:150px;">${p.label}</td>
+        <td><input value="${(p.contractor || '').replace(/"/g, '&quot;')}" placeholder="contractor" onchange="schedPhaseSet('${b.id}',${pi},'contractor',this.value)" style="width:130px; font-size:11px;"></td>
+        <td><input type="date" value="${p.date || ''}" onchange="schedPhaseSet('${b.id}',${pi},'date',this.value)" style="font-size:11px;"></td>
+        <td><select onchange="schedPhaseSet('${b.id}',${pi},'status',this.value)" style="color:${_schedStatusColor(p.status)}; font-size:11px;">
+          ${SCHED_PHASE_STATUS.map(st => `<option value="${st}" ${p.status === st ? 'selected' : ''}>${st}</option>`).join('')}
+        </select></td>
+        <td><input value="${(p.notes || '').replace(/"/g, '&quot;')}" placeholder="notes" onchange="schedPhaseSet('${b.id}',${pi},'notes',this.value)" style="width:100%; min-width:110px; font-size:11px;"></td>
+        <td><button onclick="schedPhaseDel('${b.id}',${pi})" style="padding:2px 7px !important; background:#3a1414; color:#ff9b9b; border-color:#5a1f1f;">✕</button></td>
+      </tr>`).join('');
+    const mats = b.materials.map((m, mi) => `
+      <tr>
+        <td><input value="${(m.label || '').replace(/"/g, '&quot;')}" placeholder="material / package" onchange="schedMatSet('${b.id}',${mi},'label',this.value)" style="width:100%; min-width:140px; font-size:11px;"></td>
+        <td><input value="${(m.supplier || '').replace(/"/g, '&quot;')}" placeholder="supplier" onchange="schedMatSet('${b.id}',${mi},'supplier',this.value)" style="width:110px; font-size:11px;"></td>
+        <td><select onchange="schedMatSet('${b.id}',${mi},'status',this.value)" style="color:${_schedStatusColor(m.status)}; font-size:11px;">
+          ${SCHED_MAT_STATUS.map(st => `<option value="${st}" ${m.status === st ? 'selected' : ''}>${st}</option>`).join('')}
+        </select></td>
+        <td><input type="date" value="${m.orderDate || ''}" title="Ordered" onchange="schedMatSet('${b.id}',${mi},'orderDate',this.value)" style="font-size:11px;"></td>
+        <td><input type="date" value="${m.deliveryDate || ''}" title="Delivery" onchange="schedMatSet('${b.id}',${mi},'deliveryDate',this.value)" style="font-size:11px;"></td>
+        <td><input value="${(m.notes || '').replace(/"/g, '&quot;')}" placeholder="notes" onchange="schedMatSet('${b.id}',${mi},'notes',this.value)" style="width:100%; min-width:90px; font-size:11px;"></td>
+        <td><button onclick="schedMatDel('${b.id}',${mi})" style="padding:2px 7px !important; background:#3a1414; color:#ff9b9b; border-color:#5a1f1f;">✕</button></td>
+      </tr>`).join('');
+    return `
+      <div style="border:1px solid var(--hairline); border-radius:8px; padding:12px; margin-bottom:14px;">
+        ${head}
+        <div style="margin-top:10px;">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--copper); margin-bottom:4px;">Phases &amp; contractors</div>
+          <table class="qbs-table" style="width:100%; font-size:12px;">
+            <thead><tr><th>Phase</th><th>Contractor</th><th>Date</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+            <tbody>${phases}</tbody>
+          </table>
+          <button onclick="schedPhaseAdd('${b.id}')" style="margin-top:4px; font-size:11px;">+ Add phase</button>
+        </div>
+        <div style="margin-top:12px;">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--copper); margin-bottom:4px;">Material orders &amp; deliveries</div>
+          <table class="qbs-table" style="width:100%; font-size:12px;">
+            <thead><tr><th>Material</th><th>Supplier</th><th>Status</th><th>Ordered</th><th>Delivery</th><th>Notes</th><th></th></tr></thead>
+            <tbody>${mats || ''}</tbody>
+          </table>
+          <button onclick="schedMatAdd('${b.id}')" style="margin-top:4px; font-size:11px;">+ Add material</button>
+        </div>
+        <textarea placeholder="Build notes..." onchange="schedSet('${b.id}','notes',this.value)" style="width:100%; margin-top:10px; min-height:40px; font-size:12px;">${b.notes || ''}</textarea>
+      </div>`;
+  }).join('');
+}
+schedLoad();
+
 function switchTab(name) {
   document.querySelectorAll('.qbs-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.qbs-tab-content').forEach(c => c.style.display = 'none');
@@ -7246,6 +7453,7 @@ function switchTab(name) {
   }
   if (name === 'flitch') { renderSkuMapping(); if (typeof renderPricingMasterTable === 'function') renderPricingMasterTable(); }
   if (name === 'settings') renderDefaultPrices();
+  if (name === 'schedule') { try { renderSchedule(); } catch (e) {} }
   if (name === 'calcs') { try { grCalc(); } catch(e) {} try { gsCalc(); } catch(e) {} try { shCalc(); } catch(e) {} try { swCalc(); } catch(e) {} try { stCalc(); } catch(e) {} }
   if (name === 'takeoff' && typeof takeoffInit === 'function') takeoffInit();
   if (name === 'subs') {
