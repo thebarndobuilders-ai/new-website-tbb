@@ -3204,6 +3204,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <button onclick="takeoffClearAll()" title="Clear all measurements and scale">✕ Clear</button>
         <button onclick="takeoffConvertToQuote()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600;" title="Send the measured dimensions to the Dimensions tab (footprint, wall LF, areas...)">➡ Push to Dimensions</button>
         <button onclick="takeoffPushLinesToQuote()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;" title="Send the PRICED takeoff lines to the quote's Materials list — only when you want them on the quote">$ Push to Quote</button>
+        <label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-2);" title="Zero the quote before pushing so ONLY measured items drive it — otherwise the push lands on top of whatever building is already entered (including the default one)"><input type="checkbox" id="to-clean-start" checked> Blank quote first — quote only measured items</label>
         <button onclick="takeoffPushTrusses()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;">◉ Push trusses → truss tool</button>
       </div>
 
@@ -4796,7 +4797,7 @@ const MATERIALS = [
       if (i.constructionType === 'post') return 0;
       const fieldStuds = Math.ceil(i.extWallLF / (16/12));
       // Corner/intersection studs: ~2 per outside corner + 1 per inside corner (was a flat 8).
-      const cornerExtras = (i.outsideCorners || 4) * 2 + (i.insideCorners || 0);
+      const cornerExtras = (i.outsideCorners || 0) * 2 + (i.insideCorners || 0);
       return Math.ceil((fieldStuds + cornerExtras) * 1.10);   // shop standard: ×1.1 waste on stud counts
     }},
   { id: "stud_2x4_104pc", label: "2×4 pre-cut studs (auto-sized to wall height)", cat: "Wall framing", uom: "ea", packSize: null,
@@ -5132,7 +5133,7 @@ const MATERIALS = [
           .reduce((s, g) => s + g.qty, 0);
       } else {
         // Fall back to default truss count from spacing math
-        trussCount = Math.ceil((i.L / (i.trussSpacing / 12)) + 1);
+        trussCount = i.L > 0 ? Math.ceil((i.L / (i.trussSpacing / 12)) + 1) : 0;
       }
       return trussCount * 2; // 2 clips per truss (both ends)
     }},
@@ -5762,10 +5763,10 @@ const MATERIALS = [
   // ---------------- HARDWARE ----------------
   { id: "tapcons_25", label: "Concrete Tapcons (25/box)", cat: "Hardware", uom: "box", packSize: null,
     priceCost: 12, priceSell: 16, priceRetail: 22,
-    formula: i => Math.ceil(20 / 25) }, // ~20 per build estimate
+    formula: i => (i.L > 0 || i.W > 0 || i.extWallLF > 0) ? Math.ceil(20 / 25) : 0 }, // ~20 per build
   { id: "caulk_case12", label: "Caulk/sealant (case of 12)", cat: "Hardware", uom: "case", packSize: null,
     priceCost: 42, priceSell: 56, priceRetail: 75,
-    formula: i => 1 }, // ~1 case per build for shell
+    formula: i => (i.L > 0 || i.W > 0 || i.extWallLF > 0) ? 1 : 0 }, // ~1 case per build
   { id: "dw_screws_box25lb", label: "Drywall screws 1-5/8\" (25 lb box)", cat: "Interior", uom: "box", packSize: null,
     priceCost: 38, priceSell: 49, priceRetail: 65,
     formula: i => (i.tier === 'turnkey' || i.tier === 'driedin') ? Math.ceil((i.sheetrockArea || 0) / 1000) : 0 },
@@ -6647,6 +6648,7 @@ function initRoofCalc() {
 // One-click blank quote: clears every manual entry (dimensions, areas, project info,
 // openings, truss rows, roof calculator). Saved leads/projects are untouched.
 function clearAllManual() {
+  window._takeoffOnlyQuote = false;
   if (!confirm('Clear all manual entries and start a blank quote?\n\nThis wipes the current dimensions, areas, project info, openings, truss rows, and the roof calculator. Saved leads and saved projects are NOT affected.')) return;
   if (typeof newQuoteReset === 'function') newQuoteReset();
   // Trusses
@@ -7271,6 +7273,8 @@ let _footprintAutoUpdate = true;
 function onDimChange() {
   const L = parseFloat(document.getElementById('length').value) || 0;
   const W = parseFloat(document.getElementById('width').value) || 0;
+  // Typing real building dimensions means a full quote again — leave takeoff-only mode
+  if (window._takeoffOnlyQuote && (L > 0 || W > 0)) window._takeoffOnlyQuote = false;
   const fpEl = document.getElementById('footprint');
   if (fpEl && _footprintAutoUpdate) {
     fpEl.value = Math.round(L * W);
@@ -7938,6 +7942,7 @@ FRAMING_LABOR_COLUMNS.forEach(c => {
 
 function framingLaborSuggestedSqft(colKey, i) {
   if (!i) return 0;
+  if (window._takeoffOnlyQuote) return 0;   // takeoff-only quote: no auto labor
   const c = FRAMING_LABOR_COLUMNS.find(x => x.key === colKey);
   if (!c) return 0;
   // Skip auto-fill if this scope doesn't apply to the current project mix
@@ -9431,8 +9436,11 @@ function getInputs() {
   const L = numEff('length'), W = numEff('width'), H = numEff('wall_height'), pitch = num('pitch');
   
   // Shelby Weeks geometry math (matches Shelby Weeks Roof Calculator 1.3 exactly)
-  const eaveOH = num('eave_overhang') / 12; // inches → feet
-  const gableOH = num('gable_overhang') / 12;
+  // No building geometry entered (L, W, wall LF all 0) → overhangs contribute nothing,
+  // so a takeoff-only push doesn't generate sliver soffit/fascia/roof quantities.
+  const _hasGeom = (L > 0 || W > 0 || num('ext_wall_lf') > 0);
+  const eaveOH = _hasGeom ? num('eave_overhang') / 12 : 0; // inches → feet
+  const gableOH = _hasGeom ? num('gable_overhang') / 12 : 0;
   const span = W; // truss length = building width
   const run = span / 2;
   const rise = run * (pitch / 12); // heel height
@@ -9534,7 +9542,7 @@ function getInputs() {
   const wallArea = wallRectArea + totalGableSidingArea; // include gable triangles in siding takeoff
   
   // Corner & roof feature counts (always read from measured-values inputs)
-  const outsideCorners = num('outside_corners') || 4;
+  const outsideCorners = num('outside_corners') || (_hasGeom ? 4 : 0);
   const insideCorners = num('inside_corners');
   const valleyLF = num('valley_lf');
   const hipLF = num('hip_lf');
@@ -10582,9 +10590,11 @@ function calcMaterials(i) {
 function calcSubs(i) {
   const subs = [];
   
-  // Concrete package — client-bid, markup baked in
+  // Concrete package — client-bid, markup baked in.
+  // Skipped in takeoff-only mode: measured heated/cooled SF must not silently
+  // drag a slab bid onto the quote (measure Concrete in the takeoff instead).
   const concArea = i.living + i.garageSqft + i.shopSqft + i.porchSqft;
-  if (concArea > 0) {
+  if (concArea > 0 && !window._takeoffOnlyQuote) {
     const concBase = (i.slabDepth === '6') ? (i.conc4in + i.conc6inAddon) : i.conc4in;
     const concFtg = { 'none': 0, '12x12': i.ftg12x12, '12x24': i.ftg12x24, '24x24': i.ftg24x24 }[i.footingSize] || 0;
     const concRate = concBase + concFtg;
@@ -17127,8 +17137,9 @@ if (typeof origSwitchTab === 'function') {
       return '• ' + c.label + ': ' + val + '  →  ' + c.target;
     }).join('\n');
     if (typeof switchTab === 'function') switchTab('inputs');
+    const cleaned = ($('to-clean-start') || {}).checked;
     alert('Takeoff pushed to Dimensions:\n\n' + lines
-      + '\n\nThese values are now on the Dimensions tab (set to MANUAL) and the quote has recalculated.'
+      + (cleaned ? '\n\nThe quote was BLANKED first — only these measured items drive it now.' : '\n\nPushed ON TOP of the existing quote (blank-first was unchecked).')
       + '\n\nPriced takeoff lines are NOT on the quote — use "$ Push to Quote" when you want them added.');
   };
   // Push the PRICED takeoff lines (the bottom-left estimate list) straight into the
@@ -17161,6 +17172,20 @@ if (typeof origSwitchTab === 'function') {
   };
 
   window.takeoffPushAllToQuote = function (silent) {
+    // Blank-quote-first: zero everything so ONLY the measured items drive the quote.
+    // Without this, the push lands on top of the already-entered (or default 60×40)
+    // building and unmeasured concrete/labor/panels ride along.
+    if (($('to-clean-start') || {}).checked) {
+      if (typeof newQuoteReset === 'function') newQuoteReset();
+      if (typeof trussGroups !== 'undefined') {
+        trussGroups.length = 0;
+        window._trussCleared = true;   // don't auto-reseed a truss row for an unmeasured building
+        if (typeof renderTrussTable === 'function') renderTrussTable();
+      }
+      const se = document.getElementById('shed_enabled');
+      if (se && se.checked) { se.checked = false; if (typeof onShedToggle === 'function') onShedToggle(); }
+      window._takeoffOnlyQuote = true;   // quote ONLY what was measured — no auto slab/labor
+    }
     const totals = catTotals();
     const byTarget = {};
     TAKEOFF_CATS.forEach(c => { if (c.target && totals[c.key] > 0) byTarget[c.target] = (byTarget[c.target] || 0) + totals[c.key]; });
