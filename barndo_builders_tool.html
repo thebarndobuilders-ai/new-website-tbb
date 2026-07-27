@@ -15336,9 +15336,71 @@ function buildOpeningInstance(dims, wallBase, type, wall, posFrac, sill, w, h, m
   _openingGroups.push({ ref: meta, group: grp, wall, sill, w, h, type });
 }
 
+// Give every opening a REAL wall + position so each one is an individually
+// draggable object: rows without a wall get auto-placed and written back, multi-qty
+// rows split into one row per opening, and overlapping openings on the same wall
+// get pushed apart (0.6' clearance) so doors/windows never stack on each other.
+function materializeOpeningPositions(dims) {
+  let changed = false;
+  ['window', 'extdoor', 'garage'].forEach(type => {
+    const rows = (typeof openingsState !== 'undefined' && openingsState[type]) || [];
+    for (let idx = 0; idx < rows.length; idx++) {
+      const row = rows[idx];
+      const q = row.qty || 1;
+      if (row.wall && row.pos != null && q <= 1) continue;
+      changed = true;
+      if (row.wall && row.pos != null && q > 1) {
+        // split extra qty into their own draggable rows, fanned to the right
+        row.qty = 1;
+        for (let k = 1; k < q; k++) {
+          const clone = JSON.parse(JSON.stringify(row));
+          clone.qty = 1;
+          clone.pos = Math.min(0.95, (row.pos || 0.5) + 0.1 * k);
+          rows.splice(idx + k, 0, clone);
+        }
+      } else {
+        // no wall assigned: place via auto-distribution, one row per opening
+        const targets = autoDistribute(type, q);
+        if (!targets.length) continue;
+        row.wall = targets[0].wall; row.pos = targets[0].pos; row.qty = 1;
+        for (let k = 1; k < q; k++) {
+          const t = targets[k] || targets[targets.length - 1];
+          const clone = JSON.parse(JSON.stringify(row));
+          clone.qty = 1; clone.wall = t.wall; clone.pos = t.pos;
+          rows.splice(idx + k, 0, clone);
+        }
+      }
+    }
+  });
+  // De-overlap pass: per wall, sort by position and push later openings right
+  ['front', 'back', 'left', 'right'].forEach(wall => {
+    const len = (wall === 'front' || wall === 'back') ? dims.L : dims.W;
+    if (!(len > 0)) return;
+    const list = [];
+    ['garage', 'extdoor', 'window'].forEach(type => {
+      (openingsState[type] || []).forEach(r => {
+        if (r.wall === wall && r.pos != null) list.push({ r, w: r.w || openingDefault(type, 'w') });
+      });
+    });
+    list.sort((a, b) => a.r.pos - b.r.pos);
+    let prevEnd = 0.5 / len;
+    list.forEach(it => {
+      const half = (it.w / 2 + 0.6) / len;   // 0.6' clearance for trim + jambs
+      let p = Math.max(it.r.pos, prevEnd + half);
+      p = Math.min(p, Math.max(half, 1 - half));
+      if (Math.abs(p - it.r.pos) > 1e-4) { it.r.pos = p; changed = true; }
+      prevEnd = p + half;
+    });
+  });
+  if (changed) {
+    ['window', 'extdoor', 'garage'].forEach(t => { try { renderOpeningsTable(t); } catch (e) {} });
+  }
+}
+
 function buildOpenings(dims, wallBase) {
   _openingPositions = [];
   _openingGroups.length = 0;
+  try { materializeOpeningPositions(dims); } catch (e) { console.warn('materialize openings:', e); }
   ['window', 'extdoor', 'garage'].forEach(type => {
     const rows = (typeof openingsState !== 'undefined' && openingsState[type]) || [];
     rows.forEach((row, idx) => {
