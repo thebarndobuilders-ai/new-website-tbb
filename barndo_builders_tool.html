@@ -4383,6 +4383,42 @@ function gableStepPanels(W, pitch, panelW, wallH, allowFt) {
   }
   return { count: perSide * 2, totalLF, sizes };
 }
+// Simple vertical wood-grain canvas texture for stained wood doors.
+function makeWoodTexture(baseHex) {
+  const base = (baseHex != null) ? baseHex : 0x7a4a26;
+  const shade = (hex, f) => {
+    const r = Math.min(255, Math.round(((hex >> 16) & 255) * f));
+    const gg = Math.min(255, Math.round(((hex >> 8) & 255) * f));
+    const b = Math.min(255, Math.round((hex & 255) * f));
+    return `rgb(${r},${gg},${b})`;
+  };
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = shade(base, 1.0);
+  g.fillRect(0, 0, 128, 256);
+  // long vertical grain streaks
+  for (let i = 0; i < 90; i++) {
+    const x = Math.random() * 128;
+    const wdt = 1 + Math.random() * 3;
+    const f = 0.78 + Math.random() * 0.45;
+    g.fillStyle = shade(base, f);
+    g.globalAlpha = 0.35;
+    g.fillRect(x, 0, wdt, 256);
+  }
+  // short darker flecks
+  g.globalAlpha = 0.3;
+  for (let i = 0; i < 60; i++) {
+    g.fillStyle = shade(base, 0.6);
+    g.fillRect(Math.random() * 128, Math.random() * 256, 1.2, 8 + Math.random() * 40);
+  }
+  g.globalAlpha = 1;
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  if (THREE.sRGBEncoding !== undefined) tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
 // Format a panel length in ft-inches for display: 17.5 → 17'6"
 function ftIn(len) {
   let ft = Math.floor(len);
@@ -14077,9 +14113,9 @@ function init3D() {
 
     // Meadow below the horizon — green gradient + wildflower speckles
     const meadow = g.createLinearGradient(0, HZN + 10, 0, 512);
-    meadow.addColorStop(0, '#67993c');
-    meadow.addColorStop(0.5, '#5c9134');
-    meadow.addColorStop(1, '#4f852c');
+    meadow.addColorStop(0, '#578a2f');
+    meadow.addColorStop(0.5, '#4c8128');
+    meadow.addColorStop(1, '#417522');
     g.fillStyle = meadow;
     g.fillRect(0, HZN + 14, 1024, 512 - HZN - 14);
     for (let i = 0; i < 900; i++) {
@@ -14098,7 +14134,7 @@ function init3D() {
     scene.background = tex;
   })();
   // Soft green-tinted haze so the far ground blends into the meadow backdrop.
-  scene.fog = new THREE.Fog(0x8fbb72, 300, 520);
+  scene.fog = new THREE.Fog(0x76a557, 300, 520);
   
   camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 500);
   camera.position.set(60, 35, 60);
@@ -14172,7 +14208,7 @@ function init3D() {
     const gc = document.createElement('canvas');
     gc.width = 256; gc.height = 256;
     const gx = gc.getContext('2d');
-    gx.fillStyle = '#3c7a21';
+    gx.fillStyle = '#2e661a';
     gx.fillRect(0, 0, 256, 256);
     for (let i = 0; i < 5200; i++) {
       const shade = Math.random();
@@ -14193,7 +14229,7 @@ function init3D() {
     gtex.wrapS = gtex.wrapT = THREE.RepeatWrapping;
     gtex.repeat.set(30, 30);
     const groundGeo = new THREE.PlaneGeometry(600, 600);
-    const groundMat = new THREE.MeshStandardMaterial({ map: gtex, color: 0x8cc168, roughness: 1.0, metalness: 0 });
+    const groundMat = new THREE.MeshStandardMaterial({ map: gtex, color: 0x71a94c, roughness: 1.0, metalness: 0 });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.01;
@@ -15110,11 +15146,12 @@ function buildOpeningInstance(dims, wallBase, type, wall, posFrac, sill, w, h, m
       frame(railT * 0.7, dh, -dw / 2 + (cIdx / cols) * dw, 0);
     }
   } else {
-    // CRAFTSMAN MAN DOOR — white slab, 6-lite (3×2) glass grid up top, two tall
-    // recessed panels below, handle + deadbolt on the latch side (reference photo).
+    // CRAFTSMAN MAN DOOR — stained WOOD slab, 6-lite (3×2) glass grid up top, two
+    // tall recessed panels below, handle + deadbolt on the latch side.
     const dw = w * 0.92, dh = h * 0.94;
+    const woodTex = makeWoodTexture(0x7a4a26);
     const slab = new THREE.Mesh(new THREE.PlaneGeometry(dw, dh),
-      new THREE.MeshStandardMaterial({ color: 0xebebe7, roughness: 0.55, side: THREE.DoubleSide }));
+      new THREE.MeshStandardMaterial({ color: 0xffffff, map: woodTex, roughness: 0.5, side: THREE.DoubleSide }));
     slab.position.set(0, 0, 0.14);
     slab.userData = ud('Man door'); grp.add(slab); allMeshes.push(slab);
     const dAdd = (mesh, lbl) => { mesh.userData = ud(lbl || 'Man door'); grp.add(mesh); allMeshes.push(mesh); };
@@ -15126,7 +15163,7 @@ function buildOpeningInstance(dims, wallBase, type, wall, posFrac, sill, w, h, m
     dGlass.position.set(0, liteY, 0.155);
     dAdd(dGlass, 'Man door glass');
     // white muntin grid — 3 cols × 2 rows
-    const mnt = () => new THREE.MeshStandardMaterial({ color: 0xcfcfc8, roughness: 0.5 });
+    const mnt = () => new THREE.MeshStandardMaterial({ color: 0x4e2e15, roughness: 0.55 });
     const mBar = (bw, bh, x, y) => {
       const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.03), mnt());
       b.position.set(x, y, 0.165); dAdd(b);
@@ -15139,11 +15176,12 @@ function buildOpeningInstance(dims, wallBase, type, wall, posFrac, sill, w, h, m
     // craftsman panel profile reads clearly (reference photo)
     [-1, 1].forEach(sx => {
       const pW = dw * 0.30, pH = dh * 0.52, pX = sx * dw * 0.19, pY = -dh * 0.13;
+      const pTex = makeWoodTexture(0x6b3f1f);   // recessed panels a shade darker
       const pnl = new THREE.Mesh(new THREE.PlaneGeometry(pW, pH),
-        new THREE.MeshStandardMaterial({ color: 0xd6d6cd, roughness: 0.62, side: THREE.DoubleSide }));
+        new THREE.MeshStandardMaterial({ color: 0xffffff, map: pTex, roughness: 0.58, side: THREE.DoubleSide }));
       pnl.position.set(pX, pY, 0.155);
       dAdd(pnl);
-      const edge = () => new THREE.MeshStandardMaterial({ color: 0xa9a9a0, roughness: 0.7 });
+      const edge = () => new THREE.MeshStandardMaterial({ color: 0x3f2411, roughness: 0.7 });
       const eT = 0.035;
       [[pW, eT, pX, pY + pH / 2], [pW, eT, pX, pY - pH / 2], [eT, pH, pX - pW / 2, pY], [eT, pH, pX + pW / 2, pY]]
         .forEach(([bw, bh, bx, by]) => {
@@ -15153,7 +15191,7 @@ function buildOpeningInstance(dims, wallBase, type, wall, posFrac, sill, w, h, m
         });
     });
     // handle + deadbolt, latch side
-    const hw = () => new THREE.MeshStandardMaterial({ color: 0x3a3a3e, metalness: 0.8, roughness: 0.25 });
+    const hw = () => new THREE.MeshStandardMaterial({ color: 0x2b2118, metalness: 0.85, roughness: 0.3 });
     const knob = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), hw());
     knob.position.set(-dw * 0.40, -dh * 0.04, 0.18); dAdd(knob);
     const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.02, 8), hw());
