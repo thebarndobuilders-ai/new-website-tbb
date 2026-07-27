@@ -7257,13 +7257,16 @@ function printCounterTicket() {
 // Stored in localStorage under bb_schedule_v1 (rides in the full backup).
 // =============================================================
 const SCHED_KEY = 'bb_schedule_v1';
-// Default post-frame phase chain: [label, working-day duration]
+// Standard build schedule (matches how houses are scheduled): [label, duration in days]
 const SCHED_PHASES_DEFAULT = [
-  ['Permits / site prep', 5], ['Pad & grade', 2], ['Concrete slab', 3],
-  ['Posts / framing', 10], ['Trusses set', 2], ['Roof metal', 4],
-  ['Wall metal & trim', 4], ['Doors & windows', 2], ['Gutters', 1],
-  ['Electrical', 5], ['Plumbing', 5], ['HVAC', 3], ['Insulation', 2],
-  ['Drywall & finish', 10], ['Final walkthrough', 1],
+  ['Permits & site prep', 5],
+  ['Foundation / slab', 5],
+  ['Framing & dry-in', 15],          // shell up: posts/framing, trusses, roof & wall metal, doors/windows
+  ['Rough-ins (elec · plumb · HVAC)', 10],
+  ['Insulation & drywall', 10],
+  ['Interior finish', 10],
+  ['Exterior finish & gutters', 3],
+  ['Punch list & final', 3],
 ];
 const SCHED_PHASE_STATUS = ['pending', 'scheduled', 'in progress', 'done'];
 const SCHED_MAT_STATUS = ['to order', 'ordered', 'delivered'];
