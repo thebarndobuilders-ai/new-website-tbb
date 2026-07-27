@@ -10518,6 +10518,7 @@ function calcMaterials(i) {
   (window._takeoffQuoteLines || []).forEach(t => {
     if (!t.qty || t.qty <= 0) return;
     const tCost = t.qty * (t.unitCost || 0);
+    // Takeoff prices are FINAL numbers (turnkey/shell $/sqft pricing) — no markup applied.
     lines.push({
       id: 'takeoff_line_' + t.key,
       label: t.label,
@@ -10525,11 +10526,11 @@ function calcMaterials(i) {
       uom: t.uom,
       qty: t.qty,
       cost: tCost,
-      sell: tCost * (1 + getMarkupSell()),
-      retail: tCost * (1 + getMarkupRetail()),
+      sell: tCost,
+      retail: tCost,
       unitCost: t.unitCost || 0,
-      unitSell: (t.unitCost || 0) * (1 + getMarkupSell()),
-      unitRetail: (t.unitCost || 0) * (1 + getMarkupRetail()),
+      unitSell: t.unitCost || 0,
+      unitRetail: t.unitCost || 0,
       source: 'takeoff',
       sku: ''
     });
@@ -11196,7 +11197,8 @@ function recalc() {
   // Subs costs tallied via allQuotedTotal()
   let subCostTotal = 0, subSellTotal = 0;
   
-  const laborCost = i.laborFraming + i.laborRoofing + i.laborSiding;
+  let laborCost = i.laborFraming + i.laborRoofing + i.laborSiding;
+  if (window._takeoffOnlyQuote) laborCost = 0;   // takeoff-only quote: nothing but the takeoff numbers
   const laborSell = laborCost * (1 + i.markupLabor / 100);
   
   // === Split subs into Concrete / Labor / Mechanicals / Other subs buckets ===
@@ -11262,9 +11264,10 @@ function recalc() {
   // We do NOT add framingCardTotal separately here or it would double-count.
   const allQuoted = (typeof allQuotedTotal === 'function') ? allQuotedTotal() : 0;
   const projectSubtotal = matMarkedUp + allQuoted;
-  const overhead = projectSubtotal * (i.overheadPct / 100);
-  const profit = projectSubtotal * (i.profitPct / 100);
-  const contingency = projectSubtotal * (i.contingencyPct / 100);
+  const _opcOff = !!window._takeoffOnlyQuote;   // takeoff-only: totals equal the takeoff numbers
+  const overhead = _opcOff ? 0 : projectSubtotal * (i.overheadPct / 100);
+  const profit = _opcOff ? 0 : projectSubtotal * (i.profitPct / 100);
+  const contingency = _opcOff ? 0 : projectSubtotal * (i.contingencyPct / 100);
   const grand = projectSubtotal + overhead + profit + contingency;
   // For Shop tier, use shop sqft for the $/sf metric; otherwise use living
   const sqftBasis = (i.tier === 'shop') ? i.shopSqft : i.living;
