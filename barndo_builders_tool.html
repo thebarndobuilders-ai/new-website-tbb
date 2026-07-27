@@ -4342,6 +4342,7 @@ const LUMBER_STOCK_FT = {
   'pt_2x6_plate_lf': 16, '2x6_top_plate_lf': 16, 'pt_2x4_plate_lf': 16, '2x4_top_plate_lf': 16,
   'purlin_2x4_lf': 16, 'rafter_lumber_lf': 16, 'window_frame_2x6_lf': 16,
   'gable_ladder_2x4_lf': 16, 'header_cap_2x6': 16, 'header_cap_2x4': 16,
+  'tr_soffit_panel_lf': 3, 'bb_soffit_panel_lf': 3,
   'lp_fascia_1x8_lf': 16,
 };
 
@@ -5550,28 +5551,30 @@ const MATERIALS = [
   // Soffit panel — Tuff Rib (same SKU as TR siding)
   // Method: soffit perimeter ÷ 3 ft = pieces, length = overhang width
   // Total LF = pieces × overhang width
-  { id: "tr_soffit_panel_lf", label: "Tuff Rib soffit panel (perimeter ÷ 3, cut to overhang)", cat: "Soffit & fascia", uom: "LF", packSize: null,
+  // METAL SOFFIT — builder rule: total run = both eaves (incl. gable overhangs) +
+  // all gable rakes, ÷ 3 (soffit comes in 3' pieces), ALWAYS +9' (3 pieces) waste.
+  // Zero overhang on a side = that side's run drops out.
+  { id: "tr_soffit_panel_lf", label: "Tuff Rib soffit (3' pieces · eaves + rakes ÷ 3 + 9' waste)", cat: "Soffit & fascia", uom: "LF", packSize: null,
     priceCost: 2.85, priceSell: 3.65,
     formula: i => {
       if (i.sidingProduct !== 'tuffrib_29') return 0;
-      // Eave soffit pieces: L ÷ 3 × 2 sides, each piece = eave overhang width
-      const eavePcs = Math.ceil(i.L / 3) * 2;
-      const eaveLF = eavePcs * i.eaveOH;
-      // Gable rake soffit pieces: top chord ÷ 3 × 2 rakes × gable count, each piece = gable overhang width
-      const gableRakeLength = i.topChord;
-      const gablePcs = Math.ceil(gableRakeLength / 3) * 2 * i.gableCountActual;
-      const gableLF = gablePcs * i.gableOH;
-      return Math.ceil((eaveLF + gableLF) * 1.05);
+      const eaveRun = (i.eaveOH > 0) ? (i.L + 2 * i.gableOH) * 2 : 0;
+      const rakeRun = (i.gableOH > 0) ? i.topChord * 2 * i.gableCountActual : 0;
+      const run = eaveRun + rakeRun;
+      if (run <= 0) return 0;
+      const pieces = Math.ceil(run / 3) + 3;   // +9' waste, always
+      return pieces * 3;
     }},
-  { id: "bb_soffit_panel_lf", label: "Metal B&B soffit panel (perimeter ÷ 1, cut to overhang)", cat: "Soffit & fascia", uom: "LF", packSize: null,
+  { id: "bb_soffit_panel_lf", label: "Metal B&B soffit (3' pieces · eaves + rakes ÷ 3 + 9' waste)", cat: "Soffit & fascia", uom: "LF", packSize: null,
     priceCost: 4.25, priceSell: 5.45,
     formula: i => {
       if (i.sidingProduct !== 'mbb_26') return 0;
-      const eavePcs = Math.ceil(i.L / 1) * 2;
-      const eaveLF = eavePcs * i.eaveOH;
-      const gablePcs = Math.ceil(i.topChord / 1) * 2 * i.gableCountActual;
-      const gableLF = gablePcs * i.gableOH;
-      return Math.ceil((eaveLF + gableLF) * 1.05);
+      const eaveRun = (i.eaveOH > 0) ? (i.L + 2 * i.gableOH) * 2 : 0;
+      const rakeRun = (i.gableOH > 0) ? i.topChord * 2 * i.gableCountActual : 0;
+      const run = eaveRun + rakeRun;
+      if (run <= 0) return 0;
+      const pieces = Math.ceil(run / 3) + 3;   // +9' waste, always
+      return pieces * 3;
     }},
   { id: "lp_soffit_panel", label: "LP SmartSide soffit panel (4×8)", cat: "Soffit & fascia", uom: "sheet", packSize: null,
     priceCost: 48, priceSell: 62, priceRetail: 58,
