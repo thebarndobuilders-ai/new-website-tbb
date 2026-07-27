@@ -2479,6 +2479,23 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           <select id="trim_color"></select>
           <div class="qbs-note">Ridge cap, rake/corner trim, fascia — shown on the 3D model.</div>
         </div>
+        <div class="qbs-field">
+          <label>Gutters</label>
+          <select id="gutters_on" onchange="recalc()">
+            <option value="none">None</option>
+            <option value="yes">Seamless gutters + downspouts</option>
+          </select>
+          <div class="qbs-note">Gutters run the eave lengths. Downspouts = wall height + 2' each (couplings).</div>
+        </div>
+        <div class="qbs-field">
+          <label>Downspouts (qty · 0 = auto)</label>
+          <input type="number" id="downspout_qty" value="0" min="0" step="1" oninput="recalc()" />
+          <div class="qbs-note">Auto: 2 per eave run, +1 per run over 35'.</div>
+        </div>
+        <div class="qbs-field">
+          <label>Gutter color</label>
+          <select id="gutter_color"></select>
+        </div>
       </div>
     </div>
 
@@ -5393,6 +5410,32 @@ const MATERIALS = [
       return Math.ceil(run * 1.05 / 10);
     }},
 
+  // Gutters — seamless, priced per foot ($3.50 cost / $5.00 resale). Gutter LF from the
+  // eave runs; downspouts each cut at wall height + 2' for couplings.
+  // (Auto downspout count: 2 per eave run, +1 per run over 35'. Qty override wins.)
+  { id: "gutter_seamless_lf", label: "Seamless gutter — both eave runs", cat: "Gutters", uom: "LF", packSize: null,
+    priceCost: 3.50, priceSell: 5.00, priceRetail: 6.50, fixedSell: 5.00,
+    formula: i => {
+      if (!i.guttersOn) return 0;
+      return Math.ceil((i.L + 2 * i.gableOH) * 2);
+    },
+    labelFn: i => `Seamless gutter — 2 eave runs @ ${Math.ceil(i.L + 2 * i.gableOH)}'${i.gutterColor ? ' (' + i.gutterColor + ')' : ''}`},
+  { id: "downspout_lf", label: "Downspouts (wall ht + 2' each)", cat: "Gutters", uom: "LF", packSize: null,
+    priceCost: 3.50, priceSell: 5.00, priceRetail: 6.50, fixedSell: 5.00,
+    formula: i => {
+      if (!i.guttersOn) return 0;
+      const run = i.L + 2 * i.gableOH;
+      const auto = 2 * Math.max(2, Math.ceil(run / 35));
+      const count = (i.downspoutQty > 0) ? i.downspoutQty : auto;
+      return Math.ceil(count * (i.H + 2));
+    },
+    labelFn: i => {
+      const run = i.L + 2 * i.gableOH;
+      const auto = 2 * Math.max(2, Math.ceil(run / 35));
+      const count = (i.downspoutQty > 0) ? i.downspoutQty : auto;
+      return `Downspouts — ${count} @ ${(i.H + 2)}' (wall ht + 2' couplings)${i.gutterColor ? ' (' + i.gutterColor + ')' : ''}`;
+    }},
+
   // Cupolas — louvered w/ metal roof cap, priced per unit by size (edit on Pricing master).
   { id: "cupola_3ft_ea", label: "Cupola 3' — louvered, metal cap", cat: "Roof skin", uom: "ea", packSize: null,
     priceCost: 795, priceSell: 1050, priceRetail: 1300,
@@ -6359,6 +6402,7 @@ function populateColors(selectId, product) {
 function onRoofProductChange() {
   populateColors('roof_color', document.getElementById('roof_product').value);
   populateColors('trim_color', document.getElementById('roof_product').value);
+  populateColors('gutter_color', document.getElementById('roof_product').value);
 }
 function onSidingProductChange() {
   populateColors('siding_color', document.getElementById('siding_product').value);
@@ -9755,6 +9799,9 @@ function getInputs() {
     wainscotOn: ((document.getElementById('wainscot_on') || {}).value === '36'),
     wainscotColor: (document.getElementById('wainscot_color') || {}).value || '',
     trimColor: (document.getElementById('trim_color') || {}).value || '',
+    guttersOn: ((document.getElementById('gutters_on') || {}).value === 'yes'),
+    gutterColor: (document.getElementById('gutter_color') || {}).value || '',
+    downspoutQty: (function(){ const el = document.getElementById('downspout_qty'); return el ? (parseFloat(el.value) || 0) : 0; })(),
     wainscotRunLF: Math.max(0, extWallLF - doorWidthExt - doorWidthGar),
     doorWidthExt, doorWidthGar,
     cupolaQty3: (function(){ const el = document.getElementById('cupola_qty_3'); return el ? (parseFloat(el.value) || 0) : 0; })(),
@@ -10359,6 +10406,10 @@ function calcMaterials(i) {
         retail: customCost * (1 + getMarkupRetail()),
         source: 'custom'
       };
+    }
+    // Fixed resale: line pins its sell price (e.g. gutters at $5/ft) — markup doesn't apply.
+    if (m.fixedSell != null) {
+      price = { ...price, sell: m.fixedSell, retail: Math.max(price.retail || 0, m.fixedSell), source: 'fixed-sell' };
     }
     return {
       id: m.id,
@@ -11693,6 +11744,8 @@ async function loadProject(key) {
     if (i.wallSystem) { const ws = document.getElementById('wall_system'); if (ws) ws.value = i.wallSystem; }
     if (i.proArmorScope) { const pa = document.getElementById('pro_armor_scope'); if (pa) pa.value = i.proArmorScope; }
     { const wo = document.getElementById('wainscot_on'); if (wo) wo.value = i.wainscotOn ? '36' : 'none'; }
+    { const gu = document.getElementById('gutters_on'); if (gu) gu.value = i.guttersOn ? 'yes' : 'none'; }
+    if (i.downspoutQty != null) { const dq = document.getElementById('downspout_qty'); if (dq) dq.value = i.downspoutQty; }
     ['3', '4', '5'].forEach(sz => {
       const cq = document.getElementById('cupola_qty_' + sz);
       if (cq && i['cupolaQty' + sz] != null) cq.value = i['cupolaQty' + sz];
@@ -11709,6 +11762,7 @@ async function loadProject(key) {
     document.getElementById('siding_color').value = i.sidingColor;
     if (i.wainscotColor) { const wcEl = document.getElementById('wainscot_color'); if (wcEl) wcEl.value = i.wainscotColor; }
     if (i.trimColor) { const tcEl = document.getElementById('trim_color'); if (tcEl) tcEl.value = i.trimColor; }
+    if (i.gutterColor) { const guc = document.getElementById('gutter_color'); if (guc) guc.value = i.gutterColor; }
     setTier(p.tier);
     switchTab('inputs');
   } catch(e) { alert('Load failed'); }
