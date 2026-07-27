@@ -2474,6 +2474,11 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           <label>Wainscot color</label>
           <select id="wainscot_color"></select>
         </div>
+        <div class="qbs-field">
+          <label>Trim color</label>
+          <select id="trim_color"></select>
+          <div class="qbs-note">Ridge cap, rake/corner trim, fascia — shown on the 3D model.</div>
+        </div>
       </div>
     </div>
 
@@ -2713,6 +2718,21 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           </div>
           <div class="qbs-field"><label>Rafter/truss spacing (in)</label><input type="number" id="shed_rafter_spacing" value="16" oninput="recalc()" /><div class="qbs-note">16" stick · 48" steel</div></div>
           <div class="qbs-field">
+            <label>Wainscot on shed</label>
+            <select id="shed_wainscot" onchange="recalc()">
+              <option value="none">None</option>
+              <option value="36">36" wainscot — Z bar on top</option>
+            </select>
+            <div class="qbs-note">Uses the main wainscot color</div>
+          </div>
+          <div class="qbs-field"><label>Shed windows (qty)</label><input type="number" id="shed_window_qty" value="0" min="0" step="1" oninput="recalc()" /></div>
+          <div class="qbs-field"><label>Shed window size W×H (ft)</label>
+            <div style="display:flex; gap:6px;">
+              <input type="number" id="shed_window_w" value="3" step="0.5" oninput="recalc()" />
+              <input type="number" id="shed_window_h" value="3" step="0.5" oninput="recalc()" />
+            </div>
+          </div>
+          <div class="qbs-field">
             <label>Attached side</label>
             <select id="shed_attached_side" onchange="recalc()">
               <option value="back">Back (long wall)</option>
@@ -2731,19 +2751,9 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
     <div class="qbs-card">
       <h3>Cupolas <span class="badge">Ridge accents · priced per unit on Pricing master</span></h3>
       <div class="qbs-grid-3">
-        <div class="qbs-field">
-          <label>Cupola size</label>
-          <select id="cupola_size" onchange="recalc()">
-            <option value="none">None</option>
-            <option value="3">3' cupola</option>
-            <option value="4">4' cupola</option>
-            <option value="5">5' cupola</option>
-          </select>
-        </div>
-        <div class="qbs-field">
-          <label>Quantity</label>
-          <input type="number" id="cupola_qty" value="1" min="0" step="1" oninput="recalc()" />
-        </div>
+        <div class="qbs-field"><label>3' cupolas (qty)</label><input type="number" id="cupola_qty_3" value="0" min="0" step="1" oninput="recalc()" /></div>
+        <div class="qbs-field"><label>4' cupolas (qty)</label><input type="number" id="cupola_qty_4" value="0" min="0" step="1" oninput="recalc()" /></div>
+        <div class="qbs-field"><label>5' cupolas (qty)</label><input type="number" id="cupola_qty_5" value="0" min="0" step="1" oninput="recalc()" /></div>
         <div class="qbs-field">
           <div class="qbs-note" style="margin-top:22px;">Louvered cupola with metal roof cap, set on the ridge. Edit the three per-size prices on the Pricing master tab.</div>
         </div>
@@ -3508,7 +3518,9 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
             <label style="display:block; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;">Roof color</label>
             <select id="audit3d-roof-color" onchange="bb3dColorCardChanged('audit3d-roof-color','roof_color')" style="font-family: var(--font-mono); font-size: 12px; width: 100%; margin-bottom: 8px;"></select>
             <label style="display:block; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;">Siding color</label>
-            <select id="audit3d-siding-color" onchange="bb3dColorCardChanged('audit3d-siding-color','siding_color')" style="font-family: var(--font-mono); font-size: 12px; width: 100%;"></select>
+            <select id="audit3d-siding-color" onchange="bb3dColorCardChanged('audit3d-siding-color','siding_color')" style="font-family: var(--font-mono); font-size: 12px; width: 100%; margin-bottom: 8px;"></select>
+            <label style="display:block; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;">Trim color</label>
+            <select id="audit3d-trim-color" onchange="bb3dColorCardChanged('audit3d-trim-color','trim_color')" style="font-family: var(--font-mono); font-size: 12px; width: 100%;"></select>
             <div class="qbs-note" style="margin-top: 6px;">Same color chart as the Dimensions tab — changing it here updates the quote selection AND repaints the model.</div>
           </div>
 
@@ -4994,6 +5006,21 @@ const MATERIALS = [
   { id: "shed_roof_panel_tr", label: "Side shed: TR 29ga roof panel (cut to top chord)", cat: "Side shed", uom: "LF", packSize: null,
     priceCost: 2.58, priceSell: 3.40, priceRetail: 4.25,
     formula: i => i.shedActive ? Math.ceil(i.shed.panelLF * 1.05) : 0 },
+  { id: "shed_wall_panel_tr", label: "Side shed: TR 29ga wall panel (outboard + ends)", cat: "Side shed", uom: "LF", packSize: null,
+    priceCost: 2.58, priceSell: 3.40, priceRetail: 4.25,
+    // Outboard wall (sL × sH) + 2 trapezoid end walls (avg of low/high) ÷ 3' coverage.
+    // Shed wainscot takes the bottom 3' of the run; windows deduct their area.
+    formula: i => {
+      if (!i.shedActive) return 0;
+      const sh = i.shed;
+      let area = sh.L * sh.H + 2 * (sh.W * (sh.H + (sh.hHigh || sh.H)) / 2);
+      const winQ = (i.shedActive ? (parseFloat((document.getElementById('shed_window_qty') || {}).value) || 0) : 0);
+      const winW = parseFloat((document.getElementById('shed_window_w') || {}).value) || 3;
+      const winH = parseFloat((document.getElementById('shed_window_h') || {}).value) || 3;
+      area -= winQ * winW * winH;
+      if (sh.wainscot) area -= 3 * sh.exteriorWallLF;   // band covered by the wainscot line
+      return Math.ceil(Math.max(0, area) / 3 * 1.05);
+    }},
 
   // ---------------- MOISTURE BARRIER (UNDER METAL ROOF ONLY — SHELL BUILDS) ----------------
   // Pro Armor / Therma-Guard wrap — roof area only. Walls excluded for shell tier.
@@ -5310,10 +5337,12 @@ const MATERIALS = [
   { id: "wainscot_panel_lf", label: "Wainscot 36\" — metal panels", cat: "Siding skin", uom: "LF", packSize: null,
     priceCost: 2.58, priceSell: 3.65,
     formula: i => {
-      if (!i.wainscotOn) return 0;
       if (i.sidingProduct !== 'tuffrib_29' && i.sidingProduct !== 'mbb_26') return 0;
+      let run = i.wainscotOn ? i.wainscotRunLF : 0;
+      if (i.shedActive && i.shed && i.shed.wainscot) run += i.shed.exteriorWallLF;
+      if (run <= 0) return 0;
       const cov = (i.sidingProduct === 'mbb_26') ? 1 : 3;
-      const pieces = Math.ceil(i.wainscotRunLF / cov);
+      const pieces = Math.ceil(run / cov);
       return pieces * 3;   // every piece cut 3' tall
     },
     customUnitPrice: i => getPrice(i.sidingProduct === 'mbb_26' ? 'mbb_26_rect_lf' : 'tuffrib_29_wall_lf').cost,
@@ -5321,21 +5350,23 @@ const MATERIALS = [
   { id: "wainscot_z_trim_10", label: "Z bar trim — top of wainscot (10' sticks)", cat: "Metal wall trim", uom: "ea", packSize: null,
     priceCost: 16, priceSell: 22,
     formula: i => {
-      if (!i.wainscotOn) return 0;
       if (i.sidingProduct !== 'tuffrib_29' && i.sidingProduct !== 'mbb_26') return 0;
-      return Math.ceil(i.wainscotRunLF * 1.05 / 10);
+      let run = i.wainscotOn ? i.wainscotRunLF : 0;
+      if (i.shedActive && i.shed && i.shed.wainscot) run += i.shed.exteriorWallLF;
+      if (run <= 0) return 0;
+      return Math.ceil(run * 1.05 / 10);
     }},
 
   // Cupolas — louvered w/ metal roof cap, priced per unit by size (edit on Pricing master).
   { id: "cupola_3ft_ea", label: "Cupola 3' — louvered, metal cap", cat: "Roof skin", uom: "ea", packSize: null,
     priceCost: 795, priceSell: 1050, priceRetail: 1300,
-    formula: i => (i.cupolaSize === '3') ? (i.cupolaQty || 0) : 0 },
+    formula: i => Math.max(0, i.cupolaQty3 || 0) },
   { id: "cupola_4ft_ea", label: "Cupola 4' — louvered, metal cap", cat: "Roof skin", uom: "ea", packSize: null,
     priceCost: 1195, priceSell: 1550, priceRetail: 1950,
-    formula: i => (i.cupolaSize === '4') ? (i.cupolaQty || 0) : 0 },
+    formula: i => Math.max(0, i.cupolaQty4 || 0) },
   { id: "cupola_5ft_ea", label: "Cupola 5' — louvered, metal cap", cat: "Roof skin", uom: "ea", packSize: null,
     priceCost: 1695, priceSell: 2200, priceRetail: 2750,
-    formula: i => (i.cupolaSize === '5') ? (i.cupolaQty || 0) : 0 },
+    formula: i => Math.max(0, i.cupolaQty5 || 0) },
 
   // Metal B&B: breaks at eave-to-gable line. Rectangular pieces below, separate gable triangle pieces above.
   { id: "mbb_26_rect_lf", label: "Metal B&B 26 ga panel — rectangular walls", cat: "Siding skin", uom: "LF", packSize: null,
@@ -6291,6 +6322,7 @@ function populateColors(selectId, product) {
 
 function onRoofProductChange() {
   populateColors('roof_color', document.getElementById('roof_product').value);
+  populateColors('trim_color', document.getElementById('roof_product').value);
 }
 function onSidingProductChange() {
   populateColors('siding_color', document.getElementById('siding_product').value);
@@ -9461,6 +9493,8 @@ function getInputs() {
     }
     shed = {
       W: sW, L: sL, H: sH, pitch: sPitch, eaveOH_ft: sEaveOH_ft,
+      wainscot: ((document.getElementById('shed_wainscot') || {}).value === '36'),
+      hHigh: sH + sRise,
       framing: sFraming, spacing_in: sSpacing_in, spacing_ft: sSpacing_ft,
       rise: sRise, topChord: sTopChord,
       exteriorWallLF: shedExteriorWallLF,
@@ -9504,6 +9538,13 @@ function getInputs() {
   const gableSoffitArea = topChord * 2 * gableCountActual * gableOH;
   const soffitArea = eaveSoffitArea + gableSoffitArea;
   
+  // Side shed windows fold into the global window counts (unit, wrap, header, frame lumber).
+  const _shedWinQty = shedActive ? (num('shed_window_qty') || 0) : 0;
+  const _shedWinW = num('shed_window_w') || 3;
+  const _shedWinH = num('shed_window_h') || 3;
+  const _shedWinWrap = _shedWinQty * 2 * (_shedWinW + _shedWinH);
+  const _shedWinHdr = _shedWinQty * Math.max(2, Math.round((_shedWinW + 2) * 2) / 2);
+
   // Fascia LF: both eaves + gable rakes (2 rakes per gable).
   // Zero overhang on a side = no soffit/fascia there — that side contributes nothing
   // (kills sub-fascia boards, metal fascia trim, and FJ trim for that side).
@@ -9646,19 +9687,20 @@ function getInputs() {
     frameShop: num('frame_shop') || 8.00,
     framePorch: num('frame_porch') || 8.00,
     extWallLF, intWallLF: num('int_wall_lf'),
-    windows, extDoors, garageDoors, intDoors,
+    windows: windows + _shedWinQty, extDoors, garageDoors, intDoors,
     // Header LF per type (auto-calc width+2 per row, sum × qty)
-    headerLF_windows, headerLF_extdoors, headerLF_intdoors, headerLF_garage, headerLF_total,
+    headerLF_windows: headerLF_windows + _shedWinHdr, headerLF_extdoors, headerLF_intdoors, headerLF_garage,
+    headerLF_total: headerLF_total + _shedWinHdr,
     garageHdr_2x12_doubled: garageHdrCats.lf_2x12_doubled,
     trussConfigActive,
     trussAgg,
     garageHdr_lvl_small: garageHdrCats.lf_lvl_small,
     garageHdr_lvl_large: garageHdrCats.lf_lvl_large,
-    windowFramePerimeterLF,
+    windowFramePerimeterLF: windowFramePerimeterLF + _shedWinQty * 2 * (_shedWinW + _shedWinH),
     // Opening areas (sf) for siding deduction
     area_windows, area_extdoors, area_garage,
     // J channel / trim wrap LF
-    wrap_windows, wrap_extdoors, wrap_garage,
+    wrap_windows: wrap_windows + _shedWinWrap, wrap_extdoors, wrap_garage,
     // Raw openings state — for the verify page to iterate rows directly
     openingsState,
     trussSpacing: (num('truss_spacing') || 2) * 12,   // input is feet; store INCHES internally (formulas expect inches). Guard 0 → 2'.
@@ -9676,10 +9718,12 @@ function getInputs() {
     sidingProduct: document.getElementById('siding_product').value,
     wainscotOn: ((document.getElementById('wainscot_on') || {}).value === '36'),
     wainscotColor: (document.getElementById('wainscot_color') || {}).value || '',
+    trimColor: (document.getElementById('trim_color') || {}).value || '',
     wainscotRunLF: Math.max(0, extWallLF - doorWidthExt - doorWidthGar),
     doorWidthExt, doorWidthGar,
-    cupolaSize: (document.getElementById('cupola_size') || {}).value || 'none',
-    cupolaQty: (function(){ const el = document.getElementById('cupola_qty'); return el ? (parseFloat(el.value) || 0) : 0; })(),
+    cupolaQty3: (function(){ const el = document.getElementById('cupola_qty_3'); return el ? (parseFloat(el.value) || 0) : 0; })(),
+    cupolaQty4: (function(){ const el = document.getElementById('cupola_qty_4'); return el ? (parseFloat(el.value) || 0) : 0; })(),
+    cupolaQty5: (function(){ const el = document.getElementById('cupola_qty_5'); return el ? (parseFloat(el.value) || 0) : 0; })(),
     sidingColor: document.getElementById('siding_color').value,
     markupMaterial: num('markup_material'),
     markupSub: num('markup_sub'),
@@ -11613,8 +11657,10 @@ async function loadProject(key) {
     if (i.wallSystem) { const ws = document.getElementById('wall_system'); if (ws) ws.value = i.wallSystem; }
     if (i.proArmorScope) { const pa = document.getElementById('pro_armor_scope'); if (pa) pa.value = i.proArmorScope; }
     { const wo = document.getElementById('wainscot_on'); if (wo) wo.value = i.wainscotOn ? '36' : 'none'; }
-    if (i.cupolaSize) { const cs = document.getElementById('cupola_size'); if (cs) cs.value = i.cupolaSize; }
-    if (i.cupolaQty != null) { const cq = document.getElementById('cupola_qty'); if (cq) cq.value = i.cupolaQty; }
+    ['3', '4', '5'].forEach(sz => {
+      const cq = document.getElementById('cupola_qty_' + sz);
+      if (cq && i['cupolaQty' + sz] != null) cq.value = i['cupolaQty' + sz];
+    });
     if (i.postFoundation) { const pf = document.getElementById('post_foundation'); if (pf) pf.value = i.postFoundation; }
     if (typeof onPostFoundationChange === 'function') onPostFoundationChange();
     if (i.lathSize) { const ls = document.getElementById('lath_size'); if (ls) ls.value = i.lathSize; }
@@ -11626,6 +11672,7 @@ async function loadProject(key) {
     document.getElementById('roof_color').value = i.roofColor;
     document.getElementById('siding_color').value = i.sidingColor;
     if (i.wainscotColor) { const wcEl = document.getElementById('wainscot_color'); if (wcEl) wcEl.value = i.wainscotColor; }
+    if (i.trimColor) { const tcEl = document.getElementById('trim_color'); if (tcEl) tcEl.value = i.trimColor; }
     setTier(p.tier);
     switchTab('inputs');
   } catch(e) { alert('Load failed'); }
@@ -13777,10 +13824,12 @@ function bb3dSelectedColors() {
   const rc = (document.getElementById('roof_color') || {}).value || '';
   const sc = (document.getElementById('siding_color') || {}).value || '';
   const wc = (document.getElementById('wainscot_color') || {}).value || '';
+  const tc = (document.getElementById('trim_color') || {}).value || '';
   return {
     roof: bb3dMetalHex(rc, 0x1a1a1a),
     siding: bb3dMetalHex(sc, 0xeae6dc),
     wainscot: bb3dMetalHex(wc, 0x4a3f33),
+    trim: bb3dMetalHex(tc, 0x1a1a1a),
     wainscotOn: ((document.getElementById('wainscot_on') || {}).value === '36'),
   };
 }
@@ -14411,14 +14460,18 @@ function generateModel() {
 
   // === CUPOLAS — square base, louvered mid, copper pyramid cap + finial (photo look) ===
   (function buildCupolas() {
-    const sizeSel = document.getElementById('cupola_size');
-    const qtyEl = document.getElementById('cupola_qty');
-    const sz = sizeSel ? parseFloat(sizeSel.value) : NaN;
-    const qty = qtyEl ? (parseInt(qtyEl.value, 10) || 0) : 0;
-    if (!sz || isNaN(sz) || qty <= 0) return;
+    const list = [];
+    [3, 4, 5].forEach(szv => {
+      const el = document.getElementById('cupola_qty_' + szv);
+      const q = el ? (parseInt(el.value, 10) || 0) : 0;
+      for (let k = 0; k < q; k++) list.push(szv);
+    });
+    const qty = list.length;
+    if (qty <= 0) return;
     const ridgeY = wallBase + H + rise;
-    const ud2 = { categoryKey: 'roof_skin', label: `Cupola ${sz}'` };
     for (let n = 0; n < qty; n++) {
+      const sz = list[n];
+      const ud2 = { categoryKey: 'roof_skin', label: `Cupola ${sz}'` };
       const grpC = new THREE.Group();
       const cx = (qty === 1) ? 0 : (-L / 2 + (n + 1) * (L / (qty + 1)));
       const s = sz;                                     // footprint (ft)
@@ -14496,6 +14549,17 @@ function generateModel() {
   // === SIDE SHED / LEAN-TO (from the Additions tab card) ===
   try { buildSideShed(dims, wallBase); } catch (e) { console.warn('3D side shed skipped:', e); }
 
+  // Trim color from the selector — ridge cap, rake/roof trim, corners, fascia
+  try {
+    const trimHex = bb3dSelectedColors().trim;
+    buildingGroup.traverse(o => {
+      if (o.isMesh && o.userData &&
+          ['ridge_cap', 'roof_trim', 'corner_trim', 'fascia'].indexOf(o.userData.categoryKey) !== -1) {
+        o.material.color.setHex(trimHex);
+      }
+    });
+  } catch (e) {}
+
   // Apply structure-toggle visibility
   applyStructureVisibility();
   applyCategoryFilter();
@@ -14523,8 +14587,10 @@ function buildSideShed(dims, wallBase) {
   const slopeLen = Math.sqrt(sW * sW + rise * rise) + sOH / Math.cos(angle);
 
   const grp = new THREE.Group();
-  const ud = { categoryKey: 'side_shed', label: 'Side shed / lean-to' };
-  const addM = m => { m.castShadow = m.receiveShadow = true; m.userData = ud; grp.add(m); allMeshes.push(m); };
+  const udFrame = { categoryKey: 'side_shed', label: 'Side shed / lean-to' };
+  const udSkin = { categoryKey: 'side_shed', label: 'Side shed / lean-to', shedSkin: true };
+  const addM = m => { m.castShadow = m.receiveShadow = true; m.userData = udFrame; grp.add(m); allMeshes.push(m); };
+  const addSkin = m => { m.castShadow = m.receiveShadow = true; m.userData = udSkin; grp.add(m); allMeshes.push(m); };
 
   // Slab pad
   const slab = new THREE.Mesh(new THREE.BoxGeometry(sL, 0.5, sW),
@@ -14548,7 +14614,44 @@ function buildSideShed(dims, wallBase) {
   const outWall = new THREE.Mesh(new THREE.PlaneGeometry(sL, sH),
     new THREE.MeshStandardMaterial({ color: 0xffffff, map: sidTex, roughness: 0.38, metalness: 0.45, side: THREE.DoubleSide }));
   outWall.position.set(0, wallBase + sH / 2, sW + 0.02);
-  addM(outWall);
+  addSkin(outWall);
+
+  // Shed wainscot band + Z bar (outboard wall) when the shed wainscot is on
+  if ((document.getElementById('shed_wainscot') || {}).value === '36') {
+    const wTex = makeTuffRibTexture(false, colors.wainscot);
+    wTex.repeat.set(sL / 3, 1);
+    const band = new THREE.Mesh(new THREE.PlaneGeometry(sL, 3),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, map: wTex, roughness: 0.38, metalness: 0.45, side: THREE.DoubleSide }));
+    band.position.set(0, wallBase + 1.5, sW + 0.05);
+    addSkin(band);
+    const zl = new THREE.Mesh(new THREE.BoxGeometry(sL, 0.07, 0.06),
+      new THREE.MeshStandardMaterial({ color: 0x111114, roughness: 0.45, metalness: 0.5 }));
+    zl.position.set(0, wallBase + 3, sW + 0.06);
+    addSkin(zl);
+  }
+
+  // Shed windows — black single-hung look, spaced across the outboard wall
+  (function shedWindows() {
+    const q = parseInt((document.getElementById('shed_window_qty') || {}).value, 10) || 0;
+    if (q <= 0) return;
+    const winW = parseFloat((document.getElementById('shed_window_w') || {}).value) || 3;
+    const winH = parseFloat((document.getElementById('shed_window_h') || {}).value) || 3;
+    for (let wi = 0; wi < q; wi++) {
+      const wx = -sL / 2 + (wi + 1) * (sL / (q + 1));
+      const wy = wallBase + Math.min(sH - winH / 2 - 0.5, 3.5 + winH / 2);
+      const wg = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH),
+        new THREE.MeshStandardMaterial({ color: 0xf2f5f7, roughness: 0.06, metalness: 0.35, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
+      wg.position.set(wx, wy, sW + 0.07); addSkin(wg);
+      const fb = (bw, bh, bx, by) => {
+        const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.04),
+          new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 0.45, metalness: 0.4 }));
+        b.position.set(bx, by, sW + 0.08); addSkin(b);
+      };
+      fb(winW, 0.1, wx, wy + winH / 2); fb(winW, 0.1, wx, wy - winH / 2);
+      fb(0.1, winH, wx - winW / 2, wy); fb(0.1, winH, wx + winW / 2, wy);
+      fb(winW, 0.1, wx, wy);
+    }
+  })();
 
   // End walls — trapezoids, tall at the main wall, low at the outboard wall
   [-1, 1].forEach(sx => {
@@ -14560,7 +14663,7 @@ function buildSideShed(dims, wallBase) {
     const m2 = new THREE.Mesh(g2, new THREE.MeshStandardMaterial({ color: 0xffffff, map: t2, roughness: 0.38, metalness: 0.45, side: THREE.DoubleSide }));
     m2.rotation.y = -Math.PI / 2;                    // shape x → outward (+z), depth → inward
     m2.position.set(sx * (sL / 2) + (sx > 0 ? 0 : 0.05), wallBase, 0);
-    addM(m2);
+    addSkin(m2);
   });
 
   // Mono-slope roof in the ROOF color, ribs running down the slope
@@ -14572,7 +14675,7 @@ function buildSideShed(dims, wallBase) {
   roof.position.set(0,
     wallBase + hHigh + 0.15 - Math.sin(angle) * (slopeLen / 2),
     Math.cos(angle) * (slopeLen / 2) - 0.1);
-  addM(roof);
+  addSkin(roof);
 
   // Place the local group onto the chosen wall (outward +z in local space)
   if (side === 'front')      { grp.rotation.y = 0;            grp.position.set(0, 0,  W / 2); }
@@ -15002,6 +15105,27 @@ function buildOpeningInstance(dims, wallBase, type, wall, posFrac, sill, w, h, m
     bolt.rotation.x = Math.PI / 2;
     bolt.position.set(-dw * 0.40, dh * 0.035, 0.18); dAdd(bolt);
   }
+
+  // Rough opening framing — king/jack studs + header, visible in FRAME view only
+  // (isFraming meshes are hidden in finish view by applyVisibility).
+  (function roughFraming() {
+    const lum = () => new THREE.MeshStandardMaterial({ color: 0xd2ad79, roughness: 0.92 });
+    const hdrMat = () => new THREE.MeshStandardMaterial({ color: 0xbe9352, roughness: 0.9 });
+    const fud = lbl => ({ categoryKey: 'wall_framing', isFraming: true, label: lbl });
+    const t = 0.13, d = 0.46;   // 1.5" x 5.5" lumber
+    const hdrH = (type === 'garage') ? 0.96 : 0.79;   // 2x12 vs 2x10 header depth
+    const hdr = new THREE.Mesh(new THREE.BoxGeometry(w + 0.55, hdrH, d), hdrMat());
+    hdr.position.set(0, h / 2 + hdrH / 2 + 0.02, 0);
+    hdr.userData = fud('Header — ' + type); grp.add(hdr); allMeshes.push(hdr);
+    [-1, 1].forEach(sx => {
+      const jack = new THREE.Mesh(new THREE.BoxGeometry(t, h, d), lum());
+      jack.position.set(sx * (w / 2 + t / 2), 0, 0);
+      jack.userData = fud('Jack stud'); grp.add(jack); allMeshes.push(jack);
+      const king = new THREE.Mesh(new THREE.BoxGeometry(t, h + hdrH + 0.1, d), lum());
+      king.position.set(sx * (w / 2 + t * 1.5 + 0.01), (hdrH + 0.1) / 2, 0);
+      king.userData = fud('King stud'); grp.add(king); allMeshes.push(king);
+    });
+  })();
 
   // Trim frame (4 sides) — copper-highlighted when selected
   const trimMat = () => new THREE.MeshStandardMaterial({
@@ -15798,8 +15922,8 @@ function applyVisibility() {
         ridge_cap: 1, roof_trim: 1, corner_trim: 1, fascia: 1, soffit: 1,
         windows: 1, ext_doors: 1, garage_doors: 1, mudsill: 1,
       };
-      if (skinCats[k]) {
-        visible = false;
+      if (skinCats[k] || ud.shedSkin) {
+        visible = false;   // shed metal (walls/roof/wainscot) strips off too
       } else {
         opacity = 1.0;    // framing, trusses, purlins, girts, slab all solid
       }
@@ -15908,7 +16032,7 @@ if (typeof origSwitchTab === 'function') {
 
   // --- Color chart on the 3D card: mirrors of the Dimensions-tab color selects ---
   function bb3dPopulateColorCard() {
-    [['audit3d-roof-color', 'roof_color'], ['audit3d-siding-color', 'siding_color']].forEach(([mid, src]) => {
+    [['audit3d-roof-color', 'roof_color'], ['audit3d-siding-color', 'siding_color'], ['audit3d-trim-color', 'trim_color']].forEach(([mid, src]) => {
       const mirror = document.getElementById(mid), main = document.getElementById(src);
       if (!mirror || !main) return;
       mirror.innerHTML = main.innerHTML;
