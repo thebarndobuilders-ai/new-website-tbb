@@ -3450,6 +3450,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
             </div>
             <div style="display: flex; gap: 6px; pointer-events: auto;">
               <button onclick="bb3dCmd('reset')" style="padding: 5px 10px !important; font-size: 11px !important;">Reset view</button>
+              <button onclick="bbUndoLayout()" title="Undo the last door/window move, add, or delete" style="padding: 5px 10px !important; font-size: 11px !important;">↩ Undo</button>
               <button onclick="bb3dCmd('toggleStructure')" id="audit3d-structure-btn" style="padding: 5px 10px !important; font-size: 11px !important;">◫ Frame view</button>
               <button onclick="bb3dCmd('screenshot')" style="padding: 5px 10px !important; font-size: 11px !important; background: var(--copper); color: var(--bg-deep); border-color: var(--copper);">📷 Screenshot</button>
             </div>
@@ -8451,6 +8452,27 @@ function renderCustomTrimTable() {
 }
 
 // In-memory state
+// ---- Layout undo: snapshots of openingsState taken before every move/add/remove.
+// The ↩ Undo button on the 3D view (and anywhere else) steps back one change.
+let _layoutUndoStack = [];
+function bbSnapshotLayout() {
+  try {
+    _layoutUndoStack.push(JSON.stringify(openingsState));
+    if (_layoutUndoStack.length > 30) _layoutUndoStack.shift();
+  } catch (e) {}
+}
+function bbUndoLayout() {
+  if (!_layoutUndoStack.length) return;
+  try {
+    openingsState = JSON.parse(_layoutUndoStack.pop());
+    ['window', 'extdoor', 'intdoor', 'garage'].forEach(t => { try { renderOpeningsTable(t); } catch (e) {} });
+    if (typeof recalc === 'function') recalc();
+    if (document.querySelector('#audit3d-canvas-wrap canvas') && typeof window.bb3dCmd === 'function') {
+      window.bb3dCmd('regenerate');
+    }
+  } catch (e) {}
+}
+
 let openingsState = {
   window: [],
   extdoor: [],
@@ -8674,6 +8696,7 @@ function confirmBulkImport() {
 }
 
 function addOpeningRow(type, prefill = null) {
+  bbSnapshotLayout();
   let seed;
   if (prefill) {
     seed = prefill;
@@ -8695,6 +8718,7 @@ function addOpeningRow(type, prefill = null) {
 }
 
 function removeOpeningRow(type, idx) {
+  bbSnapshotLayout();
   openingsState[type].splice(idx, 1);
   renderOpeningsTable(type);
   recalc();
@@ -14004,9 +14028,9 @@ function init3D() {
 
     // Meadow below the horizon — green gradient + wildflower speckles
     const meadow = g.createLinearGradient(0, HZN + 10, 0, 512);
-    meadow.addColorStop(0, '#88ab5d');
-    meadow.addColorStop(0.5, '#7fa854');
-    meadow.addColorStop(1, '#6d9a49');
+    meadow.addColorStop(0, '#79a94b');
+    meadow.addColorStop(0.5, '#6ca041');
+    meadow.addColorStop(1, '#5e9339');
     g.fillStyle = meadow;
     g.fillRect(0, HZN + 14, 1024, 512 - HZN - 14);
     for (let i = 0; i < 900; i++) {
@@ -14025,7 +14049,7 @@ function init3D() {
     scene.background = tex;
   })();
   // Soft green-tinted haze so the far ground blends into the meadow backdrop.
-  scene.fog = new THREE.Fog(0xd3e0c4, 220, 460);
+  scene.fog = new THREE.Fog(0xaacf90, 300, 520);
   
   camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 500);
   camera.position.set(60, 35, 60);
@@ -14099,13 +14123,13 @@ function init3D() {
     const gc = document.createElement('canvas');
     gc.width = 256; gc.height = 256;
     const gx = gc.getContext('2d');
-    gx.fillStyle = '#79a24e';
+    gx.fillStyle = '#4d8f2c';
     gx.fillRect(0, 0, 256, 256);
     for (let i = 0; i < 5200; i++) {
       const shade = Math.random();
       gx.fillStyle = shade > 0.5
-        ? 'rgba(136,170,88,0.35)'
-        : 'rgba(92,124,60,0.35)';
+        ? 'rgba(116,168,66,0.35)'
+        : 'rgba(66,112,38,0.35)';
       const x = Math.random() * 256, y = Math.random() * 256;
       gx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
     }
@@ -14120,7 +14144,7 @@ function init3D() {
     gtex.wrapS = gtex.wrapT = THREE.RepeatWrapping;
     gtex.repeat.set(30, 30);
     const groundGeo = new THREE.PlaneGeometry(600, 600);
-    const groundMat = new THREE.MeshStandardMaterial({ map: gtex, color: 0xbfcfa8, roughness: 1.0, metalness: 0 });
+    const groundMat = new THREE.MeshStandardMaterial({ map: gtex, color: 0xaede8e, roughness: 1.0, metalness: 0 });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.01;
@@ -14939,12 +14963,12 @@ function buildOpeningInstance(dims, wallBase, type, wall, posFrac, sill, w, h, m
     // 6-lite glass block: top ~30% of the slab
     const liteW = dw * 0.72, liteH = dh * 0.26, liteY = dh * 0.28;
     const dGlass = new THREE.Mesh(new THREE.PlaneGeometry(liteW, liteH),
-      new THREE.MeshStandardMaterial({ color: 0xf3f6f8, roughness: 0.06, metalness: 0.3,
-        transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
+      new THREE.MeshStandardMaterial({ color: 0xdfe9ee, roughness: 0.05, metalness: 0.35,
+        transparent: true, opacity: 0.95, side: THREE.DoubleSide }));
     dGlass.position.set(0, liteY, 0.155);
     dAdd(dGlass, 'Man door glass');
     // white muntin grid — 3 cols × 2 rows
-    const mnt = () => new THREE.MeshStandardMaterial({ color: 0xdededa, roughness: 0.5 });
+    const mnt = () => new THREE.MeshStandardMaterial({ color: 0xcfcfc8, roughness: 0.5 });
     const mBar = (bw, bh, x, y) => {
       const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.03), mnt());
       b.position.set(x, y, 0.165); dAdd(b);
@@ -14953,16 +14977,22 @@ function buildOpeningInstance(dims, wallBase, type, wall, posFrac, sill, w, h, m
     mBar(liteW, 0.045, 0, liteY);                                     // row split
     mBar(0.06, liteH, -liteW / 2, liteY); mBar(0.06, liteH, liteW / 2, liteY);
     mBar(0.045, liteH, -liteW / 6, liteY); mBar(0.045, liteH, liteW / 6, liteY);  // col splits
-    // two tall recessed panels below
+    // two tall recessed panels below — outlined all the way around so the
+    // craftsman panel profile reads clearly (reference photo)
     [-1, 1].forEach(sx => {
-      const pnl = new THREE.Mesh(new THREE.PlaneGeometry(dw * 0.30, dh * 0.52),
-        new THREE.MeshStandardMaterial({ color: 0xdfdfd9, roughness: 0.6, side: THREE.DoubleSide }));
-      pnl.position.set(sx * dw * 0.19, -dh * 0.13, 0.155);
+      const pW = dw * 0.30, pH = dh * 0.52, pX = sx * dw * 0.19, pY = -dh * 0.13;
+      const pnl = new THREE.Mesh(new THREE.PlaneGeometry(pW, pH),
+        new THREE.MeshStandardMaterial({ color: 0xd6d6cd, roughness: 0.62, side: THREE.DoubleSide }));
+      pnl.position.set(pX, pY, 0.155);
       dAdd(pnl);
-      const shadow = new THREE.Mesh(new THREE.PlaneGeometry(dw * 0.30, 0.035),
-        new THREE.MeshStandardMaterial({ color: 0xbdbdb6, roughness: 0.7 }));
-      shadow.position.set(sx * dw * 0.19, -dh * 0.13 + dh * 0.26, 0.158);
-      dAdd(shadow);
+      const edge = () => new THREE.MeshStandardMaterial({ color: 0xa9a9a0, roughness: 0.7 });
+      const eT = 0.035;
+      [[pW, eT, pX, pY + pH / 2], [pW, eT, pX, pY - pH / 2], [eT, pH, pX - pW / 2, pY], [eT, pH, pX + pW / 2, pY]]
+        .forEach(([bw, bh, bx, by]) => {
+          const b = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), edge());
+          b.position.set(bx, by, 0.158);
+          dAdd(b);
+        });
     });
     // handle + deadbolt, latch side
     const hw = () => new THREE.MeshStandardMaterial({ color: 0x3a3a3e, metalness: 0.8, roughness: 0.25 });
@@ -15367,6 +15397,7 @@ function _seedOpeningRow(type, wall, posFrac, spec) {
 
 function placeOpeningAt(type, wall, posFrac, spec) {
   if (typeof openingsState === 'undefined') return;
+  bbSnapshotLayout();
   openingsState[type].push(_seedOpeningRow(type, wall, posFrac, spec || null));
   selectedOpening = { type, idx: openingsState[type].length - 1 };
   if (typeof renderOpeningsTable === 'function') renderOpeningsTable(type);
@@ -15427,8 +15458,11 @@ function makeOpeningsEditable() {
 }
 
 // ---- Drag to reposition along a wall ----
+// Openings are ALWAYS grabbable: click a door/window/garage door and drag it along
+// its wall — no Edit-layout toggle needed. Grabbing empty space still orbits the
+// camera. (In edit mode with a placement tool armed, placement wins.)
 function _onPointerDown(event) {
-  if (!editLayout || placementTool !== 'select') return;
+  if (editLayout && placementTool !== 'select') return;
   _pointerNDC(event);
   const hits = raycaster.intersectObjects(allMeshes, false);
   const oh = hits.find(h => h.object.userData && h.object.userData.isOpening && h.object.userData.openingRef);
@@ -15436,6 +15470,7 @@ function _onPointerDown(event) {
   const ref = oh.object.userData.openingRef;
   const entry = _openingGroups.find(g => g.ref && g.ref.type === ref.type && g.ref.idx === ref.idx);
   if (!entry) return;
+  if (typeof bbSnapshotLayout === 'function') bbSnapshotLayout();   // undo point before the move
   selectedOpening = ref;
   _dragOpening = entry;
   controls.enabled = false;
