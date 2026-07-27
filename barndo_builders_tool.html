@@ -4643,6 +4643,11 @@ function gablePostLengths(i) {
   return out;
 }
 
+// Buy length for wall-height lumber (studs, kings/jacks): next even 2' stock, min 8'.
+function wallStudStock(H) {
+  return Math.max(8, Math.ceil((H || 8) / 2) * 2);
+}
+
 // Gable studs (stick frame): plain count + one buy length for the triangle framing.
 // Count = 16" OC across the gable span (corners excluded), buy length = next even
 // 2' stock that covers the peak rise.
@@ -4771,20 +4776,21 @@ const MATERIALS = [
 
   // ---------------- WALL FRAMING (STICK FRAME ONLY) ----------------
   // All stick-frame items are skipped when constructionType === 'post'
-  { id: "pt_2x6_plate_lf", label: "PT 2×6 bottom plate (exterior)", cat: "Wall framing", uom: "LF", packSize: null,
+  { id: "pt_2x6_plate_lf", label: "PT 2×6×16 bottom plate (exterior · 16' sticks)", cat: "Wall framing", uom: "LF", packSize: null,
     priceCost: 1.85, priceSell: 2.25, priceRetail: 2.75,
     formula: i => i.constructionType === 'post' ? 0 : Math.ceil(i.extWallLF * 1.05) },
-  { id: "pt_2x4_plate_lf", label: "PT 2×4 bottom plate (interior)", cat: "Wall framing", uom: "LF", packSize: null,
+  { id: "pt_2x4_plate_lf", label: "PT 2×4×16 bottom plate (interior · 16' sticks)", cat: "Wall framing", uom: "LF", packSize: null,
     priceCost: 1.25, priceSell: 1.55, priceRetail: 2,
     formula: i => Math.ceil(i.intWallLF * 1.05) },  // Interior walls still stick-frame even on post-frame builds
-  { id: "2x6_top_plate_lf", label: "2×6 double top plate (exterior)", cat: "Wall framing", uom: "LF", packSize: null,
+  { id: "2x6_top_plate_lf", label: "2×6×16 double top plate (exterior · 16' sticks)", cat: "Wall framing", uom: "LF", packSize: null,
     priceCost: 1.45, priceSell: 1.85, priceRetail: 2.4,
     formula: i => i.constructionType === 'post' ? 0 : Math.ceil(i.extWallLF * 2 * 1.05) },
-  { id: "2x4_top_plate_lf", label: "2×4 double top plate (interior)", cat: "Wall framing", uom: "LF", packSize: null,
+  { id: "2x4_top_plate_lf", label: "2×4×16 double top plate (interior · 16' sticks)", cat: "Wall framing", uom: "LF", packSize: null,
     priceCost: 0.95, priceSell: 1.25, priceRetail: 1.5,
     formula: i => Math.ceil(i.intWallLF * 2 * 1.05) },
   { id: "stud_2x6_104pc", label: "2×6 pre-cut studs (auto-sized to wall height)", cat: "Wall framing", uom: "ea", packSize: null,
     priceCost: 9.42, priceSell: 9.50, priceRetail: 14,
+    labelFn: i => `2×6×${wallStudStock(i.H)}' pre-cut studs (exterior walls · sized to wall height)`,
     formula: i => {
       if (i.constructionType === 'post') return 0;
       const fieldStuds = Math.ceil(i.extWallLF / (16/12));
@@ -4794,6 +4800,7 @@ const MATERIALS = [
     }},
   { id: "stud_2x4_104pc", label: "2×4 pre-cut studs (auto-sized to wall height)", cat: "Wall framing", uom: "ea", packSize: null,
     priceCost: 5.75, priceSell: 6.25, priceRetail: 8,
+    labelFn: i => `2×4×${wallStudStock(i.H)}' pre-cut studs (interior walls)`,
     formula: i => {
       const fieldStuds = Math.ceil(i.intWallLF / (16/12));
       const teeBlocking = Math.ceil(i.intWallLF / 10);
@@ -4810,9 +4817,10 @@ const MATERIALS = [
       const garage = (i.garageDoors || 0) * 6;
       return Math.ceil((winDoor + garage) * 1.10);   // ×1.1 stud waste
     },
-    labelFn: i => `2×6 king & jack studs (2K+2J per window/door · 2K+4J per garage door)`},
+    labelFn: i => `2×6×${wallStudStock(i.H)}' king & jack studs (2K+2J per window/door · 2K+4J per garage door)`},
   { id: "king_jack_2x4", label: "2×4 king & jack studs (interior door openings)", cat: "Wall framing", uom: "ea", packSize: null,
     priceCost: 5.75, priceSell: 6.25, priceRetail: 8,
+    labelFn: i => `2×4×${wallStudStock(i.H)}' king & jack studs (interior doors)`,
     // Interior walls stay stick-framed even on post-frame builds: 2 kings + 2 jacks per door.
     formula: i => Math.ceil((i.intDoors || 0) * 4 * 1.10) },   // ×1.1 stud waste
   { id: "gable_stud_2x6", label: "2×6 gable studs (16\" OC · gable triangles)", cat: "Wall framing", uom: "ea", packSize: null,
@@ -4841,7 +4849,7 @@ const MATERIALS = [
   // Header caps — shop standard: NO plywood spacers. Every header board gets a stud
   // cap flat on top and bottom, matched to the wall: 2×6 caps on 2×6 exterior walls,
   // 2×4 caps on 2×4 interior walls. Cap LF = 2 × header LF (+5% waste).
-  { id: "header_cap_2x6", label: "2×6 header caps (top + bottom of exterior headers)", cat: "Wall framing", uom: "LF", packSize: null,
+  { id: "header_cap_2x6", label: "2×6×16 header caps (top + bottom of exterior headers)", cat: "Wall framing", uom: "LF", packSize: null,
     priceCost: 1.45, priceSell: 1.85, priceRetail: 2.4,
     formula: i => {
       // Caps ride EVERY header board — windows, man doors, and garage door headers
@@ -4849,7 +4857,7 @@ const MATERIALS = [
       const lf = (i.headerLF_windows || 0) + (i.headerLF_extdoors || 0) + (i.headerLF_garage || 0);
       return lf > 0 ? Math.ceil(lf * 2 * 1.05) : 0;
     }},
-  { id: "header_cap_2x4", label: "2×4 header caps (top + bottom of interior door headers)", cat: "Wall framing", uom: "LF", packSize: null,
+  { id: "header_cap_2x4", label: "2×4×16 header caps (top + bottom of interior door headers)", cat: "Wall framing", uom: "LF", packSize: null,
     priceCost: 0.95, priceSell: 1.25, priceRetail: 1.5,
     formula: i => (i.headerLF_intdoors || 0) > 0 ? Math.ceil((i.headerLF_intdoors || 0) * 2 * 1.05) : 0 },
   // (King/jack + gable stud lines below also carry the ×1.1 shop-standard stud waste.)
@@ -5001,7 +5009,7 @@ const MATERIALS = [
       const bays = i.eaveBays;                                    // truss bays along the length
       return rows * bays;
     }},
-  { id: "window_frame_2x6_lf", label: "2×6 window frame lumber (post-frame only)", cat: "Post-frame wall", uom: "LF", packSize: null,
+  { id: "window_frame_2x6_lf", label: "2×6×16 window frame lumber (post-frame only · 16' sticks)", cat: "Post-frame wall", uom: "LF", packSize: null,
     priceCost: 1.25, priceSell: 1.60, priceRetail: 2,
     formula: i => i.constructionType === 'post' ? Math.ceil(i.windowFramePerimeterLF * 1.10) : 0 },
   // Wood truss carrier beam — only when post-frame + wood truss
@@ -5264,13 +5272,13 @@ const MATERIALS = [
       // Otherwise count the rows typed as 'Steel / hybrid' in the Truss configuration table.
       return i.trussAgg.groups.filter(g => g.type === 'steel').reduce((s, g) => s + g.qty, 0);
     }},
-  { id: "rafter_lumber_lf", label: "Stick-framed rafter lumber (2×10)", cat: "Roof structure", uom: "LF", packSize: null,
+  { id: "rafter_lumber_lf", label: "2×10×16 stick-framed rafter lumber (16' sticks)", cat: "Roof structure", uom: "LF", packSize: null,
     priceCost: 3.25, priceSell: 4.10, priceRetail: 4.4,
     formula: i => Math.ceil(i.roofArea * (i.pctStick / 100) * 0.55) },
   { id: "zip_12_roof_sheet", label: "1/2\" Zip roof sheathing (4×8)", cat: "Roof structure", uom: "sheet", packSize: null,
     priceCost: 42, priceSell: 52, priceRetail: 75,
     formula: i => i.roofSystem === 'sheathed' ? Math.ceil(i.roofArea / 32 * 1.10) : 0 },
-  { id: "purlin_2x4_lf", label: "2×4 purlin/lath (24\" OC)", cat: "Roof structure", uom: "LF", packSize: null,
+  { id: "purlin_2x4_lf", label: '2×4×16 purlin/lath (24" OC · 16 ft sticks)', cat: "Roof structure", uom: "LF", packSize: null,
     priceCost: 1.45, priceSell: 1.85, priceRetail: 1.5,
     formula: i => {
       if (i.roofSystem !== 'purlin') return 0;
@@ -5612,7 +5620,7 @@ const MATERIALS = [
     priceCost: 18, priceSell: 24,
     formula: i => (i.sidingProduct === 'tuffrib_29' || i.sidingProduct === 'mbb_26') ? Math.ceil(i.fasciaLF / 10 * 1.05) : 0 },
   // 1×8 LP fascia — for LP siding
-  { id: "lp_fascia_1x8_lf", label: "1×8 LP SmartSide fascia", cat: "Soffit & fascia", uom: "LF", packSize: null,
+  { id: "lp_fascia_1x8_lf", label: "1×8×16 LP SmartSide fascia (16' sticks)", cat: "Soffit & fascia", uom: "LF", packSize: null,
     priceCost: 3.45, priceSell: 4.50, priceRetail: 5.5,
     formula: i => i.sidingProduct === 'lp_bb' ? Math.ceil(i.fasciaLF * 1.05) : 0 },
   // FJ trim — metal siding only (wall metal + soffit insert)
@@ -5729,7 +5737,7 @@ const MATERIALS = [
     priceCost: 16, priceSell: 22,
     formula: i => i.sidingProduct === 'mbb_26' ? Math.ceil((i.W * i.gableCountActual) * 1.05 / 10) : 0 },
   // Gable ladder framing 2×4
-  { id: "gable_ladder_2x4_lf", label: "2×4 gable ladder framing", cat: "Soffit & fascia", uom: "LF", packSize: null,
+  { id: "gable_ladder_2x4_lf", label: "2×4×16 gable ladder framing (16' sticks)", cat: "Soffit & fascia", uom: "LF", packSize: null,
     priceCost: 1.45, priceSell: 1.85, priceRetail: 1.5,
     formula: i => Math.ceil(i.gableLadderLF * 1.05) },
 
