@@ -14077,9 +14077,9 @@ function init3D() {
 
     // Meadow below the horizon — green gradient + wildflower speckles
     const meadow = g.createLinearGradient(0, HZN + 10, 0, 512);
-    meadow.addColorStop(0, '#79a94b');
-    meadow.addColorStop(0.5, '#6ca041');
-    meadow.addColorStop(1, '#5e9339');
+    meadow.addColorStop(0, '#67993c');
+    meadow.addColorStop(0.5, '#5c9134');
+    meadow.addColorStop(1, '#4f852c');
     g.fillStyle = meadow;
     g.fillRect(0, HZN + 14, 1024, 512 - HZN - 14);
     for (let i = 0; i < 900; i++) {
@@ -14098,7 +14098,7 @@ function init3D() {
     scene.background = tex;
   })();
   // Soft green-tinted haze so the far ground blends into the meadow backdrop.
-  scene.fog = new THREE.Fog(0xaacf90, 300, 520);
+  scene.fog = new THREE.Fog(0x8fbb72, 300, 520);
   
   camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 500);
   camera.position.set(60, 35, 60);
@@ -14172,7 +14172,7 @@ function init3D() {
     const gc = document.createElement('canvas');
     gc.width = 256; gc.height = 256;
     const gx = gc.getContext('2d');
-    gx.fillStyle = '#4d8f2c';
+    gx.fillStyle = '#3c7a21';
     gx.fillRect(0, 0, 256, 256);
     for (let i = 0; i < 5200; i++) {
       const shade = Math.random();
@@ -14193,7 +14193,7 @@ function init3D() {
     gtex.wrapS = gtex.wrapT = THREE.RepeatWrapping;
     gtex.repeat.set(30, 30);
     const groundGeo = new THREE.PlaneGeometry(600, 600);
-    const groundMat = new THREE.MeshStandardMaterial({ map: gtex, color: 0xaede8e, roughness: 1.0, metalness: 0 });
+    const groundMat = new THREE.MeshStandardMaterial({ map: gtex, color: 0x8cc168, roughness: 1.0, metalness: 0 });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.01;
@@ -14809,6 +14809,29 @@ function buildRoof(shape, dims, wallTop, rise, topChord) {
   [slopeSheath_F, slopeSheath_B, slopeSkin_F, slopeSkin_B].forEach(m => {
     buildingGroup.add(m); allMeshes.push(m);
   });
+
+  // ROOF LATHING / PURLINS — rows across each slope at purlin spacing, sitting just
+  // under the metal. Frame-view members (isFraming) so the skeleton shows what the
+  // roof panels actually screw to.
+  (function buildRoofLathing() {
+    const w = L + 2 * gableOH;
+    const psEl = document.getElementById('purlin_spacing');
+    const spacing = Math.max(0.5, parseFloat(psEl ? psEl.value : 2) || 2);
+    const lathMat = () => new THREE.MeshStandardMaterial({ color: 0xb89770, roughness: 0.92 });
+    ['front', 'back'].forEach(side => {
+      const grpL = new THREE.Group();
+      grpL.rotation.x = (side === 'front' ? 1 : -1) * effectiveAngle;
+      grpL.position.set(0, wallTop + verticalExtent / 2 - 0.12, (side === 'front' ? 1 : -1) * (horizontalExtent / 2));
+      for (let d = -effectiveSlopeLen / 2 + 0.25; d <= effectiveSlopeLen / 2 - 0.1; d += spacing) {
+        const row = new THREE.Mesh(new THREE.BoxGeometry(w, 0.13, 0.3), lathMat());
+        row.position.set(0, 0, d);
+        row.castShadow = row.receiveShadow = true;
+        row.userData = { categoryKey: 'roof_lath', label: 'Roof lathing / purlin — ' + side, isFraming: true };
+        grpL.add(row); allMeshes.push(row);
+      }
+      buildingGroup.add(grpL);
+    });
+  })();
   
   if (shape === 'hip') {
     // For hip — add triangular slopes on the short sides
