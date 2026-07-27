@@ -3202,7 +3202,8 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <button onclick="takeoffFinish()">✓ Finish</button>
         <button onclick="takeoffUndoPt()">↶ Undo point</button>
         <button onclick="takeoffClearAll()" title="Clear all measurements and scale">✕ Clear</button>
-        <button onclick="takeoffConvertToQuote()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600;">➡ Convert to quote</button>
+        <button onclick="takeoffConvertToQuote()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600;" title="Send the measured dimensions to the Dimensions tab (footprint, wall LF, areas...)">➡ Push to Dimensions</button>
+        <button onclick="takeoffPushLinesToQuote()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;" title="Send the PRICED takeoff lines to the quote's Materials list — only when you want them on the quote">$ Push to Quote</button>
         <button onclick="takeoffPushTrusses()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;">◉ Push trusses → truss tool</button>
       </div>
 
@@ -17120,17 +17121,15 @@ if (typeof origSwitchTab === 'function') {
       if (!confirm(st.missing.length + ' required measurement(s) for a ' + (TIER_LABELS[st.tier] || st.tier) + ' quote are still missing:\n\n' + list + '\n\nConvert to quote anyway?')) return;
     }
     takeoffPushAllToQuote(true);
-    takeoffPushLinesToQuote(true);
-    const pricedCount = (window._takeoffQuoteLines || []).length;
     const lines = used.map(c => {
       const q = totals[c.key];
       const val = c.unit === 'LF' ? q.toFixed(1) + ' LF' : c.unit === 'EA' ? Math.round(q) + ' EA' : Math.round(q) + ' SF';
       return '• ' + c.label + ': ' + val + '  →  ' + c.target;
     }).join('\n');
     if (typeof switchTab === 'function') switchTab('inputs');
-    alert('Takeoff converted to quote:\n\n' + lines
-      + (pricedCount ? '\n\nPlus ' + pricedCount + ' priced takeoff line(s) added to the Materials list under "Takeoff items" — same names and prices as the takeoff list.' : '')
-      + '\n\nThese values are now on the Dimensions tab (set to MANUAL) and the quote has recalculated.');
+    alert('Takeoff pushed to Dimensions:\n\n' + lines
+      + '\n\nThese values are now on the Dimensions tab (set to MANUAL) and the quote has recalculated.'
+      + '\n\nPriced takeoff lines are NOT on the quote — use "$ Push to Quote" when you want them added.');
   };
   // Push the PRICED takeoff lines (the bottom-left estimate list) straight into the
   // quote as line items — same names, quantities, and unit prices.
@@ -17193,7 +17192,7 @@ if (typeof origSwitchTab === 'function') {
       return `<tr><td style="font-size:11px;">${c.label}</td><td style="font-family:var(--font-mono);white-space:nowrap;">${val}</td><td style="font-size:10px;text-align:right;">${tgt}</td></tr>`;
     }).join('');
     el.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">${cb}<button onclick="takeoffPushAllToQuote()" style="font-size:11px;background:var(--copper);color:var(--bg-deep);border-color:var(--copper);font-weight:600;">Push to quote ↗</button></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">${cb}<button onclick="takeoffPushAllToQuote()" style="font-size:11px;background:var(--copper);color:var(--bg-deep);border-color:var(--copper);font-weight:600;">Push to Dimensions ↗</button></div>
       <table class="qbs-table" style="width:100%;font-size:12px;"><tbody>${rows}</tbody></table>`;
     renderRequiredPanel();
   }
