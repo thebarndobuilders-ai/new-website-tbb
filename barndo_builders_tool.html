@@ -14608,6 +14608,38 @@ function buildSideShed(dims, wallBase) {
     addM(post);
   }
 
+  // Shed FRAMING — rafters, outboard header, girt rows. isFraming → frame view only.
+  (function shedFraming() {
+    const lumberM = c2 => new THREE.MeshStandardMaterial({ color: c2, roughness: 0.92 });
+    const spIn = parseFloat((document.getElementById('shed_rafter_spacing') || {}).value) || 16;
+    const sp = Math.max(0.5, spIn / 12);
+    const rl = slopeLen;
+    const nR = Math.ceil(sL / sp);
+    for (let r2 = 0; r2 <= nR; r2++) {
+      const rx = -sL / 2 + Math.min(sL, r2 * sp);
+      const raf = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.62, rl), lumberM(0xd2ad79));
+      raf.rotation.x = angle;
+      raf.position.set(rx,
+        wallBase + hHigh - 0.25 - Math.sin(angle) * (rl / 2),
+        Math.cos(angle) * (rl / 2) - 0.1);
+      raf.castShadow = raf.receiveShadow = true;
+      raf.userData = { categoryKey: 'side_shed', label: 'Shed rafter', isFraming: true };
+      grp.add(raf); allMeshes.push(raf);
+    }
+    const hdr2 = new THREE.Mesh(new THREE.BoxGeometry(sL, 0.62, 0.26), lumberM(0xbe9352));
+    hdr2.position.set(0, wallBase + sH - 0.31, sW - 0.2);
+    hdr2.castShadow = hdr2.receiveShadow = true;
+    hdr2.userData = { categoryKey: 'side_shed', label: 'Shed outboard header (2-ply)', isFraming: true };
+    grp.add(hdr2); allMeshes.push(hdr2);
+    for (let gy = wallBase + 2; gy < wallBase + sH - 0.7; gy += 2) {
+      const g3 = new THREE.Mesh(new THREE.BoxGeometry(sL, 0.42, 0.13), lumberM(0xcdaa76));
+      g3.position.set(0, gy, sW + 0.03);
+      g3.castShadow = g3.receiveShadow = true;
+      g3.userData = { categoryKey: 'side_shed', label: 'Shed girt', isFraming: true };
+      grp.add(g3); allMeshes.push(g3);
+    }
+  })();
+
   // Outboard wall skin (siding color)
   const sidTex = makeTuffRibTexture(false, colors.siding);
   sidTex.repeat.set(sL / 3, 1);
@@ -15216,6 +15248,39 @@ function detectConstructionType() {
 function buildWallFraming(dims, wallBase, wallTop) {
   const { L, W, H } = dims;
   const { type, hasSheathing } = detectConstructionType();
+
+  // Opening spans per wall (world coords along the wall) so studs, posts, and
+  // girts BREAK AROUND door/window/garage openings instead of running through them.
+  function _framingOpenings(side) {
+    const spans = [];
+    const wallLen = (side === 'front' || side === 'back') ? L : W;
+    const push = (pos, w, h, sill) => {
+      const cx = -wallLen / 2 + pos * wallLen;
+      spans.push({ x0: cx - w / 2, x1: cx + w / 2, y0: wallBase + sill, y1: wallBase + sill + h });
+    };
+    ['window', 'extdoor', 'garage'].forEach(t => {
+      ((typeof openingsState !== 'undefined' && openingsState[t]) || []).forEach(row => {
+        const w = row.w || openingDefault(t, 'w');
+        const h = row.h || openingDefault(t, 'h');
+        const sill = (row.sill != null) ? row.sill : openingDefault(t, 'sill');
+        if (row.wall && row.pos != null) { if (row.wall === side) push(row.pos, w, h, sill); }
+        else autoDistribute(t, row.qty || 0).forEach(p => { if (p.wall === side) push(p.pos, w, h, sill); });
+      });
+    });
+    return spans.sort((a, b) => a.x0 - b.x0);
+  }
+  // Split a full wall run into segments that skip openings crossing yLevel
+  function _segmentsAround(wallLen, spans, yLevel, pad) {
+    const cuts = spans.filter(o => yLevel > o.y0 - (pad || 0.1) && yLevel < o.y1 + (pad || 0.1));
+    const segs = [];
+    let cur = -wallLen / 2;
+    cuts.forEach(o => {
+      if (o.x0 - 0.05 > cur) segs.push([cur, o.x0 - 0.05]);
+      cur = Math.max(cur, o.x1 + 0.05);
+    });
+    if (cur < wallLen / 2) segs.push([cur, wallLen / 2]);
+    return segs.filter(sg => sg[1] - sg[0] > 0.3);
+  }
   
   // The wall surfaces sit at outer Z = ±W/2. Framing lives INSIDE that, offset by sheathing thickness.
   // Framing center plane: stud 2x6 actual depth 5.5" = 0.46 ft. Center sits at W/2 - sheathThick - 0.23.
@@ -15241,10 +15306,13 @@ function buildWallFraming(dims, wallBase, wallTop) {
       const wallLen = isLong ? L : W - 2 * sheathThick;
       const count = Math.floor(wallLen / studSpacing) + 1;
       const startPos = -wallLen / 2;
-      
+      const ops = _framingOpenings(side);
+
       for (let i = 0; i <= count; i++) {
         const offset = startPos + i * studSpacing;
         if (offset > wallLen / 2 + 0.01) break;
+        // skip field studs inside an opening — its king/jack rough framing shows instead
+        if (ops.some(o => offset > o.x0 - 0.07 && offset < o.x1 + 0.07)) continue;
         let geom, mesh;
         if (isLong) {
           // Stud runs vertically along Y, narrow in X, deep in Z
@@ -15307,9 +15375,14 @@ function buildWallFraming(dims, wallBase, wallTop) {
 
       // Columns (always present; on open walls they're the only thing left)
       const postCount = Math.floor(wallLen / postSpacing);
+      const opsP = _framingOpenings(side);
       for (let i = 0; i <= postCount; i++) {
         let offset = -wallLen / 2 + i * postSpacing;
         if (i === postCount) offset = wallLen / 2;            // corner column
+        // skip columns that land inside a door/window opening (jamb posts frame it instead);
+        // corners always stay
+        if (i !== 0 && i !== postCount &&
+            opsP.some(o => offset > o.x0 - 0.15 && offset < o.x1 + 0.15)) continue;
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(postSize, H, postSize), lumberMat('post'));
         if (isLong) mesh.position.set(offset, wallBase + H / 2, postCenter);
         else        mesh.position.set(postCenter, wallBase + H / 2, offset);
@@ -15319,33 +15392,40 @@ function buildWallFraming(dims, wallBase, wallTop) {
       }
 
       if (!isOpen) {
-        // Flat girts on the outside face, 24" OC
+        const opsG = _framingOpenings(side);
+        // Flat girts on the outside face — SEGMENTED around openings
         for (let h = wallBase + girtSpacing; h < wallTop - 0.6; h += girtSpacing) {
-          let mesh;
-          if (isLong) {
-            mesh = new THREE.Mesh(new THREE.BoxGeometry(wallLen, girtTall, girtThick), lumberMat('girt'));
-            mesh.position.set(0, h, girtFace);
-          } else {
-            mesh = new THREE.Mesh(new THREE.BoxGeometry(girtThick, girtTall, wallLen), lumberMat('girt'));
-            mesh.position.set(girtFace, h, 0);
-          }
-          mesh.castShadow = mesh.receiveShadow = true;
-          mesh.userData = { categoryKey: 'wall_girts', label: `Girt — ${side}`, isFraming: true };
-          buildingGroup.add(mesh); allMeshes.push(mesh);
+          _segmentsAround(wallLen, opsG, h, 0.15).forEach(seg => {
+            const segLen = seg[1] - seg[0], segMid = (seg[0] + seg[1]) / 2;
+            let mesh;
+            if (isLong) {
+              mesh = new THREE.Mesh(new THREE.BoxGeometry(segLen, girtTall, girtThick), lumberMat('girt'));
+              mesh.position.set(segMid, h, girtFace);
+            } else {
+              mesh = new THREE.Mesh(new THREE.BoxGeometry(girtThick, girtTall, segLen), lumberMat('girt'));
+              mesh.position.set(girtFace, h, segMid);
+            }
+            mesh.castShadow = mesh.receiveShadow = true;
+            mesh.userData = { categoryKey: 'wall_girts', label: `Girt — ${side}`, isFraming: true };
+            buildingGroup.add(mesh); allMeshes.push(mesh);
+          });
         }
 
-        // Splashboard / skirt at grade
-        let skirt;
-        if (isLong) {
-          skirt = new THREE.Mesh(new THREE.BoxGeometry(wallLen, skirtTall, skirtThick), lumberMat('skirt'));
-          skirt.position.set(0, wallBase + skirtTall / 2, skirtFace);
-        } else {
-          skirt = new THREE.Mesh(new THREE.BoxGeometry(skirtThick, skirtTall, wallLen), lumberMat('skirt'));
-          skirt.position.set(skirtFace, wallBase + skirtTall / 2, 0);
-        }
-        skirt.castShadow = skirt.receiveShadow = true;
-        skirt.userData = { categoryKey: 'wall_girts', label: `Splashboard — ${side}`, isFraming: true };
-        buildingGroup.add(skirt); allMeshes.push(skirt);
+        // Splashboard / skirt at grade — segmented around door openings
+        _segmentsAround(wallLen, opsG, wallBase + skirtTall / 2, 0.1).forEach(seg => {
+          const segLen = seg[1] - seg[0], segMid = (seg[0] + seg[1]) / 2;
+          let skirt;
+          if (isLong) {
+            skirt = new THREE.Mesh(new THREE.BoxGeometry(segLen, skirtTall, skirtThick), lumberMat('skirt'));
+            skirt.position.set(segMid, wallBase + skirtTall / 2, skirtFace);
+          } else {
+            skirt = new THREE.Mesh(new THREE.BoxGeometry(skirtThick, skirtTall, segLen), lumberMat('skirt'));
+            skirt.position.set(skirtFace, wallBase + skirtTall / 2, segMid);
+          }
+          skirt.castShadow = skirt.receiveShadow = true;
+          skirt.userData = { categoryKey: 'wall_girts', label: `Splashboard — ${side}`, isFraming: true };
+          buildingGroup.add(skirt); allMeshes.push(skirt);
+        });
       }
 
       // Truss carrier beam — wood trusses only (steel/hybrid sit directly on the posts).
