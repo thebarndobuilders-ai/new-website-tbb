@@ -10504,6 +10504,28 @@ function calcMaterials(i) {
     });
   });
   
+  // === TAKEOFF ITEMS — priced lines pushed from the Takeoff tab. Same labels,
+  // quantities, and unit prices as the takeoff's bottom-left estimate list. ===
+  (window._takeoffQuoteLines || []).forEach(t => {
+    if (!t.qty || t.qty <= 0) return;
+    const tCost = t.qty * (t.unitCost || 0);
+    lines.push({
+      id: 'takeoff_line_' + t.key,
+      label: t.label,
+      cat: 'Takeoff items',
+      uom: t.uom,
+      qty: t.qty,
+      cost: tCost,
+      sell: tCost * (1 + getMarkupSell()),
+      retail: tCost * (1 + getMarkupRetail()),
+      unitCost: t.unitCost || 0,
+      unitSell: (t.unitCost || 0) * (1 + getMarkupSell()),
+      unitRetail: (t.unitCost || 0) * (1 + getMarkupRetail()),
+      source: 'takeoff',
+      sku: ''
+    });
+  });
+
   // === MAN DOORS (exterior doors) — from openings table rows ===
   openingsState.extdoor.forEach((row, idx) => {
     if (!row.qty || row.qty <= 0) return;
@@ -16524,6 +16546,7 @@ if (typeof origSwitchTab === 'function') {
 
   // Clear/zero the whole takeoff — measurements, scale, page names, draft, edit state.
   window.takeoffClearAll = function (opts) {
+    window._takeoffQuoteLines = [];
     opts = opts || {};
     const hasWork = (TO.measures && TO.measures.length) || (TO.pages && Object.keys(TO.pages).length);
     if (!opts.silent && hasWork && !confirm('Clear all measurements and the scale on this takeoff? (The loaded plan stays open.)')) return;
@@ -17064,6 +17087,7 @@ if (typeof origSwitchTab === 'function') {
         <span>Σ Linear <strong>${tot.lf.toFixed(1)} LF</strong></span>
         <span>Σ Floor <strong>${Math.round(tot.floorSf)} SF</strong></span>
         <span style="color:var(--copper);">Σ Takeoff ref. cost <strong>$${Math.round(tot.cost).toLocaleString()}</strong></span>
+        <button onclick="takeoffPushLinesToQuote()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600; font-size:11px;">$ Push priced lines → quote</button>
       </div>`;
     renderCatTotals();
   }
@@ -17096,14 +17120,47 @@ if (typeof origSwitchTab === 'function') {
       if (!confirm(st.missing.length + ' required measurement(s) for a ' + (TIER_LABELS[st.tier] || st.tier) + ' quote are still missing:\n\n' + list + '\n\nConvert to quote anyway?')) return;
     }
     takeoffPushAllToQuote(true);
+    takeoffPushLinesToQuote(true);
+    const pricedCount = (window._takeoffQuoteLines || []).length;
     const lines = used.map(c => {
       const q = totals[c.key];
       const val = c.unit === 'LF' ? q.toFixed(1) + ' LF' : c.unit === 'EA' ? Math.round(q) + ' EA' : Math.round(q) + ' SF';
       return '• ' + c.label + ': ' + val + '  →  ' + c.target;
     }).join('\n');
     if (typeof switchTab === 'function') switchTab('inputs');
-    alert('Takeoff converted to quote:\n\n' + lines + '\n\nThese values are now on the Dimensions tab (set to MANUAL) and the quote has recalculated.');
+    alert('Takeoff converted to quote:\n\n' + lines
+      + (pricedCount ? '\n\nPlus ' + pricedCount + ' priced takeoff line(s) added to the Materials list under "Takeoff items" — same names and prices as the takeoff list.' : '')
+      + '\n\nThese values are now on the Dimensions tab (set to MANUAL) and the quote has recalculated.');
   };
+  // Push the PRICED takeoff lines (the bottom-left estimate list) straight into the
+  // quote as line items — same names, quantities, and unit prices.
+  window.takeoffPushLinesToQuote = function (silent) {
+    const out = [];
+    TO.measures.forEach((m, i) => {
+      if (!m.price || m.price <= 0) return;
+      const v = valueOf(m); if (!v) return;
+      let qty = 0, uom = 'EA';
+      if (m.mode === 'lf' || m.mode === 'wall') { qty = v.lf; uom = 'LF'; }
+      else if (m.mode === 'floor' || m.mode === 'roof') { qty = v.sf; uom = 'SF'; }
+      else { qty = v.count; uom = 'ea'; }
+      if (qty <= 0) return;
+      out.push({
+        key: i,
+        label: (m.name || m.type || 'Takeoff item') + ' — takeoff @ $' + m.price + '/' + uom,
+        qty: Math.round(qty * 100) / 100,
+        uom,
+        unitCost: m.price,
+      });
+    });
+    window._takeoffQuoteLines = out;
+    if (typeof recalc === 'function') recalc();
+    if (!silent) {
+      alert(out.length
+        ? out.length + ' priced takeoff line(s) pushed to the quote — see the "Takeoff items" category on the Materials list.'
+        : 'No priced takeoff items yet. Set a "Price per unit" when adding a measurement and it will carry to the quote.');
+    }
+  };
+
   window.takeoffPushAllToQuote = function (silent) {
     const totals = catTotals();
     const byTarget = {};
