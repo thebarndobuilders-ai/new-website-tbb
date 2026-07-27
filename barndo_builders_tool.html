@@ -3774,10 +3774,25 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
         <button onclick="schedNewBuild()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600;">+ New build</button>
         <button onclick="schedNewBuildFromQuote()" title="Uses the client/project on the current quote">+ New build from current quote</button>
+        <button onclick="schedOpenCalendar()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;">🗓 Master calendar</button>
       </div>
       <div id="sched-digest" style="margin-bottom:14px;"></div>
       <div id="sched-builds"></div>
     </div>
+  </div>
+
+  <!-- MASTER CALENDAR — full-screen year view across ALL builds -->
+  <div id="sched-cal-overlay" style="display:none; position:fixed; inset:0; background:#0a0a0a; z-index:99998; overflow:auto; padding:20px 26px;">
+    <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:14px;">
+      <div style="font-family:var(--font-headline); font-size:20px; color:var(--copper); font-weight:700;">Master schedule</div>
+      <button onclick="schedCalYear(-1)">‹</button>
+      <span id="sched-cal-year" style="font-family:var(--font-mono); font-size:16px; font-weight:600;">2026</span>
+      <button onclick="schedCalYear(1)">›</button>
+      <span class="qbs-note" style="margin:0;">Day shading = how many crews/phases are on that day across every build. Plain = open. ● = delivery due. Click any day for the detail.</span>
+      <button onclick="schedCloseCalendar()" style="margin-left:auto; background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600;">✕ Close</button>
+    </div>
+    <div id="sched-cal-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:14px;"></div>
+    <div id="sched-cal-day" style="position:sticky; bottom:0; margin-top:14px; padding:12px 14px; background:var(--bg-deep); border:1px solid var(--copper); border-radius:8px; display:none;"></div>
   </div>
 
   <!-- CALCULATORS — standalone quick-takeoff calculators (vCalc-style). These are
@@ -7257,16 +7272,20 @@ function printCounterTicket() {
 // Stored in localStorage under bb_schedule_v1 (rides in the full backup).
 // =============================================================
 const SCHED_KEY = 'bb_schedule_v1';
-// Standard build schedule (matches how houses are scheduled): [label, duration in days]
+// Standard build schedule: [label, duration in days]
+// Trades broken into steps: plumbing = under-slab rough-in / above-slab
+// rough-in / trim out; electrical = rough-in / service / trim out;
+// HVAC = rough-in / trim out.
 const SCHED_PHASES_DEFAULT = [
-  ['Permits & site prep', 5],
-  ['Foundation / slab', 5],
-  ['Framing & dry-in', 15],          // shell up: posts/framing, trusses, roof & wall metal, doors/windows
-  ['Rough-ins (elec · plumb · HVAC)', 10],
-  ['Insulation & drywall', 10],
-  ['Interior finish', 10],
-  ['Exterior finish & gutters', 3],
-  ['Punch list & final', 3],
+  ['Permits / site prep', 5], ['Pad & grade', 2],
+  ['Under-slab plumbing', 2], ['Concrete slab', 3],
+  ['Framing', 10], ['Trusses set', 2], ['Roof metal', 4],
+  ['Wall metal & trim', 4], ['Doors & windows', 2], ['Gutters', 1],
+  ['Electrical rough-in', 3], ['Electrical service', 1],
+  ['Plumbing rough-in', 2], ['HVAC rough-in', 2], ['Insulation', 2],
+  ['Drywall & finish', 10],
+  ['Electrical trim-out', 1], ['Plumbing trim-out', 1], ['HVAC trim-out', 1],
+  ['Final walkthrough', 1],
 ];
 const SCHED_PHASE_STATUS = ['pending', 'scheduled', 'in progress', 'done'];
 const SCHED_MAT_STATUS = ['to order', 'ordered', 'delivered'];
@@ -7512,6 +7531,101 @@ function renderGantt(b) {
   });
   document.addEventListener('pointerup', () => { if (drag) { schedSave(); drag = null; } });
 })();
+
+
+// ---- Master calendar: full-screen year view across all builds ----
+let _schedCalYearN = (new Date()).getFullYear();
+function schedOpenCalendar() {
+  const o = document.getElementById('sched-cal-overlay');
+  if (!o) return;
+  o.style.display = 'block';
+  renderSchedCalendar();
+}
+function schedCloseCalendar() {
+  const o = document.getElementById('sched-cal-overlay');
+  if (o) o.style.display = 'none';
+}
+function schedCalYear(dir) { _schedCalYearN += dir; renderSchedCalendar(); }
+// Build a map iso-date -> { phases: [...], deliveries: [...] } across all non-complete builds
+function _schedDayMap() {
+  const map = {};
+  const add = (iso, kind, entry) => {
+    if (!map[iso]) map[iso] = { phases: [], deliveries: [] };
+    map[iso][kind].push(entry);
+  };
+  schedBuilds.forEach(b => {
+    if (b.status === 'complete') return;
+    b.phases.forEach(p => {
+      if (!p.start || p.status === 'done') return;
+      const days = Math.max(1, p.days || 1);
+      for (let d = 0; d < days; d++) {
+        add(sdAdd(p.start, d), 'phases', { build: b.name, label: p.label, contractor: p.contractor || '', status: p.status });
+      }
+    });
+    b.materials.forEach(m => {
+      if (m.deliveryDate && m.status !== 'delivered') {
+        add(m.deliveryDate, 'deliveries', { build: b.name, label: m.label || 'material', supplier: m.supplier || '' });
+      }
+    });
+  });
+  return map;
+}
+function renderSchedCalendar() {
+  const grid = document.getElementById('sched-cal-grid'); if (!grid) return;
+  document.getElementById('sched-cal-year').textContent = _schedCalYearN;
+  const dayEl = document.getElementById('sched-cal-day');
+  if (dayEl) dayEl.style.display = 'none';
+  const map = _schedDayMap();
+  const today = sdISO(new Date());
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  let html = '';
+  for (let m = 0; m < 12; m++) {
+    const first = new Date(_schedCalYearN, m, 1);
+    const dow0 = first.getDay();
+    const daysIn = new Date(_schedCalYearN, m + 1, 0).getDate();
+    let cells = '<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:2px; font-size:10px; color:var(--text-3); text-align:center;">'
+      + ['S','M','T','W','T','F','S'].map(d => `<div>${d}</div>`).join('') + '</div>'
+      + '<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:2px;">';
+    for (let e = 0; e < dow0; e++) cells += '<div></div>';
+    for (let d = 1; d <= daysIn; d++) {
+      const iso = _schedCalYearN + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      const info = map[iso];
+      const n = info ? info.phases.length : 0;
+      const hasDel = info && info.deliveries.length > 0;
+      const bgc = n === 0 ? 'var(--surface-2)'
+        : n === 1 ? 'rgba(251,146,60,0.30)'
+        : n === 2 ? 'rgba(251,146,60,0.55)'
+        : 'rgba(251,146,60,0.85)';
+      const isToday = iso === today;
+      cells += `<div onclick="schedCalDay('${iso}')"
+        title="${n} scheduled${hasDel ? ' + delivery' : ''}"
+        style="height:30px; border-radius:4px; background:${bgc}; ${isToday ? 'outline:2px solid #ff3b30;' : ''}
+        display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative;
+        font-family:var(--font-mono); font-size:11px; color:${n >= 2 ? 'var(--bg-deep)' : 'var(--text)'};">
+        ${d}${hasDel ? '<span style="position:absolute; top:2px; right:3px; font-size:8px; color:#3ad67b;">●</span>' : ''}</div>`;
+    }
+    cells += '</div>';
+    html += `<div style="border:1px solid var(--hairline); border-radius:8px; padding:10px;">
+      <div style="font-family:var(--font-headline); font-size:13px; font-weight:600; margin-bottom:6px;">${MONTHS[m]}</div>${cells}</div>`;
+  }
+  grid.innerHTML = html;
+}
+function schedCalDay(iso) {
+  const dayEl = document.getElementById('sched-cal-day'); if (!dayEl) return;
+  const map = _schedDayMap();
+  const info = map[iso];
+  const d = sdParse(iso);
+  const dstr = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  if (!info) {
+    dayEl.innerHTML = `<strong style="color:var(--copper);">${dstr}</strong> — <span style="color:#3ad67b;">OPEN — nothing scheduled.</span>`;
+    dayEl.style.display = 'block';
+    return;
+  }
+  dayEl.innerHTML = `<strong style="color:var(--copper);">${dstr}</strong>`
+    + info.phases.map(p => `<div style="font-size:12px; padding:2px 0;">🔨 <strong>${p.label}</strong> — ${p.build}${p.contractor ? ' · <span style="color:' + _schedTradeColor(p.contractor) + ';">' + p.contractor + '</span>' : ''} <span style="color:${_schedStatusColor(p.status)};">(${p.status})</span></div>`).join('')
+    + info.deliveries.map(m => `<div style="font-size:12px; padding:2px 0;">📦 Delivery: <strong>${m.label}</strong> — ${m.build}${m.supplier ? ' · ' + m.supplier : ''}</div>`).join('');
+  dayEl.style.display = 'block';
+}
 
 function renderSchedule() {
   const wrap = document.getElementById('sched-builds'); if (!wrap) return;
