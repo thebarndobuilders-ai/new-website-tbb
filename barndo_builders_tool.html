@@ -2158,7 +2158,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v174</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v175</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3222,6 +3222,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <button onclick="takeoffOpenAdd('linear')">／ Linear</button>
         <button onclick="takeoffOpenTruss()">◉ Truss count</button>
         <button id="to-tool-pan" onclick="takeoffTool('pan')">✋ Pan</button>
+        <button onclick="takeoffSelfTest()" title="Checks that your mouse clicks/drags reach the app and that lines can draw on your screen">🩺 Test mouse</button>
         <button onclick="takeoffFinish()">✓ Finish</button>
         <button onclick="takeoffUndoPt()">↶ Undo point</button>
         <button onclick="takeoffClearAll()" title="Clear all measurements and scale">✕ Clear</button>
@@ -7317,7 +7318,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v174';
+const BB_VERSION = 'v175';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17892,6 +17893,53 @@ if (typeof origSwitchTab === 'function') {
     const sx = dc.width / r.width, sy = dc.height / r.height;
     return { x: (ev.clientX - r.left) * sx / TO.renderScale, y: (ev.clientY - r.top) * sy / TO.renderScale };
   }
+  // ---- self-test: proves whether mouse events + canvas drawing work on THIS
+  // machine, independent of the PDF/scale code. Pure diagnostics, no state. ----
+  window.takeoffSelfTest = function () {
+    const old = document.getElementById('to-selftest'); if (old) old.remove();
+    const ver = (typeof BB_VERSION !== 'undefined') ? BB_VERSION : '(unknown — OLD FILE)';
+    const wrap = document.createElement('div');
+    wrap.id = 'to-selftest';
+    wrap.style.cssText = 'position:fixed; inset:0; background:rgba(5,5,5,0.94); z-index:100000; display:flex; align-items:center; justify-content:center;';
+    wrap.innerHTML = `
+      <div style="background:#161310; border:2px solid var(--copper); border-radius:12px; padding:22px 26px; max-width:640px; width:92%;">
+        <div style="font-family:var(--font-headline); font-size:18px; color:var(--copper); font-weight:700; margin-bottom:4px;">Mouse &amp; display test — ${ver}</div>
+        <div style="font-size:12px; color:var(--text-2); margin-bottom:10px;">Step 1: You should see a <b style="color:#1e7bff;">blue line</b> already drawn in the box below.<br>Step 2: <b>Press the LEFT button inside the box and DRAG</b> — a blue line should follow your mouse.</div>
+        <canvas id="to-st-canvas" width="560" height="260" style="width:100%; background:#fff; border-radius:8px; cursor:crosshair; touch-action:none;"></canvas>
+        <div id="to-st-report" style="font-family:var(--font-mono); font-size:13px; margin-top:10px; line-height:1.7;">Waiting for your drag… <span style="color:var(--text-3)">(events seen: none yet)</span></div>
+        <div style="display:flex; justify-content:flex-end; margin-top:12px;"><button onclick="document.getElementById('to-selftest').remove()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600;">✕ Close</button></div>
+      </div>`;
+    document.body.appendChild(wrap);
+    const cv = document.getElementById('to-st-canvas');
+    const rep = document.getElementById('to-st-report');
+    const cx = cv.getContext('2d');
+    const paintBase = () => {
+      cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
+      cx.strokeStyle = '#1e7bff'; cx.lineWidth = 4; cx.lineCap = 'round';
+      cx.beginPath(); cx.moveTo(30, 230); cx.lineTo(200, 30); cx.stroke();
+      cx.fillStyle = '#666'; cx.font = '12px Arial';
+      cx.fillText('static test line ↑ — now press & drag anywhere in here', 215, 40);
+    };
+    paintBase();
+    let downs = 0, moves = 0, ups = 0, start = null;
+    const pos = (e) => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; };
+    const report = (done) => {
+      rep.innerHTML = `press: ${downs ? '✓' : '—'} &nbsp; move: ${moves} &nbsp; release: ${ups ? '✓' : '—'}` + (done
+        ? (moves > 2
+          ? `<br><b style="color:#3ad67b;">✓ YOUR MOUSE AND DISPLAY WORK.</b> Drag-to-scale works on this machine in this file (${ver}). If scale still fails on the blueprint, tell Claude exactly what the orange bar says while you drag.`
+          : `<br><b style="color:#ff9b9b;">✗ Press/release arrived but almost no movement events.</b> Tell Claude this — it points at a mouse-driver or browser issue.`)
+        : '');
+    };
+    const dn = (e) => { if (e.button !== 0) return; downs++; start = pos(e); e.preventDefault(); if (cv.setPointerCapture && e.pointerId != null) { try { cv.setPointerCapture(e.pointerId); } catch (_) {} } report(false); };
+    const mv = (e) => { if (!start) return; moves++; const p = pos(e); paintBase(); cx.strokeStyle = '#1e7bff'; cx.lineWidth = 4; cx.beginPath(); cx.moveTo(start.x, start.y); cx.lineTo(p.x, p.y); cx.stroke(); if (moves % 3 === 0) report(false); };
+    const up = () => { if (!start) return; ups++; start = null; report(true); };
+    if (typeof window.PointerEvent !== 'undefined') {
+      cv.addEventListener('pointerdown', dn); cv.addEventListener('pointermove', mv); cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    } else {
+      cv.addEventListener('mousedown', dn); cv.addEventListener('mousemove', mv); cv.addEventListener('mouseup', up);
+    }
+  };
+
   // Shared scale-line completion (used by both two-click and press-drag flows)
   function scaleComplete(p1, p2) {
     const px = dist(p1, p2);
