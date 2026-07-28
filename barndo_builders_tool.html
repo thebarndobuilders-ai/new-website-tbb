@@ -2172,6 +2172,7 @@
       <button onclick="exportPDF()">Internal cost sheet</button>
       <button onclick="printCutList()">Cut list</button>
       <button onclick="exportCutListCSV()" title="Download the cut list as a CSV spreadsheet">Cut list CSV</button>
+      <button onclick="printOrderSheets()" title="PO-style purchase sheets — one page per package (concrete, framing, metal, finish), grouped by build phase">Order sheets</button>
     </div>
   </div>
 
@@ -2926,6 +2927,12 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
       </div>
     </div>
 
+    <!-- Pipeline analytics — computed from the same leads + saved quotes; display only -->
+    <div class="qbs-card" style="margin-top:12px;">
+      <h3>Pipeline analytics <span class="badge">Close rate · pipeline value · sources · months</span></h3>
+      <div id="leads-analytics-body"><p class="qbs-sub">Loading…</p></div>
+    </div>
+
     <!-- Action bar -->
     <div class="qbs-card" style="padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
       <div style="display: flex; align-items: center; gap: 12px;">
@@ -3446,6 +3453,18 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
     </div>
 
     <div class="qbs-totals" id="grand-totals"></div>
+
+    <div class="qbs-card" style="margin-top:16px;">
+      <h3>Payment / draw schedule <span class="badge">Prints on the customer proposal</span></h3>
+      <p class="qbs-sub" style="margin-bottom:10px;">Milestone payments computed from the quote grand total. Edit labels and percentages to fit the contract — they must total 100%.</p>
+      <div id="draw-schedule-body"></div>
+    </div>
+
+    <div class="qbs-card" style="margin-top:16px;">
+      <h3>Change orders <span class="badge">Adjusts the contract total · never touches the original quote</span></h3>
+      <p class="qbs-sub" style="margin-bottom:10px;">Logged against the client / project named on the Dimensions tab. Approved change orders roll into the adjusted contract total below.</p>
+      <div id="change-orders-body"></div>
+    </div>
   </div>
 
   <!-- CUSTOMER PROPOSAL — client-facing document. NO costs, NO quantities, NO line items. -->
@@ -3481,6 +3500,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
       <p class="qbs-sub" style="margin-bottom: 16px;">A clean document for the customer. It describes the building — dimensions, areas, and finish selections — plus the scope of work and the total price. Material quantities, unit costs, line-item pricing, and your markup/overhead/profit are never shown here.</p>
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button onclick="printProposal()">🖨 Print / Save as PDF</button>
+        <button onclick="exportClientShare()" title="Downloads a single HTML file to email the customer: the proposal plus a drag-to-spin 3D view of their building in their colors">📤 Client share file (3D)</button>
         <button onclick="renderProposal()">↻ Refresh</button>
       </div>
       <div id="proposal-output"></div>
@@ -3790,7 +3810,12 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
         <button onclick="schedNewBuild()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600;">+ New build</button>
         <button onclick="schedNewBuildFromQuote()" title="Uses the client/project on the current quote">+ New build from current quote</button>
         <button onclick="schedOpenCalendar()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;">🗓 Master calendar</button>
+        <span style="display:inline-flex; align-items:center; gap:6px; margin-left:auto;">
+          <input id="wx-loc" placeholder="Zip or city for weather" style="width:170px; font-size:12px;" onkeydown="if(event.key==='Enter')wxSetLocation()">
+          <button onclick="wxSetLocation()" style="font-size:11px;" title="Pulls a 16-day forecast (needs internet) and flags rain risk on outdoor phases">⛅ Set</button>
+        </span>
       </div>
+      <div id="wx-warnings" style="margin-bottom:10px;"></div>
       <div id="sched-digest" style="margin-bottom:14px;"></div>
       <div id="sched-builds"></div>
     </div>
@@ -7442,6 +7467,72 @@ function schedMatDel(id, mi) {
   const b = schedBuilds.find(x => x.id === id); if (!b) return;
   b.materials.splice(mi, 1); schedSave(); renderSchedule();
 }
+// ---- Job costing: log actual spend against the quoted budget ----
+const SCHED_COST_CATS = ['Materials', 'Subs', 'Labor', 'Permits/fees', 'Other'];
+function schedCostAdd(id) {
+  const b = schedBuilds.find(x => x.id === id); if (!b) return;
+  if (!b.costs) b.costs = [];
+  b.costs.push({ date: sdISO(new Date()), cat: 'Materials', desc: '', amount: 0 });
+  schedSave(); renderSchedule();
+}
+function schedCostSet(id, ci, field, value) {
+  const b = schedBuilds.find(x => x.id === id); if (!b || !b.costs || !b.costs[ci]) return;
+  b.costs[ci][field] = (field === 'amount') ? (parseFloat(value) || 0) : value;
+  schedSave();
+  if (field === 'amount' || field === 'cat') renderSchedule();
+}
+function schedCostDel(id, ci) {
+  const b = schedBuilds.find(x => x.id === id); if (!b || !b.costs) return;
+  b.costs.splice(ci, 1); schedSave(); renderSchedule();
+}
+function schedBudgetSet(id, value) {
+  const b = schedBuilds.find(x => x.id === id); if (!b) return;
+  b.budget = parseFloat(value) || 0; schedSave(); renderSchedule();
+}
+function schedBudgetFromQuote(id) {
+  const b = schedBuilds.find(x => x.id === id); if (!b) return;
+  const g = (window._lastCalc && window._lastCalc.grand) || 0;
+  if (!g) { alert('No quote total yet — run a quote first (Materials/Quote tabs), then come back.'); return; }
+  b.budget = Math.round(g * 100) / 100; schedSave(); renderSchedule();
+}
+function _schedCostSection(b) {
+  const costs = b.costs || [];
+  const spent = costs.reduce((s, c) => s + (c.amount || 0), 0);
+  const budget = b.budget || 0;
+  const remaining = budget - spent;
+  const pctUsed = budget > 0 ? Math.round(spent / budget * 100) : 0;
+  const barColor = budget > 0 && spent > budget ? '#e5484d' : (pctUsed > 85 ? '#f5a623' : '#5aa24a');
+  const byCat = {};
+  costs.forEach(c => { byCat[c.cat || 'Other'] = (byCat[c.cat || 'Other'] || 0) + (c.amount || 0); });
+  const money = v => '$' + (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const rows = costs.map((c, ci) => `
+    <tr>
+      <td><input type="date" value="${c.date || ''}" onchange="schedCostSet('${b.id}',${ci},'date',this.value)" style="font-size:11px;"></td>
+      <td><select onchange="schedCostSet('${b.id}',${ci},'cat',this.value)" style="font-size:11px;">
+        ${SCHED_COST_CATS.map(k => `<option value="${k}" ${c.cat === k ? 'selected' : ''}>${k}</option>`).join('')}
+      </select></td>
+      <td><input value="${(c.desc || '').replace(/"/g, '&quot;')}" placeholder="invoice / sub draw / receipt" onchange="schedCostSet('${b.id}',${ci},'desc',this.value)" style="width:100%; min-width:160px; font-size:11px;"></td>
+      <td><input type="number" step="0.01" value="${c.amount || 0}" onchange="schedCostSet('${b.id}',${ci},'amount',this.value)" style="width:110px; font-size:11px; text-align:right;"></td>
+      <td><button onclick="schedCostDel('${b.id}',${ci})" style="padding:2px 7px !important; background:#3a1414; color:#ff9b9b; border-color:#5a1f1f;">✕</button></td>
+    </tr>`).join('');
+  return `
+    <div style="margin-top:12px;">
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--copper); margin-bottom:4px;">Job costing — actuals vs quote</div>
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+        <label style="font-size:11px;">Contract / quoted $
+          <input type="number" step="0.01" value="${budget || ''}" placeholder="0" onchange="schedBudgetSet('${b.id}',this.value)" style="width:120px; font-size:12px; text-align:right;"></label>
+        <button onclick="schedBudgetFromQuote('${b.id}')" title="Copy the current quote's grand total in as this job's budget" style="font-size:11px;">⤓ Use current quote total</button>
+        <span style="font-family:var(--font-mono); font-size:12px;">Spent <b>${money(spent)}</b>${budget > 0 ? ` of ${money(budget)} · <b style="color:${remaining < 0 ? '#e5484d' : '#5aa24a'};">${remaining < 0 ? money(-remaining) + ' OVER' : money(remaining) + ' left'}</b>` : ''}</span>
+        ${budget > 0 ? `<div style="flex:1; min-width:120px; height:8px; background:var(--surface-2); border-radius:4px; overflow:hidden;"><div style="width:${Math.min(100, pctUsed)}%; height:100%; background:${barColor};"></div></div><span style="font-family:var(--font-mono); font-size:11px;">${pctUsed}%</span>` : ''}
+      </div>
+      ${Object.keys(byCat).length ? `<div style="font-size:11px; color:var(--text-2); margin-bottom:4px;">${Object.entries(byCat).map(([k, v]) => `${k}: <b>${money(v)}</b>`).join(' · ')}</div>` : ''}
+      ${costs.length ? `<table class="qbs-table" style="width:100%; font-size:12px;">
+        <thead><tr><th>Date</th><th>Category</th><th>Description</th><th style="text-align:right;">Amount</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>` : ''}
+      <button onclick="schedCostAdd('${b.id}')" style="margin-top:4px; font-size:11px;">+ Add cost</button>
+    </div>`;
+}
 function schedSetView(v) { schedView = v; renderSchedule(); }
 function _schedPct(b) {
   if (!b.phases.length) return 0;
@@ -7576,6 +7667,73 @@ function renderGantt(b) {
 })();
 
 
+// ---- Weather (Open-Meteo, key-free) — flags rain risk on outdoor phases.
+// Purely additive: offline or unset location = schedule behaves exactly as before.
+const WX_KEY = 'bb_weather_loc_v1';
+let wxDays = {};   // iso -> { pp (precip prob %), tmax, tmin (°F) }
+let wxLoc = null;
+function wxLoadLoc() { try { wxLoc = JSON.parse(localStorage.getItem(WX_KEY)); } catch (e) { wxLoc = null; } }
+async function wxSetLocation() {
+  const q = ((document.getElementById('wx-loc') || {}).value || '').trim();
+  if (!q) return;
+  try {
+    const geo = await (await fetch('https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name=' + encodeURIComponent(q))).json();
+    const hit = geo && geo.results && geo.results[0];
+    if (!hit) { alert('Location not found — try "Selmer TN", "Adamsville", or a 5-digit zip.'); return; }
+    wxLoc = { name: hit.name + (hit.admin1 ? ', ' + hit.admin1 : ''), lat: hit.latitude, lon: hit.longitude };
+    try { localStorage.setItem(WX_KEY, JSON.stringify(wxLoc)); } catch (e) {}
+    await wxFetch();
+    renderWxWarnings();
+    const o = document.getElementById('sched-cal-overlay');
+    if (o && o.style.display === 'block') renderSchedCalendar();
+  } catch (e) { alert('Weather lookup failed (offline?) — the schedule works fine without it.'); }
+}
+async function wxFetch() {
+  if (!wxLoc) return;
+  try {
+    const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + wxLoc.lat + '&longitude=' + wxLoc.lon +
+      '&daily=precipitation_probability_max,temperature_2m_max,temperature_2m_min&forecast_days=16&temperature_unit=fahrenheit&timezone=auto';
+    const d = await (await fetch(u)).json();
+    wxDays = {};
+    ((d.daily && d.daily.time) || []).forEach((iso, k) => {
+      wxDays[iso] = { pp: d.daily.precipitation_probability_max[k] || 0, tmax: Math.round(d.daily.temperature_2m_max[k]), tmin: Math.round(d.daily.temperature_2m_min[k]) };
+    });
+  } catch (e) { /* offline — leave wxDays empty */ }
+}
+// Phases where rain actually stops work
+const WX_OUTDOOR_RE = /site prep|grade|slab|under-slab|framing|truss|roof|metal|gutter|doors & windows/i;
+function wxRainRisks() {
+  const risks = [];
+  schedBuilds.forEach(b => {
+    if (b.status === 'complete') return;
+    (b.phases || []).forEach(p => {
+      if (p.status === 'done' || !p.start || !WX_OUTDOOR_RE.test(p.label || '')) return;
+      const end = sdEnd(p);
+      for (let d = p.start; d <= end; d = sdAdd(d, 1)) {
+        const w = wxDays[d];
+        if (w && w.pp >= 50) risks.push({ date: d, pp: w.pp, phase: p.label, build: b.name });
+      }
+    });
+  });
+  return risks.sort((a, b) => a.date.localeCompare(b.date));
+}
+function renderWxWarnings() {
+  const box = document.getElementById('wx-warnings'); if (!box) return;
+  const locEl = document.getElementById('wx-loc');
+  if (locEl && wxLoc && !locEl.value) locEl.value = wxLoc.name;
+  if (!wxLoc) { box.innerHTML = ''; return; }
+  if (!Object.keys(wxDays).length) { box.innerHTML = `<div class="qbs-note">⛅ ${wxLoc.name} — forecast unavailable (offline?). Rain flags return when online.</div>`; return; }
+  const risks = wxRainRisks();
+  if (!risks.length) { box.innerHTML = `<div class="qbs-note">⛅ ${wxLoc.name} — no rain conflicts (≥50% chance) with outdoor phases over the next 16 days.</div>`; return; }
+  const fdate = iso => new Date(iso + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+  box.innerHTML = `<div style="border:1px solid rgba(74,144,217,0.5); background:rgba(74,144,217,0.10); border-radius:8px; padding:8px 12px; font-size:12px; line-height:1.7;">
+    <b>🌧 Rain risk — ${wxLoc.name}:</b> ` +
+    risks.slice(0, 8).map(r => `${fdate(r.date)} <b>${r.pp}%</b> — ${r.phase} (${r.build})`).join(' &nbsp;·&nbsp; ') +
+    (risks.length > 8 ? ` &nbsp;·&nbsp; +${risks.length - 8} more` : '') + `</div>`;
+}
+wxLoadLoc();
+if (wxLoc) { wxFetch().then(() => { try { renderWxWarnings(); } catch (e) {} }); }
+
 // ---- Master calendar: full-screen year view across all builds ----
 let _schedCalYearN = (new Date()).getFullYear();
 function schedOpenCalendar() {
@@ -7645,7 +7803,7 @@ function renderSchedCalendar() {
         style="height:30px; border-radius:4px; background:${bgc}; ${isToday ? 'outline:2px solid #ff3b30;' : ''}
         display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative;
         font-family:var(--font-mono); font-size:11px; color:${n >= 2 ? 'var(--bg-deep)' : 'var(--text)'};">
-        ${d}${hasDel ? '<span style="position:absolute; top:2px; right:3px; font-size:8px; color:#3ad67b;">●</span>' : ''}</div>`;
+        ${d}${hasDel ? '<span style="position:absolute; top:2px; right:3px; font-size:8px; color:#3ad67b;">●</span>' : ''}${wxDays[iso] && wxDays[iso].pp >= 50 ? '<span style="position:absolute; top:1px; left:2px; font-size:8px;" title="' + wxDays[iso].pp + '% rain">💧</span>' : ''}</div>`;
     }
     cells += '</div>';
     html += `<div style="border:1px solid var(--hairline); border-radius:8px; padding:10px;">
@@ -7659,12 +7817,14 @@ function schedCalDay(iso) {
   const info = map[iso];
   const d = sdParse(iso);
   const dstr = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const wx = wxDays[iso];
+  const wxLine = wx ? ` <span style="color:var(--text-3); font-size:12px;">· ⛅ ${wx.tmin}–${wx.tmax}°F, ${wx.pp}% rain${wx.pp >= 50 ? ' 🌧' : ''}</span>` : '';
   if (!info) {
-    dayEl.innerHTML = `<strong style="color:var(--copper);">${dstr}</strong> — <span style="color:#3ad67b;">OPEN — nothing scheduled.</span>`;
+    dayEl.innerHTML = `<strong style="color:var(--copper);">${dstr}</strong>${wxLine} — <span style="color:#3ad67b;">OPEN — nothing scheduled.</span>`;
     dayEl.style.display = 'block';
     return;
   }
-  dayEl.innerHTML = `<strong style="color:var(--copper);">${dstr}</strong>`
+  dayEl.innerHTML = `<strong style="color:var(--copper);">${dstr}</strong>${wxLine}`
     + info.phases.map(p => `<div style="font-size:12px; padding:2px 0;">🔨 <strong>${p.label}</strong> — ${p.build}${p.contractor ? ' · <span style="color:' + _schedTradeColor(p.contractor) + ';">' + p.contractor + '</span>' : ''} <span style="color:${_schedStatusColor(p.status)};">(${p.status})</span></div>`).join('')
     + info.deliveries.map(m => `<div style="font-size:12px; padding:2px 0;">📦 Delivery: <strong>${m.label}</strong> — ${m.build}${m.supplier ? ' · ' + m.supplier : ''}</div>`).join('');
   dayEl.style.display = 'block';
@@ -7673,6 +7833,7 @@ function schedCalDay(iso) {
 function renderSchedule() {
   const wrap = document.getElementById('sched-builds'); if (!wrap) return;
   renderScheduleDigest();
+  try { renderWxWarnings(); } catch (e) {}
   const viewBtns = `<div style="display:flex; gap:6px; margin-bottom:10px;">
     ${['gantt', 'list'].map(v => `<button onclick="schedSetView('${v}')" style="font-size:11px; ${schedView === v ? 'background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600;' : ''}">${v === 'gantt' ? '📊 Gantt' : '☰ List'}</button>`).join('')}
   </div>`;
@@ -7742,11 +7903,135 @@ function renderSchedule() {
           </table>
           <button onclick="schedMatAdd('${b.id}')" style="margin-top:4px; font-size:11px;">+ Add material</button>
         </div>
+        ${_schedCostSection(b)}
         <textarea placeholder="Build notes..." onchange="schedSet('${b.id}','notes',this.value)" style="width:100%; margin-top:10px; min-height:40px; font-size:12px;">${b.notes || ''}</textarea>
       </div>`;
   }).join('');
 }
 schedLoad();
+
+// =============================================================
+// DRAW SCHEDULE + CHANGE ORDERS — additive layer over the quote.
+// Reads window._lastCalc.grand; never writes into quote math.
+// Draw milestones: one editable template (bb_draw_schedule_v1).
+// Change orders: keyed by client|project (bb_change_orders_v1).
+// =============================================================
+const DRAW_KEY = 'bb_draw_schedule_v1';
+const CO_KEY = 'bb_change_orders_v1';
+const DRAW_DEFAULT = [
+  { label: 'Contract signing / deposit', pct: 30 },
+  { label: 'Slab complete', pct: 25 },
+  { label: 'Dried-in — framing, roof & wall metal', pct: 25 },
+  { label: 'Final completion / walkthrough', pct: 20 },
+];
+let drawMilestones = null;
+function drawLoad() {
+  try { drawMilestones = JSON.parse(localStorage.getItem(DRAW_KEY)); } catch (e) { drawMilestones = null; }
+  if (!Array.isArray(drawMilestones) || !drawMilestones.length) drawMilestones = DRAW_DEFAULT.map(m => ({ ...m }));
+}
+function drawSaveLS() { try { localStorage.setItem(DRAW_KEY, JSON.stringify(drawMilestones)); } catch (e) {} }
+function _quoteGrand() { return (window._lastCalc && window._lastCalc.grand) || 0; }
+function _moneyFmt(v) { return '$' + (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function drawSet(di, field, value) {
+  if (!drawMilestones[di]) return;
+  drawMilestones[di][field] = (field === 'pct') ? (parseFloat(value) || 0) : value;
+  drawSaveLS(); renderDrawSchedule();
+}
+function drawAdd() { drawMilestones.push({ label: 'Milestone', pct: 0 }); drawSaveLS(); renderDrawSchedule(); }
+function drawDel(di) { drawMilestones.splice(di, 1); drawSaveLS(); renderDrawSchedule(); }
+function drawReset() { drawMilestones = DRAW_DEFAULT.map(m => ({ ...m })); drawSaveLS(); renderDrawSchedule(); }
+function renderDrawSchedule() {
+  const box = document.getElementById('draw-schedule-body'); if (!box) return;
+  if (!drawMilestones) drawLoad();
+  const total = _adjustedContractTotal();
+  const pctSum = drawMilestones.reduce((s, m) => s + (m.pct || 0), 0);
+  const rows = drawMilestones.map((m, di) => `
+    <tr>
+      <td><input value="${(m.label || '').replace(/"/g, '&quot;')}" onchange="drawSet(${di},'label',this.value)" style="width:100%; min-width:220px;"></td>
+      <td><input type="number" step="1" value="${m.pct || 0}" onchange="drawSet(${di},'pct',this.value)" style="width:70px; text-align:right;"> %</td>
+      <td style="text-align:right; font-family:var(--font-mono);">${total > 0 ? _moneyFmt(total * (m.pct || 0) / 100) : '—'}</td>
+      <td><button onclick="drawDel(${di})" style="padding:2px 7px !important; background:#3a1414; color:#ff9b9b; border-color:#5a1f1f;">✕</button></td>
+    </tr>`).join('');
+  box.innerHTML = `
+    ${total > 0 ? `<div class="qbs-note" style="margin-bottom:6px;">Based on the adjusted contract total ${_moneyFmt(total)}${_coApprovedTotal() ? ` (quote ${_moneyFmt(_quoteGrand())} + approved change orders ${_moneyFmt(_coApprovedTotal())})` : ''}.</div>`
+      : '<div class="qbs-note" style="margin-bottom:6px;">No quote total yet — amounts appear once the quote calculates.</div>'}
+    <table class="qbs-table" style="width:100%;">
+      <thead><tr><th>Milestone</th><th>% of contract</th><th style="text-align:right;">Amount</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr>
+        <td style="font-weight:600;">Total</td>
+        <td style="font-weight:600; color:${Math.round(pctSum) === 100 ? 'var(--text-1)' : '#e5484d'};">${pctSum}% ${Math.round(pctSum) === 100 ? '' : '⚠ must equal 100%'}</td>
+        <td style="text-align:right; font-weight:600; font-family:var(--font-mono);">${total > 0 ? _moneyFmt(total * pctSum / 100) : '—'}</td><td></td>
+      </tr></tfoot>
+    </table>
+    <div style="margin-top:6px; display:flex; gap:8px;">
+      <button onclick="drawAdd()" style="font-size:11px;">+ Add milestone</button>
+      <button onclick="drawReset()" style="font-size:11px;">↺ Reset to standard 30 / 25 / 25 / 20</button>
+    </div>`;
+}
+// ---- change orders ----
+function _coKey() {
+  const g = id => (((document.getElementById(id) || {}).value) || '').trim();
+  return (g('client_name') + '|' + g('project_name')).toLowerCase();
+}
+function _coAll() { try { return JSON.parse(localStorage.getItem(CO_KEY)) || {}; } catch (e) { return {}; } }
+function _coList() { return _coAll()[_coKey()] || []; }
+function _coSaveList(list) { const all = _coAll(); all[_coKey()] = list; try { localStorage.setItem(CO_KEY, JSON.stringify(all)); } catch (e) {} }
+function _coApprovedTotal() { return _coList().reduce((s, c) => s + (c.approved ? (c.amount || 0) : 0), 0); }
+function _adjustedContractTotal() { return _quoteGrand() + _coApprovedTotal(); }
+function coAdd() { const l = _coList(); l.push({ date: sdISO(new Date()), desc: '', amount: 0, approved: false }); _coSaveList(l); renderChangeOrders(); renderDrawSchedule(); }
+function coSet(ci, field, value) {
+  const l = _coList(); if (!l[ci]) return;
+  l[ci][field] = (field === 'amount') ? (parseFloat(value) || 0) : (field === 'approved' ? !!value : value);
+  _coSaveList(l); renderChangeOrders(); renderDrawSchedule();
+}
+function coDel(ci) { const l = _coList(); l.splice(ci, 1); _coSaveList(l); renderChangeOrders(); renderDrawSchedule(); }
+function renderChangeOrders() {
+  const box = document.getElementById('change-orders-body'); if (!box) return;
+  const key = _coKey();
+  if (key === '|') { box.innerHTML = '<div class="qbs-note">Name the client / project on the Dimensions tab first — change orders file under that job.</div>'; return; }
+  const list = _coList();
+  const approved = _coApprovedTotal();
+  const rows = list.map((c, ci) => `
+    <tr>
+      <td><input type="date" value="${c.date || ''}" onchange="coSet(${ci},'date',this.value)"></td>
+      <td><input value="${(c.desc || '').replace(/"/g, '&quot;')}" placeholder="e.g. add 12×20 lean-to, 2 windows" onchange="coSet(${ci},'desc',this.value)" style="width:100%; min-width:220px;"></td>
+      <td><input type="number" step="0.01" value="${c.amount || 0}" title="Positive adds, negative credits" onchange="coSet(${ci},'amount',this.value)" style="width:110px; text-align:right;"></td>
+      <td style="text-align:center;"><input type="checkbox" ${c.approved ? 'checked' : ''} onchange="coSet(${ci},'approved',this.checked)"></td>
+      <td><button onclick="coDel(${ci})" style="padding:2px 7px !important; background:#3a1414; color:#ff9b9b; border-color:#5a1f1f;">✕</button></td>
+    </tr>`).join('');
+  box.innerHTML = `
+    <div class="qbs-note" style="margin-bottom:6px;">Job: <b>${key.replace('|', ' — ').replace(/^\s*—\s*|\s*—\s*$/g, '') || key}</b></div>
+    ${list.length ? `<table class="qbs-table" style="width:100%;">
+      <thead><tr><th>Date</th><th>Description</th><th style="text-align:right;">+ / − $</th><th>Approved</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>` : '<div class="qbs-note">No change orders yet.</div>'}
+    <button onclick="coAdd()" style="margin-top:6px; font-size:11px;">+ Add change order</button>
+    <div style="margin-top:10px; font-family:var(--font-mono); font-size:13px;">
+      Original quote: <b>${_moneyFmt(_quoteGrand())}</b> · Approved change orders: <b style="color:${approved < 0 ? '#5aa24a' : 'var(--copper)'};">${approved >= 0 ? '+' : ''}${_moneyFmt(approved).replace('$-', '-$')}</b> ·
+      Adjusted contract total: <b style="font-size:15px;">${_moneyFmt(_adjustedContractTotal())}</b>
+    </div>`;
+}
+drawLoad();
+// Draw schedule + change orders block for the PRINTED proposal.
+function _drawProposalHTML() {
+  try {
+    if (!drawMilestones) drawLoad();
+    const total = _adjustedContractTotal();
+    if (total <= 0) return '';
+    const pctSum = drawMilestones.reduce((s, m) => s + (m.pct || 0), 0);
+    const co = _coApprovedTotal();
+    let h = '';
+    if (co) {
+      h += `<div class="total" style="margin-top:4px;"><span><b>Adjusted contract total</b> <span style="font-weight:400;color:#777;font-size:11px;">(incl. approved change orders)</span></span><span class="amt">${_moneyFmt(total)}</span></div>`;
+    }
+    if (Math.round(pctSum) === 100) {
+      h += `<h2>Payment schedule</h2><table>` + drawMilestones.map(m =>
+        `<tr><td>${m.label}</td><td style="text-align:right;white-space:nowrap;">${m.pct}%</td><td style="text-align:right;white-space:nowrap;">${_moneyFmt(total * (m.pct || 0) / 100)}</td></tr>`).join('') + `</table>`;
+    }
+    return h;
+  } catch (e) { return ''; }
+}
 
 function switchTab(name) {
   document.querySelectorAll('.qbs-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
@@ -7760,6 +8045,7 @@ function switchTab(name) {
   if (name === 'flitch') { renderSkuMapping(); if (typeof renderPricingMasterTable === 'function') renderPricingMasterTable(); }
   if (name === 'settings') renderDefaultPrices();
   if (name === 'schedule') { try { renderSchedule(); } catch (e) {} }
+  if (name === 'quote') { try { renderDrawSchedule(); renderChangeOrders(); } catch (e) {} }
   if (name === 'calcs') { try { grCalc(); } catch(e) {} try { gsCalc(); } catch(e) {} try { shCalc(); } catch(e) {} try { swCalc(); } catch(e) {} try { stCalc(); } catch(e) {} }
   if (name === 'takeoff' && typeof takeoffInit === 'function') takeoffInit();
   if (name === 'subs') {
@@ -12103,6 +12389,66 @@ function renderLeadsStats() {
   setText('stat-quoted', counts.quoted);
   setText('stat-won', counts.won);
   setText('stat-lost', counts.lost);
+  try { renderLeadsAnalytics(); } catch (e) {}
+}
+
+// Pipeline analytics — read-only rollups from leadsState + saved quotes.
+async function renderLeadsAnalytics() {
+  const box = document.getElementById('leads-analytics-body'); if (!box) return;
+  const money = v => '$' + Math.round(v || 0).toLocaleString('en-US');
+  const won = leadsState.filter(l => l.status === 'won').length;
+  const lost = leadsState.filter(l => l.status === 'lost' || l.status === 'cold').length;
+  const quoted = leadsState.filter(l => l.status === 'quoted').length;
+  const open = leadsState.length - won - lost;
+  const closeRate = (won + lost) > 0 ? Math.round(won / (won + lost) * 100) : null;
+  const quoteRate = leadsState.length > 0 ? Math.round((quoted + won) / leadsState.length * 100) : null;
+  // leads by month created (last 6 months)
+  const byMonth = {};
+  leadsState.forEach(l => { const m = (l.createdAt || '').slice(0, 7); if (m) byMonth[m] = (byMonth[m] || 0) + 1; });
+  const months = Object.keys(byMonth).sort().slice(-6);
+  const maxM = Math.max(1, ...months.map(m => byMonth[m]));
+  // leads by source
+  const bySource = {};
+  leadsState.forEach(l => { const s = (l.source || 'unknown').trim() || 'unknown'; bySource[s] = (bySource[s] || 0) + 1; });
+  const sources = Object.entries(bySource).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  // saved quotes → avg job size + quoted value
+  let quoteCount = 0, quoteSum = 0;
+  try {
+    const r = await window.storage.list('project:');
+    if (r && r.keys) {
+      for (const k of r.keys) {
+        try {
+          const p = JSON.parse((await window.storage.get(k)).value);
+          if (p.totals && p.totals.grand > 0) { quoteCount++; quoteSum += p.totals.grand; }
+        } catch (e) {}
+      }
+    }
+  } catch (e) {}
+  const tile = (label, val, sub) => `
+    <div style="flex:1; min-width:130px; background:var(--surface-2); border-radius:8px; padding:10px 14px;">
+      <div style="font-family:var(--font-mono); font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.06em;">${label}</div>
+      <div style="font-family:var(--font-mono); font-size:22px; font-weight:600; margin-top:2px;">${val}</div>
+      ${sub ? `<div style="font-size:10px; color:var(--text-3);">${sub}</div>` : ''}
+    </div>`;
+  const bar = (label, n, max, right) => `
+    <div style="display:flex; align-items:center; gap:8px; margin:3px 0;">
+      <span style="width:110px; font-size:11px; color:var(--text-2); text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${label}</span>
+      <div style="flex:1; height:12px; background:var(--surface-2); border-radius:3px; overflow:hidden;"><div style="width:${Math.round(n / max * 100)}%; height:100%; background:var(--copper);"></div></div>
+      <span style="width:56px; font-family:var(--font-mono); font-size:11px;">${right}</span>
+    </div>`;
+  box.innerHTML = `
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+      ${tile('Close rate', closeRate === null ? '—' : closeRate + '%', won + ' won / ' + lost + ' lost')}
+      ${tile('Quoted or better', quoteRate === null ? '—' : quoteRate + '%', 'of all leads')}
+      ${tile('Open pipeline', open, 'leads not yet won/lost')}
+      ${tile('Avg quote size', quoteCount ? money(quoteSum / quoteCount) : '—', quoteCount + ' saved quotes')}
+      ${tile('Total quoted value', quoteCount ? money(quoteSum) : '—', 'all saved quotes')}
+    </div>
+    <div style="display:flex; gap:24px; flex-wrap:wrap;">
+      ${months.length ? `<div style="flex:1; min-width:260px;"><div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--copper); margin-bottom:4px;">New leads by month</div>${months.map(m => bar(m, byMonth[m], maxM, byMonth[m])).join('')}</div>` : ''}
+      ${sources.length ? `<div style="flex:1; min-width:260px;"><div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--copper); margin-bottom:4px;">Leads by source</div>${sources.map(([s, n]) => bar(s, n, sources[0][1], n + ' (' + Math.round(n / leadsState.length * 100) + '%)')).join('')}</div>` : ''}
+    </div>
+    ${!leadsState.length ? '<p class="qbs-sub">No leads yet — analytics fill in as leads are logged.</p>' : ''}`;
 }
 
 function renderLeadsLog() {
@@ -12599,6 +12945,94 @@ function renderProposal() {
     </div>`;
 }
 
+// =============================================================
+// CLIENT SHARE FILE — standalone HTML the customer can open anywhere:
+// proposal content + a drag-to-spin 3D turntable of THEIR building in
+// THEIR colors (frames captured from the live 3D viewer, no libraries).
+// =============================================================
+function exportClientShare() {
+  const model = proposalModel();
+  if (!model) return alert('Enter the building dimensions first — the share file builds itself from the quote.');
+  const { i, c, dims, specs, scope } = model;
+  const co = getCompany();
+  let frames = null;
+  try { frames = (typeof window.bb3dCaptureTurntable === 'function') ? window.bb3dCaptureTurntable(28, 1100, 640) : null; } catch (e) { frames = null; }
+  if (!frames || !frames.length) {
+    if (!confirm('Could not capture the 3D model (open the 3D tab once, then retry for the spinning view). Export the share file without the 3D turntable?')) return;
+    frames = [];
+  }
+  const money = v => '$' + (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const total = (typeof _adjustedContractTotal === 'function' && _adjustedContractTotal() > 0) ? _adjustedContractTotal() : c.grand;
+  const row = ([k, v]) => `<tr><td class="k">${k}</td><td class="v">${v}</td></tr>`;
+  let payHtml = '';
+  try {
+    if (!drawMilestones) drawLoad();
+    const pctSum = drawMilestones.reduce((s, m) => s + (m.pct || 0), 0);
+    if (Math.round(pctSum) === 100 && total > 0) {
+      payHtml = `<h2>Payment schedule</h2><table>` + drawMilestones.map(m =>
+        `<tr><td class="k">${m.label}</td><td class="v" style="white-space:nowrap;">${m.pct}% · ${money(total * (m.pct || 0) / 100)}</td></tr>`).join('') + `</table>`;
+    }
+  } catch (e) {}
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${(i.project || 'Your building') } — ${co.name}</title><style>
+    body{font-family:Georgia,'Times New Roman',serif;margin:0;background:#f7f4ef;color:#222}
+    .wrap{max-width:900px;margin:0 auto;padding:28px 20px 60px}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;border-bottom:3px solid #b05c22;padding-bottom:14px;margin-bottom:20px}
+    h1{font-size:24px;margin:0}
+    h2{font-size:16px;color:#b05c22;margin:26px 0 8px;text-transform:uppercase;letter-spacing:.06em}
+    table{width:100%;border-collapse:collapse}
+    td{padding:7px 4px;border-bottom:1px solid #e2ddd4;vertical-align:top}
+    td.k{color:#777;width:45%}
+    td.v{font-weight:bold;text-align:right}
+    .chip{display:inline-block;background:#fff;border:1px solid #e2ddd4;border-radius:14px;padding:4px 12px;margin:3px 4px 3px 0;font-size:13px}
+    .total{display:flex;justify-content:space-between;align-items:center;background:#1d1d1d;color:#fff;border-radius:8px;padding:14px 20px;margin-top:24px}
+    .total .amt{font-size:26px;font-weight:bold;color:#f5a623}
+    .spin{position:relative;background:#111;border-radius:10px;overflow:hidden;margin-bottom:6px;user-select:none;touch-action:pan-y}
+    .spin img{width:100%;display:block;pointer-events:none}
+    .spin .hint{position:absolute;bottom:10px;left:0;right:0;text-align:center;color:#fff;font-family:Arial,sans-serif;font-size:12px;opacity:.75;text-shadow:0 1px 3px #000}
+    .fine{margin-top:18px;font-size:11px;color:#888}
+    .sub{color:#777;font-size:12px;line-height:1.5}
+  </style></head><body><div class="wrap">
+    <div class="hdr">
+      <div>${co.logo ? `<img src="${co.logo}" alt="${co.name}" style="max-height:64px;max-width:280px;display:block;margin-bottom:6px">` : `<h1>${co.name}</h1>`}
+        <div class="sub">Construction Proposal${i.projectQuoteNum ? ' · Quote #' + i.projectQuoteNum : ''} · ${i.projectQuoteDate || new Date().toLocaleDateString()}</div>
+        <div class="sub">${[co.address, co.city, co.phone, co.email, co.website].filter(Boolean).join(' · ')}</div></div>
+      <div style="text-align:right" class="sub"><b style="color:#222;font-size:14px;">Prepared for</b><br>${i.client || '—'}<br>${i.project || ''}</div>
+    </div>
+    ${frames.length ? `
+    <div class="spin" id="spin"><img id="spin-img" src="${frames[0]}" alt="3D view of your building"><div class="hint">⟲ Drag to spin your building</div></div>` : ''}
+    <h2>Your building</h2><table>${dims.map(row).join('')}</table>
+    ${specs.length ? `<h2>Specifications</h2><table>${specs.map(row).join('')}</table>` : ''}
+    ${scope.length ? `<h2>Scope of work — included</h2><div>${scope.map(s => `<span class="chip">${s}</span>`).join('')}</div>` : ''}
+    <div class="total"><span><b>Total investment</b></span><span class="amt">${money(total)}</span></div>
+    ${payHtml}
+    ${i.projectNotes ? `<div class="fine">${i.projectNotes}</div>` : ''}
+    <div class="fine">This proposal covers the scope listed above. Changes to size, selections, or site conditions may affect the final price.</div>
+  </div>
+  ${frames.length ? `<script>
+  (function(){
+    var F=${JSON.stringify(frames)},n=F.length,idx=0,el=document.getElementById('spin-img'),box=document.getElementById('spin');
+    F.forEach(function(s){var im=new Image();im.src=s;});
+    function show(k){idx=((k%n)+n)%n;el.src=F[idx];}
+    var auto=setInterval(function(){show(idx+1);},220);
+    var dragging=false,lastX=0;
+    function stopAuto(){if(auto){clearInterval(auto);auto=null;}}
+    box.addEventListener('pointerdown',function(e){dragging=true;lastX=e.clientX;stopAuto();box.setPointerCapture(e.pointerId);});
+    box.addEventListener('pointermove',function(e){if(!dragging)return;var dx=e.clientX-lastX;if(Math.abs(dx)>12){show(idx+(dx>0?1:-1));lastX=e.clientX;}});
+    box.addEventListener('pointerup',function(){dragging=false;});
+    box.addEventListener('pointercancel',function(){dragging=false;});
+  })();
+  <\/script>` : ''}
+  </body></html>`;
+  const name = ((i.project || i.client || 'proposal').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'proposal');
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name + '_proposal.html';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
 function printProposal() {
   const model = proposalModel();
   if (!model) return alert('Enter the building dimensions first — there is nothing to propose yet.');
@@ -12644,6 +13078,7 @@ function printProposal() {
     ${specs.length ? `<h2>Specifications</h2><table>${specs.map(row).join('')}</table>` : ''}
     ${scope.length ? `<h2>Scope of work — included</h2><div>${scope.map(s => `<span class="chip">${s}</span>`).join('')}</div>` : ''}
     <div class="total"><span><b>Total investment</b></span><span class="amt">${fmt(c.grand)}</span></div>
+    ${typeof _drawProposalHTML === 'function' ? _drawProposalHTML() : ''}
     ${i.projectNotes ? `<div class="fine">${i.projectNotes}</div>` : ''}
     <div class="fine">This proposal covers the scope listed above. Changes to size, selections, or site conditions may affect the final price.</div>
     <script>window.onload=()=>setTimeout(()=>window.print(),300);<\/script>
@@ -12747,6 +13182,76 @@ function buildCutList(i, mats) {
   });
 
   return { cut, byFoot, countOnly };
+}
+
+// =============================================================
+// MATERIAL ORDER SHEETS — PO-style purchase sheets, one per package,
+// grouped from the current quote's material lines by catalog category.
+// Display/print only — quote math untouched.
+// =============================================================
+const ORDER_PKGS = [
+  { name: 'Concrete / foundation package', phase: 'Pad & grade → Concrete slab', cats: ['Foundation', 'Moisture barrier'] },
+  { name: 'Framing package', phase: 'Framing → Trusses set', cats: ['Post-frame wall', 'Wall framing', 'Roof structure', 'Wall sheathing', 'Fasteners & connectors', 'Hardware'] },
+  { name: 'Metal package', phase: 'Roof metal → Wall metal & trim → Gutters', cats: ['Roof skin', 'Siding skin', 'Metal wall trim', 'Soffit & fascia', 'Gutters'] },
+  { name: 'Doors & windows package', phase: 'Doors & windows', cats: ['Openings', 'Doors — garage', 'Doors — exterior', 'Windows'] },
+  { name: 'Side shed package', phase: 'Framing (shed)', cats: ['Side shed'] },
+  { name: 'Porch package', phase: 'Framing (porch)', cats: ['Cypress timber porch'] },
+  { name: 'Exterior trim package', phase: 'Wall metal & trim', cats: ['LP trim', 'Custom trim'] },
+  { name: 'Interior package', phase: 'Insulation → Drywall', cats: ['Interior'] },
+];
+function printOrderSheets() {
+  const c = window._lastCalc;
+  if (!c || !c.mats || !c.mats.length) return alert('No calculation yet — enter the building dimensions first.');
+  const co = getCompany();
+  const i = c.i;
+  const money = v => '$' + (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const used = new Set();
+  const pkgs = ORDER_PKGS.map(p => {
+    const rows = c.mats.filter(m => p.cats.includes(m.cat));
+    rows.forEach(m => used.add(m));
+    return { ...p, rows };
+  }).filter(p => p.rows.length);
+  const leftovers = c.mats.filter(m => !used.has(m));
+  if (leftovers.length) pkgs.push({ name: 'Other items', phase: '', cats: [], rows: leftovers });
+  const bldg = `${i.L}' × ${i.W}' × ${i.H}' walls · ${i.pitch}/12`;
+  const sheet = p => {
+    const sub = p.rows.reduce((s, m) => s + (m.cost || 0), 0);
+    return `
+    <div class="pkg">
+      <h2>${p.name}${p.phase ? ` <span class="ph">· needed for: ${p.phase}</span>` : ''}</h2>
+      <table><thead><tr><th>Item</th><th class="n">Qty</th><th>Unit</th><th class="n">Unit cost</th><th class="n">Ext. cost</th><th>Supplier / PO #</th></tr></thead>
+      <tbody>${p.rows.map(m => `<tr><td>${m.label}</td><td class="n">${(+m.qty).toLocaleString()}</td><td>${m.uom || ''}</td><td class="n">${money(m.unitCost)}</td><td class="n">${money(m.cost)}</td><td class="blank"></td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="4" style="text-align:right;font-weight:bold;">Package total (cost)</td><td class="n" style="font-weight:bold;">${money(sub)}</td><td></td></tr></tfoot></table>
+    </div>`;
+  };
+  const html = `<!DOCTYPE html><html><head><title>Order sheets — ${i.project || i.client || 'The Barndo Builders'}</title><style>
+    body{font-family:Arial,Helvetica,sans-serif;padding:32px;font-size:11px;color:#111}
+    h1{font-size:20px;margin:0}
+    h2{font-size:13px;margin:0 0 4px}
+    .ph{font-weight:400;color:#777;font-size:10px}
+    .sub{color:#555;margin-bottom:8px}
+    table{width:100%;border-collapse:collapse;margin-bottom:10px}
+    th,td{padding:5px 8px;border-bottom:1px solid #e5e5e5;text-align:left}
+    th{background:#f0f0f0;font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+    td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+    td.blank{min-width:110px;border-bottom:1px solid #bbb}
+    .pkg{page-break-inside:avoid;margin-bottom:22px}
+    .hdr{display:flex;justify-content:space-between;margin-bottom:16px}
+    .fine{margin-top:12px;font-size:10px;color:#666}
+    @media print { .pkg{page-break-after:always} .pkg:last-of-type{page-break-after:auto} }
+  </style></head><body>
+    <div class="hdr">
+      <div>${co.logo ? `<img src="${co.logo}" alt="${co.name}" style="max-height:56px;max-width:260px;display:block;margin-bottom:4px" />` : `<h1>${co.name}</h1>`}
+        <div class="sub">Material order sheets · ${new Date().toLocaleDateString()}</div></div>
+      <div style="text-align:right;color:#555">${i.project || ''}<br>${i.client || ''}<br>${bldg}</div>
+    </div>
+    ${pkgs.map(sheet).join('')}
+    <div class="fine">Internal purchasing document — costs are catalog cost (no markup). Each package prints on its own page. Verify quantities against the cut list before ordering.</div>
+    <script>window.onload=()=>setTimeout(()=>window.print(),300);<\/script>
+  </body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) return alert('Pop-up blocked — allow pop-ups to print the order sheets.');
+  w.document.write(html); w.document.close();
 }
 
 function printCutList() {
@@ -16856,6 +17361,40 @@ window.bb3dRefresh = function() {
   renderLegend();
   renderLayoutInspector();
   renderOpeningGuide();
+};
+
+// Capture a turntable of the current model: orbit the camera a full circle,
+// explicitly rendering before each grab (no preserveDrawingBuffer needed).
+// Returns an array of JPEG data URLs; restores the camera/renderer after.
+window.bb3dCaptureTurntable = function(frames, w, h) {
+  if (!initialized) init3D();
+  if (!renderer || !scene || !camera) return null;
+  generateModel();
+  frames = frames || 24; w = w || 1100; h = h || 640;
+  const oldPos = camera.position.clone();
+  const oldTarget = controls ? controls.target.clone() : new THREE.Vector3(0, 5, 0);
+  const oldAspect = camera.aspect;
+  const oldSize = new THREE.Vector2(); renderer.getSize(oldSize);
+  const oldPR = renderer.getPixelRatio();
+  renderer.setPixelRatio(1); renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  const dx = oldPos.x - oldTarget.x, dz = oldPos.z - oldTarget.z;
+  const r = Math.max(20, Math.sqrt(dx * dx + dz * dz));
+  const y = Math.max(10, oldPos.y);
+  const a0 = Math.atan2(dz, dx);
+  const shots = [];
+  for (let f = 0; f < frames; f++) {
+    const a = a0 + f / frames * Math.PI * 2;
+    camera.position.set(oldTarget.x + Math.cos(a) * r, y, oldTarget.z + Math.sin(a) * r);
+    camera.lookAt(oldTarget);
+    renderer.render(scene, camera);
+    shots.push(renderer.domElement.toDataURL('image/jpeg', 0.6));
+  }
+  renderer.setPixelRatio(oldPR); renderer.setSize(oldSize.x, oldSize.y, false);
+  camera.aspect = oldAspect; camera.updateProjectionMatrix();
+  camera.position.copy(oldPos); camera.lookAt(oldTarget);
+  renderer.render(scene, camera);
+  return shots;
 };
 
 // Auto-init when the 3D audit tab becomes visible
