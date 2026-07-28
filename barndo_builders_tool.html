@@ -2158,7 +2158,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v172</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v173</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -7317,7 +7317,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v172';
+const BB_VERSION = 'v173';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17849,18 +17849,21 @@ if (typeof origSwitchTab === 'function') {
       : (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit') ? 'crosshair' : 'default';
     updateToolStatus();
   }
-  // Live status readout so the toolbar always says what the tool is waiting for.
-  function updateToolStatus() {
+  // Live status readout so the toolbar always says what the tool is waiting
+  // for. Plain HTML on purpose — visible even if canvas drawing ever fails.
+  function updateToolStatus(override) {
     const el = $('to-tool-status'); if (!el) return;
+    const ver = (typeof BB_VERSION !== 'undefined') ? BB_VERSION + ' · ' : '';
+    if (override) { el.textContent = ver + override; return; }
     let msg = '';
     if (!TO.pdfDoc) msg = 'Load a PDF to start.';
     else if (TO.tool === 'scale') msg = (TO.draft && TO.draft.basePts.length === 1)
-      ? 'SCALE: now click or release at the other end of the known dimension.'
-      : 'SCALE: click-drag along a known dimension (or click both ends).';
+      ? 'SCALE: point 1 set ✓ — now click or release at the other end.'
+      : 'SCALE: press at one end of a known dimension, DRAG, release at the other end (two clicks also work).';
     else if (TO.tool === 'measure') msg = 'MEASURE: click points · double-click to finish. Right-drag pans.';
     else if (TO.tool === 'edit') msg = 'EDIT: drag points to move · click a line to add a point.';
     else msg = 'PAN: drag to move the sheet. Right-drag pans in any tool. Scroll = zoom.';
-    el.textContent = msg;
+    el.textContent = ver + msg;
   }
 
   function isPolygon(mode) { return mode === 'floor' || mode === 'roof'; }
@@ -17896,8 +17899,20 @@ if (typeof origSwitchTab === 'function') {
     if (!feet) { const s = prompt('Real length of this line, in feet (decimal ok):', '40'); feet = parseFloat(s); }
     if (feet && feet > 0) {
       const upf = px / feet;
-      if (TO.scaleEntry && TO.scaleEntry.applyAll) { for (let pg = 1; pg <= TO.pageCount; pg++) TO.pages[pg] = { unitsPerFoot: upf }; }
-      else { TO.pages[TO.pageNum] = { unitsPerFoot: upf }; }
+      // Keep the drawn scale line so it stays visible on the sheet afterwards.
+      const line = { p1: { x: p1.x, y: p1.y }, p2: { x: p2.x, y: p2.y }, feet };
+      if (TO.scaleEntry && TO.scaleEntry.applyAll) {
+        for (let pg = 1; pg <= TO.pageCount; pg++) TO.pages[pg] = { unitsPerFoot: upf };
+        TO.pages[TO.pageNum].scaleLine = line;
+      } else {
+        TO.pages[TO.pageNum] = { unitsPerFoot: upf, scaleLine: line };
+      }
+      // One-and-done: after the scale is set, hand the mouse back to PAN so
+      // the next drag moves the sheet instead of silently re-scaling.
+      TO.tool = 'pan';
+      TO.draft = null; highlightTool(); redraw(); updateHud(); renderResults();
+      updateToolStatus('✓ SCALE SET — ' + feet + ' ft line locked in (green line on the sheet). Back in PAN mode.');
+      return;
     }
     TO.draft = null; redraw(); updateHud(); renderResults();
   }
@@ -17914,7 +17929,7 @@ if (typeof origSwitchTab === 'function') {
         if (!moved && Math.hypot(e.clientX - sx, e.clientY - sy) > 8) {
           moved = true;
           TO.draft = { mode: 'scale', basePts: [startBase] };
-          updateToolStatus();
+          updateToolStatus('SCALE: dragging — release at the far end of the known dimension…');
         }
         if (moved) { TO.mouseBase = toBase(e); scheduleRedraw(); }
       };
@@ -18106,6 +18121,24 @@ if (typeof origSwitchTab === 'function') {
     const S = TO.renderScale;
     // committed measures on this page (skip hidden)
     TO.measures.filter(m => m.page === TO.pageNum && m.visible !== false).forEach(m => drawMeasure(ctx, m, S, m.color, false));
+    // persistent scale line — stays on the sheet after the scale is set
+    const _sl = (TO.pages[TO.pageNum] || {}).scaleLine;
+    if (_sl) {
+      const a = { x: _sl.p1.x * S, y: _sl.p1.y * S }, b2 = { x: _sl.p2.x * S, y: _sl.p2.y * S };
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y); ctx.stroke();
+      ctx.strokeStyle = '#3ad67b'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y); ctx.stroke();
+      [a, b2].forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); ctx.fillStyle = '#3ad67b'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.stroke(); });
+      const mx = (a.x + b2.x) / 2, my = (a.y + b2.y) / 2;
+      const lbl = _sl.feet + "' scale";
+      ctx.font = 'bold 12px Arial'; const tw = ctx.measureText(lbl).width;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(mx - tw / 2 - 5, my - 20, tw + 10, 16);
+      ctx.fillStyle = '#3ad67b'; ctx.fillText(lbl, mx - tw / 2, my - 8);
+      ctx.restore();
+    }
     // draft (live)
     if (TO.draft) {
       const isScale = TO.draft.mode === 'scale';
