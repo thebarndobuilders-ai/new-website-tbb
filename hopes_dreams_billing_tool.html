@@ -137,6 +137,7 @@
         <div id="svcOT"></div>
       </div>
     </div>
+    <div id="liveFlags"></div>
     <div style="margin-top:12px"><button class="btn" id="btnAdvise">Show billable codes →</button></div>
     <div id="advResult"></div>
   </div>
@@ -205,7 +206,7 @@
       <div><label class="fld">Location</label><select id="dLoc"></select></div>
       <div><label class="fld">Payer</label><select id="dPayer"></select></div>
       <div><label class="fld">Client initials</label><input type="text" id="dClient" placeholder="e.g. J.T." maxlength="12"></div>
-      <div><label class="fld">Codes billed (comma-separated)</label><input type="text" id="dCodes" placeholder="92507, 92526-59"></div>
+      <div><label class="fld">Codes billed (comma-separated)</label><input type="text" id="dCodes" placeholder="92507, 92526-59"><div id="dCodeFlag"></div></div>
       <div><label class="fld">Outcome</label><select id="dOutcome">
         <option value="paid">Paid in full</option>
         <option value="partial">Partially paid</option>
@@ -233,9 +234,11 @@
     <h2>Practice</h2>
     <div class="grid g3">
       <div><label class="fld">Practice name</label><input type="text" id="setName"></div>
+      <div><label class="fld">State</label><select id="setState"></select></div>
       <div><label class="fld">Location 1</label><input type="text" id="setLoc1"></div>
       <div><label class="fld">Location 2</label><input type="text" id="setLoc2"></div>
     </div>
+    <p class="note" style="margin-top:6px">Your state labels the Medicaid payer, shows on the cheat sheet, and reminds staff which Medicaid rules apply.</p>
     <div style="margin-top:10px"><button class="btn" id="btnSaveSettings">Save</button></div>
   </div>
   <div class="card">
@@ -391,7 +394,8 @@ const LS = {
 function load(k, fb){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):fb; }catch(e){ return fb; } }
 function save(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
 
-let settings = load(LS.settings, {name:"Hopes and Dreams Speech Therapy", loc1:"Location 1", loc2:"Location 2"});
+let settings = load(LS.settings, {name:"Hopes and Dreams Speech Therapy", state:"", loc1:"Location 1", loc2:"Location 2"});
+const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 let payers   = load(LS.payers, [
   {id:"p1", name:"Medicaid (set your state)", loc:"BOTH"},
   {id:"p2", name:"BCBS", loc:"BOTH"},
@@ -465,17 +469,48 @@ function renderServices(){
     }).join("");
   });
   document.querySelectorAll(".svc input[type=checkbox]").forEach(chk=>{
-    chk.addEventListener("change", ()=> chk.closest(".svc").classList.toggle("checked", chk.checked));
+    chk.addEventListener("change", ()=>{ chk.closest(".svc").classList.toggle("checked", chk.checked); liveComboCheck(); });
   });
+  document.querySelectorAll(".svc select[data-pick]").forEach(sel=>sel.addEventListener("change", liveComboCheck));
   // Don't let clicking the minutes input or pick dropdown toggle the checkbox
   document.querySelectorAll(".svc input[type=number], .svc select").forEach(el=>{
     el.addEventListener("click", e=>e.stopPropagation());
   });
 }
 
+/* Codes currently selected in the Advisor (respects discipline toggles + pick dropdowns) */
+function selectedAdvisorCodes(){
+  const codes=[];
+  ["ST","OT"].forEach(d=>{
+    if(!advDisc[d]) return;
+    SERVICES[d].forEach(s=>{
+      const chk=document.querySelector(`[data-chk="${s.id}"]`);
+      if(!chk||!chk.checked) return;
+      let code=s.codes[0];
+      if(s.pick){ const sel=document.querySelector(`[data-pick="${s.id}"]`); if(sel) code=sel.value; }
+      codes.push(code);
+    });
+  });
+  return [...new Set(codes)];
+}
+
+/* Live conflict flags — fires on every checkbox / dropdown change, before the button is pressed */
+function liveComboCheck(){
+  const codes=selectedAdvisorCodes();
+  const flags=[];
+  for(let i=0;i<codes.length;i++) for(let j=i+1;j<codes.length;j++){
+    const cb=comboFor(codes[i],codes[j]);
+    if(!cb) continue;
+    if(cb.level==="never") flags.push(`<div class="alert bad">⛔ <b>${cb.a} + ${cb.b} CANNOT be billed together.</b> ${esc(cb.note)}</div>`);
+    else if(cb.level==="edit") flags.push(`<div class="alert warn">⚠ <b>${cb.a} + ${cb.b}</b> — only as separate documented sessions with modifier 59. ${esc(cb.note)}</div>`);
+    else if(cb.level==="caution") flags.push(`<div class="alert warn">⚠ <b>${cb.a} + ${cb.b}</b> — payer-dependent. ${esc(cb.note)}</div>`);
+  }
+  document.getElementById("liveFlags").innerHTML=flags.join("");
+}
+
 function chip(el, on){ el.classList.toggle("on", on); }
-document.getElementById("chipST").onclick = function(){ advDisc.ST=!advDisc.ST; chip(this,advDisc.ST); document.getElementById("advColST").style.display=advDisc.ST?"":"none"; };
-document.getElementById("chipOT").onclick = function(){ advDisc.OT=!advDisc.OT; chip(this,advDisc.OT); this.classList.toggle("otchip",advDisc.OT); document.getElementById("advColOT").style.display=advDisc.OT?"":"none"; };
+document.getElementById("chipST").onclick = function(){ advDisc.ST=!advDisc.ST; chip(this,advDisc.ST); document.getElementById("advColST").style.display=advDisc.ST?"":"none"; liveComboCheck(); };
+document.getElementById("chipOT").onclick = function(){ advDisc.OT=!advDisc.OT; chip(this,advDisc.OT); this.classList.toggle("otchip",advDisc.OT); document.getElementById("advColOT").style.display=advDisc.OT?"":"none"; liveComboCheck(); };
 document.getElementById("chipTele").onclick = function(){ advTele=!advTele; chip(this,advTele); };
 document.getElementById("chipHab").onclick = function(){ advHab=!advHab; chip(this,advHab); };
 
@@ -731,8 +766,8 @@ document.getElementById("btnCheat").onclick = ()=>{
     ul{margin:2px 0 4px 16px}li{margin-bottom:2px}
     @media print{body{margin:10mm}}
   </style></head><body>
-  <h1>${esc(settings.name)} — ST Same-Day Billing Cheat Sheet</h1>
-  <div class="sub">Speech codes, one client, one date of service · GN on every ST code · 59 only for genuinely separate sessions with separate notes</div>
+  <h1>${esc(settings.name)} — ST Same-Day Billing Cheat Sheet${settings.state?" ("+esc(settings.state)+")":""}</h1>
+  <div class="sub">Speech codes, one client, one date of service · GN on every ST code · 59 only for genuinely separate sessions with separate notes${settings.state?" · Medicaid rules: "+esc(settings.state):""}</div>
 
   <h2>Treatment day</h2>
   <table>
@@ -817,18 +852,48 @@ document.getElementById("btnAddDenial").onclick=()=>{
 document.getElementById("dFilterPayer").addEventListener("change",renderDenials);
 document.getElementById("dFilterOutcome").addEventListener("change",renderDenials);
 
+/* Flag incompatible pairs as codes are typed into the log */
+document.getElementById("dCodes").addEventListener("input",()=>{
+  const raw=document.getElementById("dCodes").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
+  const bases=[...new Set(raw.map(c=>c.split("-")[0]))];
+  const flags=[];
+  for(let i=0;i<bases.length;i++) for(let j=i+1;j<bases.length;j++){
+    const cb=comboFor(bases[i],bases[j]);
+    if(!cb) continue;
+    if(cb.level==="never") flags.push(`<div class="alert bad" style="padding:6px 10px;font-size:12.5px">⛔ ${cb.a} + ${cb.b} cannot be billed together — this claim will deny.</div>`);
+    else if(cb.level==="edit"){
+      const has59=raw.some(c=>c.startsWith(cb.b)&&c.includes("-59"))||raw.some(c=>c.startsWith(cb.a)&&c.includes("-59"));
+      flags.push(`<div class="alert warn" style="padding:6px 10px;font-size:12.5px">⚠ ${cb.a} + ${cb.b} needs modifier 59 on distinct sessions${has59?" — 59 present ✓":" — no -59 seen in what you typed"}.</div>`);
+    }
+  }
+  document.getElementById("dCodeFlag").innerHTML=flags.join("");
+});
+
 /* ══════════════════ SETTINGS / BACKUP ══════════════════ */
 function renderSettings(){
   document.getElementById("setName").value=settings.name;
+  const ss=document.getElementById("setState");
+  ss.innerHTML='<option value="">— select state —</option>'+STATES.map(s=>`<option value="${s}" ${settings.state===s?"selected":""}>${s}</option>`).join("");
   document.getElementById("setLoc1").value=settings.loc1;
   document.getElementById("setLoc2").value=settings.loc2;
   document.getElementById("hdrName").textContent=settings.name;
+  document.querySelector("header .sub").textContent=
+    "Billing Code Advisor — Speech & Occupational Therapy · companion to Fusion"+(settings.state?" · "+settings.state:"");
 }
 document.getElementById("btnSaveSettings").onclick=()=>{
+  const newState=document.getElementById("setState").value;
   settings={name:document.getElementById("setName").value.trim()||"Hopes and Dreams Speech Therapy",
+            state:newState,
             loc1:document.getElementById("setLoc1").value.trim()||"Location 1",
             loc2:document.getElementById("setLoc2").value.trim()||"Location 2"};
-  save(LS.settings,settings); refreshAll();
+  save(LS.settings,settings);
+  // Label the placeholder Medicaid payer with the state
+  if(newState){
+    let renamed=false;
+    payers.forEach(p=>{ if(/^Medicaid( \(set your state\))?$/.test(p.name)){ p.name="Medicaid ("+newState+")"; renamed=true; } });
+    if(renamed) save(LS.payers,payers);
+  }
+  refreshAll();
 };
 document.getElementById("btnExport").onclick=()=>{
   const blob=new Blob([JSON.stringify({settings,payers,matrix,denials,exported:new Date().toISOString(),app:"hd_billing_tool"},null,2)],{type:"application/json"});
