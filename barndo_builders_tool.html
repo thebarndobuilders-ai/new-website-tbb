@@ -2158,7 +2158,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v171</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -4227,9 +4227,9 @@ async function bbSignOut() {
 
 function bbRenderUserPill() {
   const ss = document.getElementById('bb-storage-status');
-  if (ss) ss.textContent = bbCurrentUser
+  if (ss) ss.textContent = (bbCurrentUser
     ? ('Cloud database · ' + (bbCurrentUser.email || 'signed in'))
-    : 'Local database · this device';
+    : 'Local database · this device') + (typeof BB_VERSION !== 'undefined' ? ' · ' + BB_VERSION : '');
   const container = document.getElementById('bb-user-pill-container');
   if (!container) return;
   if (bbCurrentUser) {
@@ -7314,6 +7314,9 @@ function printCounterTicket() {
 // dependencies with auto-shift, Gantt timeline, baseline vs actual.
 // Stored in localStorage under bb_schedule_v1 (rides in the full backup).
 // =============================================================
+// Visible build version — bump on every release so the header shows which
+// file is actually open (guards against running a stale download).
+const BB_VERSION = 'v171';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17846,7 +17849,43 @@ if (typeof origSwitchTab === 'function') {
     const sx = dc.width / r.width, sy = dc.height / r.height;
     return { x: (ev.clientX - r.left) * sx / TO.renderScale, y: (ev.clientY - r.top) * sy / TO.renderScale };
   }
+  // Shared scale-line completion (used by both two-click and press-drag flows)
+  function scaleComplete(p1, p2) {
+    const px = dist(p1, p2);
+    let feet = (TO.scaleEntry && TO.scaleEntry.feet) || 0;
+    if (!feet) { const s = prompt('Real length of this line, in feet (decimal ok):', '40'); feet = parseFloat(s); }
+    if (feet && feet > 0) {
+      const upf = px / feet;
+      if (TO.scaleEntry && TO.scaleEntry.applyAll) { for (let pg = 1; pg <= TO.pageCount; pg++) TO.pages[pg] = { unitsPerFoot: upf }; }
+      else { TO.pages[TO.pageNum] = { unitsPerFoot: upf }; }
+    }
+    TO.draft = null; redraw(); updateHud(); renderResults();
+  }
   function onDown(ev) {
+    // Scale tool: press-drag-release draws the scale line in ONE motion
+    // (two separate clicks still work). The band follows the mouse live.
+    if (TO.tool === 'scale' && ev.button === 0 && TO.pdfDoc) {
+      ev.preventDefault();
+      const startBase = toBase(ev);
+      const sx = ev.clientX, sy = ev.clientY;
+      let moved = false;
+      const mv = (e) => {
+        if (!moved && Math.hypot(e.clientX - sx, e.clientY - sy) > 8) {
+          moved = true;
+          TO.draft = { mode: 'scale', basePts: [startBase] };
+        }
+        if (moved) { TO.mouseBase = toBase(e); redraw(); }
+      };
+      const up = (e) => {
+        window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up);
+        if (moved) {
+          TO._suppressClick = true; setTimeout(() => { TO._suppressClick = false; }, 80);
+          scaleComplete(startBase, toBase(e));
+        }
+      };
+      window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+      return;
+    }
     // Edit mode: left-button on a vertex starts a drag-to-move
     if (TO.tool === 'edit' && ev.button === 0 && TO.editIndex != null) {
       const m = TO.measures[TO.editIndex];
@@ -17899,20 +17938,10 @@ if (typeof origSwitchTab === 'function') {
       TO.selVertex = null; redraw(); renderEditBar(); return;
     }
     if (TO.tool === 'scale') {
+      if (TO._suppressClick) return;      // a drag-to-scale just completed
       if (!TO.draft || TO.draft.mode !== 'scale') TO.draft = { mode: 'scale', basePts: [] };
       TO.draft.basePts.push(p);
-      if (TO.draft.basePts.length === 2) {
-        const px = dist(TO.draft.basePts[0], TO.draft.basePts[1]);
-        let feet = (TO.scaleEntry && TO.scaleEntry.feet) || 0;
-        if (!feet) { const s = prompt('Real length of this line, in feet (decimal ok):', '40'); feet = parseFloat(s); }
-        if (feet && feet > 0) {
-          const upf = px / feet;
-          if (TO.scaleEntry && TO.scaleEntry.applyAll) { for (let pg = 1; pg <= TO.pageCount; pg++) TO.pages[pg] = { unitsPerFoot: upf }; }
-          else { TO.pages[TO.pageNum] = { unitsPerFoot: upf }; }
-        }
-        TO.draft = null; redraw(); updateHud(); renderResults();
-        return;
-      }
+      if (TO.draft.basePts.length === 2) { scaleComplete(TO.draft.basePts[0], TO.draft.basePts[1]); return; }
       redraw(); return;
     }
     // measure
