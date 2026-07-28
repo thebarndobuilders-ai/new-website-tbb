@@ -20,6 +20,13 @@ A single, self-contained HTML app — **The Barndo Builders** post-frame / barnd
 - Three.js is now **bundled inline** (like pdf.js) — the 3D viewer works fully offline. Internet is only needed for web fonts and Supabase cloud sync.
 
 ## 4. ⚠️ Critical warnings
+
+### 🔒 DO NOT TOUCH — Takeoff viewer rendering (locked at v177, commit 429aa90)
+The builder confirmed the takeoff scale/pan works on their machine as of **v177**. The fix that made it work is the **GPU-safe canvas split** in the takeoff viewer, and it must never be reverted or "simplified":
+- The canvas **backing store is capped** (≤48M px, ≤10,000px per side) via `TO.pixelScale`; deeper zoom is **CSS scaling only** (`TO.renderScale` = display zoom). Weak Windows GPUs silently refuse to composite bigger canvases — drawings vanish from screen while pixel reads still pass, so headless tests will NOT catch a regression here.
+- `toBase()` and `redraw()`'s `S` divide/multiply by `TO.pixelScale` (NOT `renderScale`).
+- Other locked-in takeoff behavior: loads start in **PAN** tool; native OS cursors only (no custom image cursors — Windows DPI hides them); pointer events with capture; pdf.js renders serialized (cancel in-flight before new); blue drag band for Set scale; persistent green scale line; sticky status bar with version; 🩺 self-test + on-sheet X diagnostic.
+
 - **VERSION DRIFT:** Work has been lost twice by editing across two different chats (v105→v115, then v117→v123 silently re-broke fixes). **Always start the next session from v127.** If you go back to any old chat, upload v127 there FIRST.
 - **localStorage doesn't travel in the file:** saved leads, quotes, company contact info, imported master list, and settings live in the browser on the original machine. The **logo IS baked into the file**; the rest is not. Use Supabase sign-in to sync, or ask Claude to build a localStorage export/import.
 
