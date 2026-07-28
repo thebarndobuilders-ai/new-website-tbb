@@ -2158,7 +2158,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v171</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v172</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3230,6 +3230,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-2);" title="Zero the quote before pushing so ONLY measured items drive it — otherwise the push lands on top of whatever building is already entered (including the default one)"><input type="checkbox" id="to-clean-start" checked> Blank quote first — quote only measured items</label>
         <button onclick="takeoffPushTrusses()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;">◉ Push trusses → truss tool</button>
       </div>
+      <div id="to-tool-status" style="font-family:var(--font-mono); font-size:12px; color:var(--copper); background:var(--copper-soft); border:1px solid rgba(251,146,60,0.35); border-radius:6px; padding:5px 10px; margin-bottom:8px;">Load a PDF to start.</div>
 
       <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px; border-top:1px solid var(--hairline); padding-top:8px;">
         <label style="font-size:11px; color:var(--text-2);">Save under lead</label>
@@ -7316,7 +7317,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v171';
+const BB_VERSION = 'v172';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17450,7 +17451,7 @@ if (typeof origSwitchTab === 'function') {
     inited: false,
     pdfDoc: null, pageNum: 1, pageCount: 0,
     renderScale: 1.5, vp: null,
-    tool: 'scale', measureAs: 'lf',
+    tool: 'pan', measureAs: 'lf',   // start in PAN — click-drag moves the sheet; scale only after ⟂ Set scale
     pages: {},            // pageNum -> { unitsPerFoot }
     measures: [],         // { page, mode, basePts:[{x,y}], color }
     draft: null,          // { mode, basePts:[...] }
@@ -17569,15 +17570,18 @@ if (typeof origSwitchTab === 'function') {
       const dc = $('to-draw-canvas');
       dc.addEventListener('click', onClick);
       dc.addEventListener('dblclick', onDblClick);
-      dc.addEventListener('mousemove', onMove);
-      dc.addEventListener('mouseleave', () => { TO.mouseBase = null; redraw(); });
-      dc.addEventListener('mousedown', onDown);
+      // Pointer events (with mouse fallback) — more reliable through Windows
+      // input drivers than compatibility mouse events, and they allow capture
+      // so drags survive the pointer leaving the window.
+      dc.addEventListener(EV_DOWN, onDown);
+      dc.addEventListener(EV_MOVE, onMove);
+      dc.addEventListener('mouseleave', () => { TO.mouseBase = null; scheduleRedraw(); });
       dc.addEventListener('contextmenu', (e) => e.preventDefault());
       const wrap = $('to-canvas-wrap');
       wrap.addEventListener('contextmenu', (e) => e.preventDefault());
       // Right/middle-drag pans from ANYWHERE in the viewer, including the gray
       // margin around the sheet (dc only covers the page itself).
-      wrap.addEventListener('mousedown', (e) => {
+      wrap.addEventListener(EV_DOWN, (e) => {
         if (e.target === dc) return;                       // dc listener already handled it
         if (e.button === 2 || e.button === 1 || TO.tool === 'pan') onDown(e);
       });
@@ -17703,6 +17707,7 @@ if (typeof origSwitchTab === 'function') {
       pdfjsLib.getDocument({ data }).promise.then(doc => {
         TO.pdfDoc = doc; TO.pageCount = doc.numPages; TO.pageNum = 1;
         TO.pages = {}; TO.measures = []; TO.draft = null; TO.pageNames = {};
+        TO.tool = 'pan'; highlightTool();   // fresh sheet always starts in pan
         const e = $('to-empty'); if (e) e.style.display = 'none';
         renderPage(); renderPagesList();
         takeoffAutoNamePages(doc);
@@ -17837,13 +17842,48 @@ if (typeof origSwitchTab === 'function') {
       b.style.color = on ? 'var(--bg-deep)' : '';
     });
     const dc = $('to-draw-canvas');
+    // Native OS cursors only — custom image cursors (the old SVG cross) go
+    // invisible on Windows display scaling, which reads as "my cursor is gone".
+    // The canvas-drawn crosshair guides stay as the precision aid.
     if (dc) dc.style.cursor = (TO.tool === 'pan') ? 'grab'
-      : (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit') ? BLUE_CROSS : 'default';
+      : (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit') ? 'crosshair' : 'default';
+    updateToolStatus();
+  }
+  // Live status readout so the toolbar always says what the tool is waiting for.
+  function updateToolStatus() {
+    const el = $('to-tool-status'); if (!el) return;
+    let msg = '';
+    if (!TO.pdfDoc) msg = 'Load a PDF to start.';
+    else if (TO.tool === 'scale') msg = (TO.draft && TO.draft.basePts.length === 1)
+      ? 'SCALE: now click or release at the other end of the known dimension.'
+      : 'SCALE: click-drag along a known dimension (or click both ends).';
+    else if (TO.tool === 'measure') msg = 'MEASURE: click points · double-click to finish. Right-drag pans.';
+    else if (TO.tool === 'edit') msg = 'EDIT: drag points to move · click a line to add a point.';
+    else msg = 'PAN: drag to move the sheet. Right-drag pans in any tool. Scroll = zoom.';
+    el.textContent = msg;
   }
 
   function isPolygon(mode) { return mode === 'floor' || mode === 'roof'; }
 
-  // ---- mouse ----
+  // ---- mouse / pointer ----
+  // Pointer events where available (all modern browsers); mouse fallback kept.
+  const HAS_PE = typeof window.PointerEvent !== 'undefined';
+  const EV_DOWN = HAS_PE ? 'pointerdown' : 'mousedown';
+  const EV_MOVE = HAS_PE ? 'pointermove' : 'mousemove';
+  const EV_UP = HAS_PE ? 'pointerup' : 'mouseup';
+  function capturePointer(ev) {
+    if (HAS_PE && ev.pointerId != null && ev.target && ev.target.setPointerCapture) {
+      try { ev.target.setPointerCapture(ev.pointerId); } catch (e) {}
+    }
+  }
+  // Repaints driven by pointer movement go through requestAnimationFrame —
+  // on big sheets a full-canvas redraw per move event makes the mouse feel dead.
+  let _rafPending = false;
+  function scheduleRedraw() {
+    if (_rafPending) return;
+    _rafPending = true;
+    requestAnimationFrame(() => { _rafPending = false; redraw(); });
+  }
   function toBase(ev) {
     const dc = $('to-draw-canvas'); const r = dc.getBoundingClientRect();
     const sx = dc.width / r.width, sy = dc.height / r.height;
@@ -17866,6 +17906,7 @@ if (typeof origSwitchTab === 'function') {
     // (two separate clicks still work). The band follows the mouse live.
     if (TO.tool === 'scale' && ev.button === 0 && TO.pdfDoc) {
       ev.preventDefault();
+      capturePointer(ev);
       const startBase = toBase(ev);
       const sx = ev.clientX, sy = ev.clientY;
       let moved = false;
@@ -17873,17 +17914,18 @@ if (typeof origSwitchTab === 'function') {
         if (!moved && Math.hypot(e.clientX - sx, e.clientY - sy) > 8) {
           moved = true;
           TO.draft = { mode: 'scale', basePts: [startBase] };
+          updateToolStatus();
         }
-        if (moved) { TO.mouseBase = toBase(e); redraw(); }
+        if (moved) { TO.mouseBase = toBase(e); scheduleRedraw(); }
       };
       const up = (e) => {
-        window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up);
+        window.removeEventListener(EV_MOVE, mv); window.removeEventListener(EV_UP, up); window.removeEventListener('pointercancel', up);
         if (moved) {
           TO._suppressClick = true; setTimeout(() => { TO._suppressClick = false; }, 80);
           scaleComplete(startBase, toBase(e));
         }
       };
-      window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+      window.addEventListener(EV_MOVE, mv); window.addEventListener(EV_UP, up); window.addEventListener('pointercancel', up);
       return;
     }
     // Edit mode: left-button on a vertex starts a drag-to-move
@@ -17893,15 +17935,16 @@ if (typeof origSwitchTab === 'function') {
         const vi = hitVertex(m, toBase(ev));
         if (vi >= 0) {
           ev.preventDefault();
+          capturePointer(ev);
           TO.dragVertex = vi; TO.selVertex = vi; TO._dragMoved = false; redraw();
-          const mv = (e) => { const bp = toBase(e); m.basePts[vi] = { x: bp.x, y: bp.y }; TO._dragMoved = true; redraw(); renderResults(); };
+          const mv = (e) => { const bp = toBase(e); m.basePts[vi] = { x: bp.x, y: bp.y }; TO._dragMoved = true; scheduleRedraw(); renderResults(); };
           const up = () => {
             TO.dragVertex = null;
             if (TO._dragMoved) { TO._suppressClick = true; setTimeout(() => { TO._suppressClick = false; }, 50); }
-            window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up);
+            window.removeEventListener(EV_MOVE, mv); window.removeEventListener(EV_UP, up); window.removeEventListener('pointercancel', up);
             renderResults(); renderEditBar(); takeoffAutoPush();
           };
-          window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+          window.addEventListener(EV_MOVE, mv); window.addEventListener(EV_UP, up); window.addEventListener('pointercancel', up);
           return;
         }
       }
@@ -17909,6 +17952,7 @@ if (typeof origSwitchTab === 'function') {
     const panBtn = (ev.button === 2 || ev.button === 1);   // right OR middle button pans
     if (!panBtn && TO.tool !== 'pan') return;
     if (panBtn) ev.preventDefault();
+    capturePointer(ev);
     const wrap = $('to-canvas-wrap');
     wrap.style.cursor = 'grabbing';
     TO.pan = { x: ev.clientX, y: ev.clientY, sl: wrap.scrollLeft, st: wrap.scrollTop };
@@ -17919,10 +17963,10 @@ if (typeof origSwitchTab === 'function') {
     const mv = (e) => { if (!TO.pan) return; wrap.scrollLeft = TO.pan.sl - (e.clientX - TO.pan.x); wrap.scrollTop = TO.pan.st - (e.clientY - TO.pan.y); };
     const up = () => {
       TO.pan = null; wrap.style.cursor = '';
-      window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up);
+      window.removeEventListener(EV_MOVE, mv); window.removeEventListener(EV_UP, up); window.removeEventListener('pointercancel', up);
       if (panBtn) setTimeout(() => window.removeEventListener('contextmenu', ctxGuard, true), 150);
     };
-    window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+    window.addEventListener(EV_MOVE, mv); window.addEventListener(EV_UP, up); window.addEventListener('pointercancel', up);
   }
   function onClick(ev) {
     if (!TO.pdfDoc || TO.tool === 'pan') return;
@@ -17942,7 +17986,7 @@ if (typeof origSwitchTab === 'function') {
       if (!TO.draft || TO.draft.mode !== 'scale') TO.draft = { mode: 'scale', basePts: [] };
       TO.draft.basePts.push(p);
       if (TO.draft.basePts.length === 2) { scaleComplete(TO.draft.basePts[0], TO.draft.basePts[1]); return; }
-      redraw(); return;
+      redraw(); updateToolStatus(); return;
     }
     // measure
     if (TO.measureAs !== 'count' && !uPerFt()) { alert('Set the scale on this page first (⟂ Set scale).'); return; }
@@ -17953,7 +17997,7 @@ if (typeof origSwitchTab === 'function') {
   function onDblClick(ev) { if (TO.tool !== 'pan' && TO.tool !== 'scale') takeoffFinish(); }
   function onMove(ev) {
     if (TO.tool !== 'scale' && TO.tool !== 'measure' && TO.tool !== 'edit') return;
-    TO.mouseBase = toBase(ev); redraw();
+    TO.mouseBase = toBase(ev); scheduleRedraw();
   }
   function zoomAt(factor, clientX, clientY) {
     if (!TO.pdfDoc) return;
@@ -18192,6 +18236,7 @@ if (typeof origSwitchTab === 'function') {
   }
   function updateHud() {
     $('to-page-ind').textContent = TO.pdfDoc ? (pageLabel(TO.pageNum) + '  (' + TO.pageNum + '/' + TO.pageCount + ')') : '— / —';
+    updateToolStatus();
     const upf = uPerFt();
     const ro = $('to-scale-readout');
     if (ro) ro.innerHTML = upf
