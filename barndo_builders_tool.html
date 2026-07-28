@@ -17572,6 +17572,12 @@ if (typeof origSwitchTab === 'function') {
       dc.addEventListener('contextmenu', (e) => e.preventDefault());
       const wrap = $('to-canvas-wrap');
       wrap.addEventListener('contextmenu', (e) => e.preventDefault());
+      // Right/middle-drag pans from ANYWHERE in the viewer, including the gray
+      // margin around the sheet (dc only covers the page itself).
+      wrap.addEventListener('mousedown', (e) => {
+        if (e.target === dc) return;                       // dc listener already handled it
+        if (e.button === 2 || e.button === 1 || TO.tool === 'pan') onDown(e);
+      });
       wrap.addEventListener('wheel', onWheel, { passive: false });
       document.addEventListener('keydown', (e) => {
         if ($('tab-takeoff').style.display === 'none') return;
@@ -17744,6 +17750,11 @@ if (typeof origSwitchTab === 'function') {
 
   function renderPage() {
     if (!TO.pdfDoc) return;
+    // Serialize pdf.js renders: rapid zoom/page flips used to start overlapping
+    // render() calls on the same canvas, which throws and leaves the sheet
+    // half-drawn (and the measure/scale overlay dead). Cancel the in-flight
+    // render before starting a new one; ignore the cancellation rejection.
+    if (TO._renderTask) { try { TO._renderTask.cancel(); } catch (e) {} TO._renderTask = null; }
     TO.pdfDoc.getPage(TO.pageNum).then(page => {
       const vp = page.getViewport({ scale: TO.renderScale });
       TO.vp = vp;
@@ -17753,9 +17764,17 @@ if (typeof origSwitchTab === 'function') {
       $('to-stage').style.width = vp.width + 'px';
       $('to-stage').style.height = vp.height + 'px';
       const ctx = pc.getContext('2d');
-      page.render({ canvasContext: ctx, viewport: vp }).promise.then(() => {
+      const task = page.render({ canvasContext: ctx, viewport: vp });
+      TO._renderTask = task;
+      task.promise.then(() => {
+        if (TO._renderTask === task) TO._renderTask = null;
         redraw(); updateHud();
         if (TO._afterRender) { const f = TO._afterRender; TO._afterRender = null; f(); }
+      }).catch(err => {
+        if (TO._renderTask === task) TO._renderTask = null;
+        // RenderingCancelledException is expected when zooming fast — a newer
+        // render owns the canvas. Anything else: repaint the overlay anyway.
+        if (!err || err.name !== 'RenderingCancelledException') { try { redraw(); updateHud(); } catch (e) {} }
       });
     });
   }
@@ -17854,8 +17873,16 @@ if (typeof origSwitchTab === 'function') {
     const wrap = $('to-canvas-wrap');
     wrap.style.cursor = 'grabbing';
     TO.pan = { x: ev.clientX, y: ev.clientY, sl: wrap.scrollLeft, st: wrap.scrollTop };
+    // Right-button release can land outside the viewer — swallow the one
+    // context menu that fires on mouseup anywhere on the page, then detach.
+    const ctxGuard = (e) => e.preventDefault();
+    if (panBtn) window.addEventListener('contextmenu', ctxGuard, true);
     const mv = (e) => { if (!TO.pan) return; wrap.scrollLeft = TO.pan.sl - (e.clientX - TO.pan.x); wrap.scrollTop = TO.pan.st - (e.clientY - TO.pan.y); };
-    const up = () => { TO.pan = null; wrap.style.cursor = ''; window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
+    const up = () => {
+      TO.pan = null; wrap.style.cursor = '';
+      window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up);
+      if (panBtn) setTimeout(() => window.removeEventListener('contextmenu', ctxGuard, true), 150);
+    };
     window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
   }
   function onClick(ev) {
@@ -18011,7 +18038,27 @@ if (typeof origSwitchTab === 'function') {
       const isScale = TO.draft.mode === 'scale';
       const pts = TO.draft.basePts.slice();
       const live = (TO.mouseBase && pts.length && TO.draft.mode !== 'count') ? pts.concat([TO.mouseBase]) : pts;
-      drawMeasure(ctx, { mode: TO.draft.mode, basePts: live }, S, isScale ? '#ffd27f' : '#1e7bff', true);
+      if (isScale && live.length) {
+        // High-contrast rubber band for the scale line — dark halo + thick
+        // amber stroke + outlined endpoints, readable on any blueprint.
+        const P = live.map(p => ({ x: p.x * S, y: p.y * S }));
+        ctx.save();
+        ctx.lineCap = 'round';
+        if (P.length >= 2) {
+          ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 7;
+          ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y); ctx.lineTo(P[1].x, P[1].y); ctx.stroke();
+          ctx.strokeStyle = '#ffb020'; ctx.lineWidth = 3.5;
+          ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y); ctx.lineTo(P[1].x, P[1].y); ctx.stroke();
+        }
+        P.forEach(p => {
+          ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffb020'; ctx.fill();
+          ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+        });
+        ctx.restore();
+      } else {
+        drawMeasure(ctx, { mode: TO.draft.mode, basePts: live }, S, isScale ? '#ffd27f' : '#1e7bff', true);
+      }
     }
     // edit handles
     if (TO.tool === 'edit' && TO.editIndex != null && TO.measures[TO.editIndex]) {
