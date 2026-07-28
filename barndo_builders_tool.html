@@ -2158,7 +2158,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v175</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v176</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3274,9 +3274,10 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
             </span>
           </div>
           <div id="to-canvas-wrap" style="position:relative; width:100%; height:600px; overflow:auto; background:#2a2a2a; border:1px solid var(--hairline); border-radius:6px;">
+            <div id="to-scale-banner" style="display:none; position:sticky; top:0; left:0; z-index:12; background:rgba(30,123,255,0.92); color:#fff; font-family:var(--font-mono); font-size:13px; font-weight:700; padding:7px 12px; border-radius:0 0 8px 8px; width:fit-content; max-width:96%;">⟂ SET SCALE ARMED — press &amp; DRAG along a known dimension (blue line follows)</div>
             <div id="to-stage" style="position:relative;">
               <canvas id="to-pdf-canvas" style="display:block;"></canvas>
-              <canvas id="to-draw-canvas" style="position:absolute; left:0; top:0;"></canvas>
+              <canvas id="to-draw-canvas" style="position:absolute; left:0; top:0; touch-action:none;"></canvas>
             </div>
             <div id="to-empty" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#888; font-size:13px;">No PDF loaded — click “Load PDF”.</div>
           </div>
@@ -7318,7 +7319,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v175';
+const BB_VERSION = 'v176';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17765,6 +17766,13 @@ if (typeof origSwitchTab === 'function') {
     // render before starting a new one; ignore the cancellation rejection.
     if (TO._renderTask) { try { TO._renderTask.cancel(); } catch (e) {} TO._renderTask = null; }
     TO.pdfDoc.getPage(TO.pageNum).then(page => {
+      // Safety clamp: never let the render exceed the browser's canvas limits
+      // (silently-dead canvas). Uses the page's true base size.
+      const base = page.getViewport({ scale: 1 });
+      const areaCap = Math.sqrt(200000000 / Math.max(1, base.width * base.height));
+      const dimCap = Math.min(16000 / base.width, 16000 / base.height);
+      const cap = Math.max(0.25, Math.min(8, areaCap, dimCap));
+      if (TO.renderScale > cap) TO.renderScale = cap;
       const vp = page.getViewport({ scale: TO.renderScale });
       TO.vp = vp;
       const pc = $('to-pdf-canvas'), dc = $('to-draw-canvas');
@@ -17848,6 +17856,8 @@ if (typeof origSwitchTab === 'function') {
     // The canvas-drawn crosshair guides stay as the precision aid.
     if (dc) dc.style.cursor = (TO.tool === 'pan') ? 'grab'
       : (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit') ? 'crosshair' : 'default';
+    const bn = $('to-scale-banner');
+    if (bn) bn.style.display = (TO.tool === 'scale') ? 'block' : 'none';
     updateToolStatus();
   }
   // Live status readout so the toolbar always says what the tool is waiting
@@ -17974,6 +17984,7 @@ if (typeof origSwitchTab === 'function') {
     if (TO.tool === 'scale' && ev.button === 0 && TO.pdfDoc) {
       ev.preventDefault();
       capturePointer(ev);
+      updateToolStatus('SCALE: press ✓ — now DRAG to the far end and release…');
       const startBase = toBase(ev);
       const sx = ev.clientX, sy = ev.clientY;
       let moved = false;
@@ -18066,6 +18077,19 @@ if (typeof origSwitchTab === 'function') {
     if (TO.tool !== 'scale' && TO.tool !== 'measure' && TO.tool !== 'edit') return;
     TO.mouseBase = toBase(ev); scheduleRedraw();
   }
+  // Max zoom that keeps the canvases inside the browser's hard limits.
+  // Chrome silently KILLS a canvas whose area exceeds ~268M px (16384²) —
+  // no error, it just stops drawing. A full-size architectural sheet
+  // (24×36 / 36×48) zoomed past ~4-6× crosses that line, which made the
+  // overlay (bands, crosshairs, measures) go invisible while clicks still
+  // registered. Cap zoom by the PAGE's base size so it can never happen.
+  function maxZoomForPage() {
+    const baseW = TO.vp ? TO.vp.width / TO.renderScale : 612;
+    const baseH = TO.vp ? TO.vp.height / TO.renderScale : 792;
+    const byArea = Math.sqrt(200000000 / Math.max(1, baseW * baseH)); // ~200M px budget
+    const byDim = Math.min(16000 / baseW, 16000 / baseH);
+    return Math.max(0.25, Math.min(8, byArea, byDim));
+  }
   function zoomAt(factor, clientX, clientY) {
     if (!TO.pdfDoc) return;
     const dc = $('to-draw-canvas'), wrap = $('to-canvas-wrap');
@@ -18073,7 +18097,7 @@ if (typeof origSwitchTab === 'function') {
     const ax = (clientX != null) ? clientX : wr.left + wrap.clientWidth / 2;
     const ay = (clientY != null) ? clientY : wr.top + wrap.clientHeight / 2;
     const bx = (ax - r.left) / TO.renderScale, by = (ay - r.top) / TO.renderScale;
-    const ns = Math.max(0.25, Math.min(8, TO.renderScale * factor));
+    const ns = Math.max(0.25, Math.min(maxZoomForPage(), TO.renderScale * factor));
     if (ns === TO.renderScale) return;
     const viewX = ax - wr.left, viewY = ay - wr.top;
     TO.renderScale = ns;
@@ -18528,10 +18552,10 @@ if (typeof origSwitchTab === 'function') {
     $('to-modal-body').innerHTML =
       `<div style="color:var(--text-2);">Enter the real length of a known dimension, click <strong>Start</strong>, then <strong>press at one end and DRAG to the other end</strong> of that dimension on the plan (two separate clicks work too). A blue line follows your mouse.</div>
        <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
-         ${fieldRow('Feet', `<input type="number" id="to-sc-ft" value="40" style="width:72px;">`)}
-         ${fieldRow('Inches', `<input type="number" id="to-sc-in" value="0" style="width:62px;">`)}
-         ${fieldRow('Frac num', `<input type="number" id="to-sc-fn" value="0" style="width:62px;">`)}
-         ${fieldRow('Frac den', `<input type="number" id="to-sc-fd" value="0" style="width:62px;">`)}
+         ${fieldRow('Feet', `<input type="number" id="to-sc-ft" value="40" style="width:72px;" onkeydown="if(event.key==='Enter')takeoffScaleStart()">`)}
+         ${fieldRow('Inches', `<input type="number" id="to-sc-in" value="0" style="width:62px;" onkeydown="if(event.key==='Enter')takeoffScaleStart()">`)}
+         ${fieldRow('Frac num', `<input type="number" id="to-sc-fn" value="0" style="width:62px;" onkeydown="if(event.key==='Enter')takeoffScaleStart()">`)}
+         ${fieldRow('Frac den', `<input type="number" id="to-sc-fd" value="0" style="width:62px;" onkeydown="if(event.key==='Enter')takeoffScaleStart()">`)}
        </div>
        <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="to-sc-all"> Apply same scale to all pages</label>`;
     setFoot([['▶ Start', 'takeoffScaleStart()', true], ['Close', 'takeoffCloseDialog()', false]]);
