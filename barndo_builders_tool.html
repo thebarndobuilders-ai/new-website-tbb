@@ -2158,7 +2158,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v173</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v174</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3230,7 +3230,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-2);" title="Zero the quote before pushing so ONLY measured items drive it — otherwise the push lands on top of whatever building is already entered (including the default one)"><input type="checkbox" id="to-clean-start" checked> Blank quote first — quote only measured items</label>
         <button onclick="takeoffPushTrusses()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;">◉ Push trusses → truss tool</button>
       </div>
-      <div id="to-tool-status" style="font-family:var(--font-mono); font-size:12px; color:var(--copper); background:var(--copper-soft); border:1px solid rgba(251,146,60,0.35); border-radius:6px; padding:5px 10px; margin-bottom:8px;">Load a PDF to start.</div>
+      <div id="to-tool-status" style="position:sticky; top:0; z-index:30; font-family:var(--font-mono); font-size:12px; color:var(--copper); background:#241a10; border:1px solid rgba(251,146,60,0.45); border-radius:6px; padding:6px 10px; margin-bottom:8px;">Load a PDF to start.</div>
 
       <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px; border-top:1px solid var(--hairline); padding-top:8px;">
         <label style="font-size:11px; color:var(--text-2);">Save under lead</label>
@@ -7317,7 +7317,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v173';
+const BB_VERSION = 'v174';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17908,13 +17908,17 @@ if (typeof origSwitchTab === 'function') {
         TO.pages[TO.pageNum] = { unitsPerFoot: upf, scaleLine: line };
       }
       // One-and-done: after the scale is set, hand the mouse back to PAN so
-      // the next drag moves the sheet instead of silently re-scaling.
-      TO.tool = 'pan';
+      // the next drag moves the sheet instead of silently re-scaling, and
+      // clear the entered feet so a future re-scale can't reuse stale footage.
+      TO.tool = 'pan'; TO.scaleEntry = null;
       TO.draft = null; highlightTool(); redraw(); updateHud(); renderResults();
       updateToolStatus('✓ SCALE SET — ' + feet + ' ft line locked in (green line on the sheet). Back in PAN mode.');
       return;
     }
+    // Canceled or invalid length — reset cleanly instead of leaving a stale
+    // "dragging..." status on screen.
     TO.draft = null; redraw(); updateHud(); renderResults();
+    updateToolStatus('Scale canceled — press ⟂ Set scale to try again.');
   }
   function onDown(ev) {
     // Scale tool: press-drag-release draws the scale line in ONE motion
@@ -18146,19 +18150,19 @@ if (typeof origSwitchTab === 'function') {
       const live = (TO.mouseBase && pts.length && TO.draft.mode !== 'count') ? pts.concat([TO.mouseBase]) : pts;
       if (isScale && live.length) {
         // High-contrast rubber band for the scale line — dark halo + thick
-        // amber stroke + outlined endpoints, readable on any blueprint.
+        // BLUE stroke + outlined endpoints, readable on any blueprint.
         const P = live.map(p => ({ x: p.x * S, y: p.y * S }));
         ctx.save();
         ctx.lineCap = 'round';
         if (P.length >= 2) {
           ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 7;
           ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y); ctx.lineTo(P[1].x, P[1].y); ctx.stroke();
-          ctx.strokeStyle = '#ffb020'; ctx.lineWidth = 3.5;
+          ctx.strokeStyle = '#1e7bff'; ctx.lineWidth = 3.5;
           ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y); ctx.lineTo(P[1].x, P[1].y); ctx.stroke();
         }
         P.forEach(p => {
           ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-          ctx.fillStyle = '#ffb020'; ctx.fill();
+          ctx.fillStyle = '#1e7bff'; ctx.fill();
           ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
         });
         ctx.restore();
@@ -18182,7 +18186,7 @@ if (typeof origSwitchTab === 'function') {
     if (TO.mouseBase && (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit')) {
       const mx = TO.mouseBase.x * S, my = TO.mouseBase.y * S;
       ctx.save();
-      ctx.strokeStyle = (TO.tool === 'scale') ? 'rgba(255,210,127,0.85)' : 'rgba(30,123,255,0.75)';
+      ctx.strokeStyle = 'rgba(30,123,255,0.8)';   // blue guides in every tool, matching the drag band
       ctx.lineWidth = 1;
       ctx.setLineDash([6, 4]);
       ctx.beginPath(); ctx.moveTo(mx, 0); ctx.lineTo(mx, dc.height); ctx.stroke();
@@ -18474,7 +18478,7 @@ if (typeof origSwitchTab === 'function') {
     if (!TO.pdfDoc) { alert('Load a PDF first.'); return; }
     $('to-modal-title').textContent = 'Set scale — page ' + TO.pageNum;
     $('to-modal-body').innerHTML =
-      `<div style="color:var(--text-2);">Enter the real length of a known dimension, then click <strong>Start</strong> and click its two endpoints on the plan.</div>
+      `<div style="color:var(--text-2);">Enter the real length of a known dimension, click <strong>Start</strong>, then <strong>press at one end and DRAG to the other end</strong> of that dimension on the plan (two separate clicks work too). A blue line follows your mouse.</div>
        <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
          ${fieldRow('Feet', `<input type="number" id="to-sc-ft" value="40" style="width:72px;">`)}
          ${fieldRow('Inches', `<input type="number" id="to-sc-in" value="0" style="width:62px;">`)}
