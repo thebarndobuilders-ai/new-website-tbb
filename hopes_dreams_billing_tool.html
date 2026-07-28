@@ -100,6 +100,7 @@
 </header>
 <nav id="nav">
   <button data-tab="advisor" class="active">Session Advisor</button>
+  <button data-tab="auths">Authorizations<span id="authBadge" style="color:#ff5c51;font-weight:800"></span></button>
   <button data-tab="codes">Code Library</button>
   <button data-tab="payers">Payer Matrix</button>
   <button data-tab="combos">Combo Checker</button>
@@ -140,6 +141,39 @@
     <div id="liveFlags"></div>
     <div style="margin-top:12px"><button class="btn" id="btnAdvise">Show billable codes →</button></div>
     <div id="advResult"></div>
+  </div>
+</section>
+
+<!-- ═══════════════ AUTHORIZATIONS ═══════════════ -->
+<section class="tab" id="tab-auths">
+  <div class="card">
+    <h2>Authorization Tracker</h2>
+    <p class="note">Every client's prior auth in one list, sorted by urgency. <b>Red = act now</b> — visits nearly used up, or the auth expires soon. Visit #21 on a 20-visit auth pays <b>zero</b>, so this list is money. Leave "visits approved" blank if the payer doesn't cap visits (date-only auth).</p>
+    <div class="kpi" id="authKpi"></div>
+    <h3>Add an authorization</h3>
+    <div class="grid g3">
+      <div><label class="fld">Client initials</label><input type="text" id="aClient" placeholder="J.T." maxlength="12"></div>
+      <div><label class="fld">Location</label><select id="aLoc"></select></div>
+      <div><label class="fld">Payer</label><select id="aPayer"></select></div>
+      <div><label class="fld">Discipline</label><select id="aDisc"><option>ST</option><option>OT</option><option>ST + OT</option></select></div>
+      <div><label class="fld">Codes authorized</label><input type="text" id="aCodes" placeholder="92507, 92526"></div>
+      <div><label class="fld">Auth #</label><input type="text" id="aNum" placeholder="from the payer letter"></div>
+      <div><label class="fld">Visits approved (blank = no cap)</label><input type="number" id="aVisits" min="1" step="1"></div>
+      <div><label class="fld">Visits already used</label><input type="number" id="aUsed" min="0" step="1" value="0"></div>
+      <div><label class="fld">Start date</label><input type="date" id="aStart"></div>
+      <div><label class="fld">Expiration date</label><input type="date" id="aEnd"></div>
+      <div><label class="fld">Notes</label><input type="text" id="aNotes" placeholder="e.g. reauth needs progress report"></div>
+      <div style="align-self:end"><button class="btn" id="btnAddAuth">+ Add authorization</button></div>
+    </div>
+    <div class="toolbar" style="margin-top:14px">
+      <select id="aFilterLoc" style="max-width:200px"><option value="">Both locations</option></select>
+      <select id="aFilterUrg" style="max-width:200px"><option value="">All statuses</option><option value="red">🔴 Act now</option><option value="amber">🟡 Start reauth</option><option value="green">🟢 OK</option></select>
+      <span class="note">Tip: after each visit is billed, hit <b>+1</b> on the client's row — that's the whole workflow.</span>
+    </div>
+    <div class="scrollwrap"><table id="authTable">
+      <thead><tr><th>Status</th><th>Client</th><th>Loc</th><th>Payer</th><th>Disc</th><th>Codes</th><th>Auth #</th><th>Visits</th><th>Expires</th><th>Notes</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
   </div>
 </section>
 
@@ -389,7 +423,7 @@ function comboFor(a,b){ return COMBOS.find(c=>(c.a===a&&c.b===b)||(c.a===b&&c.b=
 
 /* ══════════════════ STORAGE ══════════════════ */
 const LS = {
-  settings:"hd_settings", payers:"hd_payers", matrix:"hd_matrix", denials:"hd_denials"
+  settings:"hd_settings", payers:"hd_payers", matrix:"hd_matrix", denials:"hd_denials", auths:"hd_auths"
 };
 function load(k, fb){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):fb; }catch(e){ return fb; } }
 function save(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
@@ -403,6 +437,7 @@ let payers   = load(LS.payers, [
 ]);
 let matrix   = load(LS.matrix, {});   // matrix[payerId][code] = {s:"cov|pa|no|unk", rate:"", note:""}
 let denials  = load(LS.denials, []);  // {id,date,loc,payer,client,codes,outcome,reason}
+let auths    = load(LS.auths, []);    // {id,client,loc,payer,disc,codes,num,visits,used,start,end,notes}
 
 function cell(pid, code){ return (matrix[pid]&&matrix[pid][code]) || {s:"unk", rate:"", note:""}; }
 function setCell(pid, code, patch){
@@ -869,6 +904,80 @@ document.getElementById("dCodes").addEventListener("input",()=>{
   document.getElementById("dCodeFlag").innerHTML=flags.join("");
 });
 
+/* ══════════════════ AUTHORIZATION TRACKER ══════════════════ */
+function authStatus(a){
+  const today = new Date().toISOString().slice(0,10);
+  const remaining = a.visits ? a.visits - a.used : null;
+  const daysLeft = a.end ? Math.floor((new Date(a.end) - new Date(today)) / 86400000) : null;
+  if(remaining!==null && remaining<=0) return {urg:"red", label:"EXHAUSTED", detail:"No visits left — further visits are unbillable until reauth"};
+  if(daysLeft!==null && daysLeft<0)    return {urg:"red", label:"EXPIRED",  detail:"Auth expired "+a.end};
+  if((remaining!==null && remaining<=3)||(daysLeft!==null && daysLeft<=14))
+    return {urg:"red", label:"REAUTH NOW", detail:(remaining!==null?remaining+" visits left":"")+(remaining!==null&&daysLeft!==null?" · ":"")+(daysLeft!==null?daysLeft+" days left":"")};
+  if((remaining!==null && remaining<=5)||(daysLeft!==null && daysLeft<=30))
+    return {urg:"amber", label:"Start reauth", detail:(remaining!==null?remaining+" visits left":"")+(remaining!==null&&daysLeft!==null?" · ":"")+(daysLeft!==null?daysLeft+" days left":"")};
+  return {urg:"green", label:"OK", detail:(remaining!==null?remaining+" visits left":"no visit cap")+(daysLeft!==null?" · "+daysLeft+" days":"")};
+}
+function renderAuths(){
+  const fl=document.getElementById("aFilterLoc").value;
+  const fu=document.getElementById("aFilterUrg").value;
+  const rank={red:0,amber:1,green:2};
+  const rows=auths.map(a=>({a,st:authStatus(a)}))
+    .filter(r=>(!fl||r.a.loc===fl)&&(!fu||r.st.urg===fu))
+    .sort((x,y)=>rank[x.st.urg]-rank[y.st.urg] || (x.a.end||"9999").localeCompare(y.a.end||"9999"));
+  document.querySelector("#authTable tbody").innerHTML = rows.map(({a,st})=>`<tr>
+    <td><span class="badge ${st.urg==="red"?"b-no":st.urg==="amber"?"b-pa":"b-cov"}">${st.urg==="red"?"🔴":st.urg==="amber"?"🟡":"🟢"} ${esc(st.label)}</span><br><span class="note">${esc(st.detail)}</span></td>
+    <td><b>${esc(a.client)}</b></td>
+    <td>${esc(locName(a.loc))}</td>
+    <td>${esc(a.payer)}</td>
+    <td>${esc(a.disc)}</td>
+    <td>${esc(a.codes)}</td>
+    <td class="note" style="color:var(--ink)">${esc(a.num)}</td>
+    <td style="white-space:nowrap"><b>${a.used}</b> / ${a.visits||"∞"} <button class="btn small" data-authplus="${a.id}" style="margin-left:4px">+1</button></td>
+    <td>${esc(a.end||"—")}</td>
+    <td class="note" style="color:var(--ink)">${esc(a.notes)}</td>
+    <td><button class="btn danger small" data-authdel="${a.id}">✕</button></td>
+  </tr>`).join("") || `<tr><td colspan="11" class="note">No authorizations tracked yet — add your active auths above. Start with the clients you see most.</td></tr>`;
+  document.querySelectorAll("[data-authplus]").forEach(b=>b.addEventListener("click",()=>{
+    const a=auths.find(x=>x.id===b.dataset.authplus); if(!a) return;
+    a.used++; save(LS.auths,auths); renderAuths();
+  }));
+  document.querySelectorAll("[data-authdel]").forEach(b=>b.addEventListener("click",()=>{
+    const a=auths.find(x=>x.id===b.dataset.authdel);
+    if(!confirm(`Remove auth for ${a.client} (${a.payer})? Do this when a reauth replaces it.`)) return;
+    auths=auths.filter(x=>x.id!==a.id); save(LS.auths,auths); renderAuths();
+  }));
+  const reds=auths.filter(a=>authStatus(a).urg==="red").length;
+  const ambers=auths.filter(a=>authStatus(a).urg==="amber").length;
+  document.getElementById("authKpi").innerHTML=`
+    <div class="k"><div class="n">${auths.length}</div><div class="l">Tracked auths</div></div>
+    <div class="k"><div class="n" style="color:var(--bad)">${reds}</div><div class="l">🔴 Act now</div></div>
+    <div class="k"><div class="n" style="color:var(--warn)">${ambers}</div><div class="l">🟡 Start reauth</div></div>`;
+  document.getElementById("authBadge").textContent = reds ? " ●"+reds : "";
+}
+document.getElementById("btnAddAuth").onclick=()=>{
+  const client=document.getElementById("aClient").value.trim();
+  if(!client) return alert("Enter client initials.");
+  auths.push({
+    id:"a"+Date.now(), client,
+    loc:document.getElementById("aLoc").value,
+    payer:document.getElementById("aPayer").value,
+    disc:document.getElementById("aDisc").value,
+    codes:document.getElementById("aCodes").value.trim(),
+    num:document.getElementById("aNum").value.trim(),
+    visits:parseInt(document.getElementById("aVisits").value,10)||null,
+    used:parseInt(document.getElementById("aUsed").value,10)||0,
+    start:document.getElementById("aStart").value,
+    end:document.getElementById("aEnd").value,
+    notes:document.getElementById("aNotes").value.trim()
+  });
+  save(LS.auths,auths);
+  ["aClient","aCodes","aNum","aVisits","aNotes"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("aUsed").value="0";
+  renderAuths();
+};
+document.getElementById("aFilterLoc").addEventListener("change",renderAuths);
+document.getElementById("aFilterUrg").addEventListener("change",renderAuths);
+
 /* ══════════════════ SETTINGS / BACKUP ══════════════════ */
 function renderSettings(){
   document.getElementById("setName").value=settings.name;
@@ -896,7 +1005,7 @@ document.getElementById("btnSaveSettings").onclick=()=>{
   refreshAll();
 };
 document.getElementById("btnExport").onclick=()=>{
-  const blob=new Blob([JSON.stringify({settings,payers,matrix,denials,exported:new Date().toISOString(),app:"hd_billing_tool"},null,2)],{type:"application/json"});
+  const blob=new Blob([JSON.stringify({settings,payers,matrix,denials,auths,exported:new Date().toISOString(),app:"hd_billing_tool"},null,2)],{type:"application/json"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
   a.download="hopes_dreams_billing_backup_"+new Date().toISOString().slice(0,10)+".json"; a.click();
 };
@@ -908,8 +1017,8 @@ document.getElementById("importFile").addEventListener("change",e=>{
     const d=JSON.parse(r.result);
     if(d.app!=="hd_billing_tool") throw new Error("Not a Hopes and Dreams backup file.");
     if(!confirm("Import will REPLACE all current data in this browser. Continue?")) return;
-    settings=d.settings; payers=d.payers; matrix=d.matrix; denials=d.denials;
-    save(LS.settings,settings); save(LS.payers,payers); save(LS.matrix,matrix); save(LS.denials,denials);
+    settings=d.settings; payers=d.payers; matrix=d.matrix; denials=d.denials; auths=d.auths||[];
+    save(LS.settings,settings); save(LS.payers,payers); save(LS.matrix,matrix); save(LS.denials,denials); save(LS.auths,auths);
     refreshAll(); alert("Backup imported.");
   }catch(err){ alert("Import failed: "+err.message); } };
   r.readAsText(f); e.target.value="";
@@ -925,11 +1034,15 @@ function refreshAll(){
   renderSettings();
   locOptions(document.getElementById("advLoc"));
   locOptions(document.getElementById("dLoc"));
+  locOptions(document.getElementById("aLoc"));
   locOptions(document.getElementById("newPayerLoc"),"Both locations");
+  document.getElementById("aFilterLoc").innerHTML =
+    `<option value="">Both locations</option><option value="L1">${esc(settings.loc1)}</option><option value="L2">${esc(settings.loc2)}</option>`;
   payerOptions(document.getElementById("advPayer"));
   payerOptions(document.getElementById("dPayer"));
+  payerOptions(document.getElementById("aPayer"));
   payerOptions(document.getElementById("dFilterPayer"),true);
-  renderCodes(); renderMatrix(); renderComboTools(); renderDenials();
+  renderCodes(); renderMatrix(); renderComboTools(); renderDenials(); renderAuths();
 }
 renderServices();
 refreshAll();
