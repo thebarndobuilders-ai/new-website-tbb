@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hopes and Dreams — Billing Code Advisor</title>
+<style>
+  :root{
+    --teal:#0e7c7b; --teal-dark:#0a5c5b; --teal-light:#e6f4f4;
+    --purple:#6b5b95; --purple-light:#f0edf7;
+    --ink:#1f2933; --muted:#5f6b76; --line:#d9e2e8;
+    --bg:#f5f8f9; --card:#ffffff;
+    --good:#1a7f37; --good-bg:#e6f4ea;
+    --warn:#9a6700; --warn-bg:#fff8e1;
+    --bad:#b3261e; --bad-bg:#fdecea;
+    --unk:#5f6b76; --unk-bg:#eef1f3;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
+  header{background:linear-gradient(120deg,var(--teal-dark),var(--teal) 55%,var(--purple));color:#fff;padding:16px 22px}
+  header h1{font-size:21px;font-weight:600;letter-spacing:.2px}
+  header .sub{font-size:13px;opacity:.9;margin-top:2px}
+  nav{display:flex;flex-wrap:wrap;gap:4px;background:var(--card);border-bottom:2px solid var(--line);padding:8px 14px;position:sticky;top:0;z-index:20}
+  nav button{border:0;background:transparent;padding:9px 14px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-radius:8px 8px 0 0;border-bottom:3px solid transparent}
+  nav button:hover{background:var(--teal-light);color:var(--teal-dark)}
+  nav button.active{color:var(--teal-dark);border-bottom-color:var(--teal)}
+  main{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
+  .tab{display:none}
+  .tab.active{display:block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px;box-shadow:0 1px 2px rgba(20,40,50,.05)}
+  .card h2{font-size:17px;color:var(--teal-dark);margin-bottom:10px}
+  .card h3{font-size:14.5px;color:var(--purple);margin:12px 0 6px}
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  label.fld{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:3px}
+  select,input[type=text],input[type=number],input[type=date],textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff;color:var(--ink)}
+  select:focus,input:focus,textarea:focus{outline:2px solid var(--teal);outline-offset:1px}
+  .btn{display:inline-block;border:0;border-radius:8px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;background:var(--teal);color:#fff}
+  .btn:hover{background:var(--teal-dark)}
+  .btn.secondary{background:var(--purple-light);color:var(--purple)}
+  .btn.secondary:hover{background:#e2dcf0}
+  .btn.ghost{background:transparent;color:var(--teal-dark);border:1px solid var(--teal)}
+  .btn.danger{background:var(--bad-bg);color:var(--bad)}
+  .btn.small{padding:5px 10px;font-size:12.5px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{background:var(--teal-light);color:var(--teal-dark);text-align:left;padding:8px 9px;font-size:12.5px;text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid var(--line);position:sticky;top:0}
+  td{padding:8px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:hover td{background:#fafcfc}
+  .scrollwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11.5px;font-weight:700;white-space:nowrap}
+  .b-cov{background:var(--good-bg);color:var(--good)}
+  .b-pa{background:var(--warn-bg);color:var(--warn)}
+  .b-no{background:var(--bad-bg);color:var(--bad)}
+  .b-unk{background:var(--unk-bg);color:var(--unk)}
+  .b-st{background:var(--teal-light);color:var(--teal-dark)}
+  .b-ot{background:var(--purple-light);color:var(--purple)}
+  .b-timed{background:#e8f1fb;color:#1a5f9e}
+  .b-untimed{background:var(--unk-bg);color:var(--unk)}
+  .note{font-size:12.5px;color:var(--muted)}
+  .alert{border-radius:10px;padding:10px 14px;font-size:13.5px;margin:8px 0}
+  .alert.warn{background:var(--warn-bg);color:var(--warn);border:1px solid #eeda9b}
+  .alert.bad{background:var(--bad-bg);color:var(--bad);border:1px solid #f2c2be}
+  .alert.good{background:var(--good-bg);color:var(--good);border:1px solid #bfe3c9}
+  .alert.info{background:var(--teal-light);color:var(--teal-dark);border:1px solid #bcdedd}
+  .svc{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px;background:#fff;cursor:pointer}
+  .svc:hover{border-color:var(--teal)}
+  .svc input[type=checkbox]{margin-top:3px;accent-color:var(--teal);width:16px;height:16px;flex-shrink:0}
+  .svc .t{font-weight:600;font-size:13.5px}
+  .svc .d{font-size:12px;color:var(--muted)}
+  .svc .mins{margin-left:auto;flex-shrink:0;display:none;align-items:center;gap:5px;font-size:12px;color:var(--muted)}
+  .svc.checked .mins{display:flex}
+  .svc .mins input{width:64px;padding:5px 7px}
+  .chipbar{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}
+  .chip{padding:6px 14px;border-radius:20px;border:1.5px solid var(--line);background:#fff;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
+  .chip.on{background:var(--teal);border-color:var(--teal);color:#fff}
+  .chip.on.otchip{background:var(--purple);border-color:var(--purple)}
+  .resultbox{background:#f8fbfb;border:1.5px dashed var(--teal);border-radius:12px;padding:14px;margin-top:12px}
+  .copybox{background:#102a2a;color:#d7f0ef;font-family:Consolas,monospace;font-size:13px;border-radius:9px;padding:12px;white-space:pre-wrap;margin-top:8px}
+  .flexrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .statline{font-size:11.5px;white-space:nowrap}
+  .statline .ok{color:var(--good);font-weight:700}
+  .statline .no{color:var(--bad);font-weight:700}
+  .matrix-cell select{padding:4px 5px;font-size:12px;border-radius:6px}
+  .matrix-cell input{padding:4px 5px;font-size:12px;border-radius:6px;width:70px;margin-top:3px}
+  footer{max-width:1180px;margin:0 auto;padding:12px 16px 30px;font-size:12px;color:var(--muted)}
+  .search{max-width:340px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+  .kpi{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  .kpi .k{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 16px;min-width:130px}
+  .kpi .k .n{font-size:22px;font-weight:700;color:var(--teal-dark)}
+  .kpi .k .l{font-size:12px;color:var(--muted)}
+  @media print{nav,header .sub,.btn{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="hdrName">Hopes and Dreams Speech Therapy</h1>
+  <div class="sub">Billing Code Advisor — Speech &amp; Occupational Therapy · companion to Fusion</div>
+</header>
+<nav id="nav">
+  <button data-tab="advisor" class="active">Session Advisor</button>
+  <button data-tab="codes">Code Library</button>
+  <button data-tab="payers">Payer Matrix</button>
+  <button data-tab="combos">Combo Checker</button>
+  <button data-tab="denials">Denial Log</button>
+  <button data-tab="settings">Settings</button>
+</nav>
+<main>
+
+<!-- ═══════════════ ADVISOR ═══════════════ -->
+<section class="tab active" id="tab-advisor">
+  <div class="card">
+    <h2>Session Advisor</h2>
+    <p class="note">Pick what was <b>actually done and documented</b> in the session. The tool returns the billable codes, units (8-minute rule applied for timed codes), required modifiers, and this payer's coverage — ready to key into Fusion.</p>
+    <div class="grid g3" style="margin-top:10px">
+      <div><label class="fld">Location</label><select id="advLoc"></select></div>
+      <div><label class="fld">Payer</label><select id="advPayer"></select></div>
+      <div><label class="fld">Session date</label><input type="date" id="advDate"></div>
+    </div>
+    <h3>Discipline(s) in this visit</h3>
+    <div class="chipbar">
+      <button class="chip on" id="chipST">Speech (ST)</button>
+      <button class="chip" id="chipOT">OT</button>
+    </div>
+    <div class="chipbar">
+      <button class="chip" id="chipTele">Telehealth (adds modifier 95)</button>
+      <button class="chip" id="chipHab">Habilitative plan (modifier 96 — commercial plans)</button>
+    </div>
+    <div class="grid g2">
+      <div id="advColST">
+        <h3>Speech — services performed</h3>
+        <div id="svcST"></div>
+      </div>
+      <div id="advColOT" style="display:none">
+        <h3>OT — services performed</h3>
+        <div id="svcOT"></div>
+      </div>
+    </div>
+    <div style="margin-top:12px"><button class="btn" id="btnAdvise">Show billable codes →</button></div>
+    <div id="advResult"></div>
+  </div>
+</section>
+
+<!-- ═══════════════ CODE LIBRARY ═══════════════ -->
+<section class="tab" id="tab-codes">
+  <div class="card">
+    <h2>Code Library — ST &amp; OT CPT codes</h2>
+    <div class="toolbar">
+      <input type="text" class="search" id="codeSearch" placeholder="Search code or keyword…">
+      <button class="chip on" data-cf="ALL">All</button>
+      <button class="chip" data-cf="ST">Speech</button>
+      <button class="chip" data-cf="OT">OT</button>
+      <button class="chip" data-cf="EVAL">Evals only</button>
+    </div>
+    <div class="scrollwrap"><table id="codeTable">
+      <thead><tr><th>Code</th><th>Disc.</th><th>Name</th><th>Billing</th><th>When to use it</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ═══════════════ PAYER MATRIX ═══════════════ -->
+<section class="tab" id="tab-payers">
+  <div class="card">
+    <h2>Payer Coverage Matrix</h2>
+    <p class="note">One row per code, one column per payer. Set each cell to what that payer actually does: <span class="badge b-cov">Covered</span> <span class="badge b-pa">Prior auth</span> <span class="badge b-no">Not covered</span> <span class="badge b-unk">Unknown</span>. Add your contracted rate if you know it. Green/red counts under a cell come from the Denial Log — real approvals and denials you've recorded.</p>
+    <div class="toolbar">
+      <input type="text" id="newPayerName" placeholder="Add payer (e.g. Georgia Medicaid, BCBS)" style="max-width:280px">
+      <select id="newPayerLoc" style="max-width:170px"></select>
+      <button class="btn small" id="btnAddPayer">+ Add payer</button>
+      <span class="note">Tip: if the two locations are in different coverage areas, add the payer once per location.</span>
+    </div>
+    <div class="scrollwrap" style="max-height:640px;overflow-y:auto"><table id="matrixTable"><thead></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- ═══════════════ COMBOS ═══════════════ -->
+<section class="tab" id="tab-combos">
+  <div class="card">
+    <h2>Same-Day Combination Checker</h2>
+    <p class="note">Pick two codes to see whether they can be billed on the same date of service, and what it takes (distinct sessions, modifier 59). These reflect common NCCI edits and general payer behavior — your Denial Log is the final word for each payer.</p>
+    <div class="grid g3" style="margin:10px 0">
+      <div><label class="fld">Code A</label><select id="comboA"></select></div>
+      <div><label class="fld">Code B</label><select id="comboB"></select></div>
+      <div style="align-self:end"><button class="btn" id="btnCombo">Check pair</button></div>
+    </div>
+    <div id="comboResult"></div>
+    <h3>Reference — all known pairs</h3>
+    <div class="scrollwrap"><table id="comboTable">
+      <thead><tr><th>Pair</th><th>Verdict</th><th>Rule</th></tr></thead><tbody></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ═══════════════ DENIAL LOG ═══════════════ -->
+<section class="tab" id="tab-denials">
+  <div class="card">
+    <h2>Denial / Approval Log</h2>
+    <p class="note">Log every claim outcome in a few clicks. This builds your practice's real coverage knowledge — the Payer Matrix shows these counts under each cell.</p>
+    <div class="kpi" id="denKpi"></div>
+    <div class="grid g3">
+      <div><label class="fld">Date</label><input type="date" id="dDate"></div>
+      <div><label class="fld">Location</label><select id="dLoc"></select></div>
+      <div><label class="fld">Payer</label><select id="dPayer"></select></div>
+      <div><label class="fld">Client initials</label><input type="text" id="dClient" placeholder="e.g. J.T." maxlength="12"></div>
+      <div><label class="fld">Codes billed (comma-separated)</label><input type="text" id="dCodes" placeholder="92507, 92526-59"></div>
+      <div><label class="fld">Outcome</label><select id="dOutcome">
+        <option value="paid">Paid in full</option>
+        <option value="partial">Partially paid</option>
+        <option value="denied">Denied</option>
+      </select></div>
+    </div>
+    <div class="grid g2" style="margin-top:8px">
+      <div><label class="fld">Denial reason / notes</label><input type="text" id="dReason" placeholder="e.g. 92526 bundled into 92507 — needed mod 59"></div>
+      <div style="align-self:end"><button class="btn" id="btnAddDenial">+ Log outcome</button></div>
+    </div>
+    <div class="toolbar" style="margin-top:14px">
+      <select id="dFilterPayer" style="max-width:220px"><option value="">All payers</option></select>
+      <select id="dFilterOutcome" style="max-width:180px"><option value="">All outcomes</option><option value="paid">Paid</option><option value="partial">Partial</option><option value="denied">Denied</option></select>
+    </div>
+    <div class="scrollwrap"><table id="denialTable">
+      <thead><tr><th>Date</th><th>Loc</th><th>Payer</th><th>Client</th><th>Codes</th><th>Outcome</th><th>Reason / notes</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ═══════════════ SETTINGS ═══════════════ -->
+<section class="tab" id="tab-settings">
+  <div class="card">
+    <h2>Practice</h2>
+    <div class="grid g3">
+      <div><label class="fld">Practice name</label><input type="text" id="setName"></div>
+      <div><label class="fld">Location 1</label><input type="text" id="setLoc1"></div>
+      <div><label class="fld">Location 2</label><input type="text" id="setLoc2"></div>
+    </div>
+    <div style="margin-top:10px"><button class="btn" id="btnSaveSettings">Save</button></div>
+  </div>
+  <div class="card">
+    <h2>Backup</h2>
+    <p class="note">Everything (payers, matrix, denial log, settings) lives in this browser's localStorage. Export a backup to move it to another computer or share between locations.</p>
+    <div class="flexrow" style="margin-top:8px">
+      <button class="btn secondary" id="btnExport">⬇ Export full backup (JSON)</button>
+      <button class="btn secondary" id="btnImport">⬆ Import backup</button>
+      <input type="file" id="importFile" accept=".json" style="display:none">
+      <button class="btn danger" id="btnWipe">Erase all saved data</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>About this tool</h2>
+    <p class="note">This tool helps staff code <b>services that were actually delivered and documented</b> — it is a coding accuracy and revenue-capture aid, not a substitute for payer policy. CPT® codes are © the AMA. NCCI edits and payer rules change quarterly: when this tool and a current payer policy disagree, the payer policy wins. Log the outcome so the tool learns.</p>
+  </div>
+</section>
+</main>
+<footer>Hopes and Dreams — Billing Code Advisor · data stays in this browser (use Settings → Backup to move it) · verify codes against current payer policy before claim submission</footer>
+
+<script>
+"use strict";
+/* ══════════════════ DATA: CPT CODE LIBRARY ══════════════════ */
+const CODES = [
+  // ---- Speech-language pathology ----
+  {code:"92521", disc:"ST", eval:true,  timed:false, unit:"per eval",  name:"Evaluation of speech fluency",
+   desc:"Fluency evaluation (stuttering, cluttering). Use when the visit's purpose is assessing fluency."},
+  {code:"92522", disc:"ST", eval:true,  timed:false, unit:"per eval",  name:"Evaluation of speech sound production",
+   desc:"Articulation/phonology eval WITHOUT language testing. Never bill with 92523 (92523 includes it)."},
+  {code:"92523", disc:"ST", eval:true,  timed:false, unit:"per eval",  name:"Eval of speech sound production + language",
+   desc:"Combined artic + language comprehension/expression eval — the standard full pediatric speech eval. Pays more than 92522; use it whenever language was formally assessed too."},
+  {code:"92524", disc:"ST", eval:true,  timed:false, unit:"per eval",  name:"Behavioral/qualitative analysis of voice & resonance",
+   desc:"Voice or resonance evaluation."},
+  {code:"92507", disc:"ST", eval:false, timed:false, unit:"per session", name:"Speech/language treatment, individual",
+   desc:"The workhorse ST treatment code — articulation, language, fluency, voice, auditory processing. Untimed: one unit per session regardless of length."},
+  {code:"92508", disc:"ST", eval:false, timed:false, unit:"per session", name:"Speech/language treatment, group (2+)",
+   desc:"Group speech treatment. Untimed. Don't also bill 92507 for the same client the same visit."},
+  {code:"92526", disc:"ST", eval:false, timed:false, unit:"per session", name:"Treatment of swallowing / oral function for feeding",
+   desc:"Feeding & swallowing therapy. Frequently MISSED: if the session was feeding work, this is the code — not 92507. NCCI pairs it with 92507; billing both same day needs truly separate sessions + modifier 59."},
+  {code:"92610", disc:"ST", eval:true,  timed:false, unit:"per eval",  name:"Evaluation of oral & pharyngeal swallowing function",
+   desc:"Clinical (bedside) feeding/swallowing evaluation."},
+  {code:"92605", disc:"ST", eval:true,  timed:false, unit:"first hour", name:"Eval for prescription of non-speech-generating AAC device",
+   desc:"Evaluation for low-tech AAC (boards, PECS-style systems)."},
+  {code:"92606", disc:"ST", eval:false, timed:false, unit:"per session", name:"Therapeutic service for non-speech-generating AAC device",
+   desc:"Treatment/training with a low-tech AAC device, including programming and family training."},
+  {code:"92607", disc:"ST", eval:true,  timed:false, unit:"first hour", name:"Eval for prescription of speech-generating device (SGD)",
+   desc:"High-tech AAC/SGD evaluation, first hour. Use 92608 for each additional 30 minutes — commonly missed money on long AAC evals."},
+  {code:"92608", disc:"ST", eval:true,  timed:false, unit:"each addl 30 min", name:"SGD evaluation, each additional 30 minutes",
+   desc:"Add-on to 92607. Bill one unit per additional 30 min of the SGD eval."},
+  {code:"92609", disc:"ST", eval:false, timed:false, unit:"per session", name:"Therapeutic services for use of SGD",
+   desc:"Programming, modification, and training on a speech-generating device."},
+  {code:"96125", disc:"ST", eval:true,  timed:true,  unit:"per hour",  name:"Standardized cognitive performance testing",
+   desc:"Standardized cognitive testing, per hour (includes interpretation & report time). Requires at least 31 minutes to bill the first unit."},
+  {code:"97129", disc:"BOTH", eval:false, timed:true, unit:"initial 15 min", name:"Therapeutic cognitive function intervention, initial 15 min",
+   desc:"Cognitive skills treatment (attention, memory, executive function, problem solving). ST or OT. NCCI pairs it with 92507 — same-day with 92507 by the same clinician generally denies."},
+  {code:"97130", disc:"BOTH", eval:false, timed:true, unit:"each addl 15 min", name:"Cognitive function intervention, each additional 15 min",
+   desc:"Add-on to 97129 — bill one unit per extra 15 minutes. Missed money on longer cognitive sessions."},
+  // ---- Occupational therapy ----
+  {code:"97165", disc:"OT", eval:true,  timed:false, unit:"per eval",  name:"OT evaluation — low complexity",
+   desc:"1–3 performance deficits, problem-focused history, ~30 min typical."},
+  {code:"97166", disc:"OT", eval:true,  timed:false, unit:"per eval",  name:"OT evaluation — moderate complexity",
+   desc:"3–5 performance deficits, expanded review, ~45 min typical. Most common pediatric OT eval level — don't default to 97165 when the documentation supports moderate."},
+  {code:"97167", disc:"OT", eval:true,  timed:false, unit:"per eval",  name:"OT evaluation — high complexity",
+   desc:"5+ deficits, comprehensive history & multiple standardized assessments, ~60 min typical."},
+  {code:"97168", disc:"OT", eval:true,  timed:false, unit:"per re-eval", name:"OT re-evaluation",
+   desc:"Re-evaluation of an established plan of care when status has changed."},
+  {code:"97110", disc:"OT", eval:false, timed:true,  unit:"15 min",   name:"Therapeutic exercise",
+   desc:"Exercises for strength, endurance, ROM, flexibility. Timed — bill in 15-min units under the 8-minute rule."},
+  {code:"97112", disc:"OT", eval:false, timed:true,  unit:"15 min",   name:"Neuromuscular re-education",
+   desc:"Balance, coordination, posture, proprioception work. Timed."},
+  {code:"97530", disc:"OT", eval:false, timed:true,  unit:"15 min",   name:"Therapeutic activities",
+   desc:"Dynamic functional activities (lifting, reaching, play-based functional tasks). Timed. The pediatric OT workhorse. NCCI pairs it with OT evals and with 97533 — see Combo Checker."},
+  {code:"97533", disc:"OT", eval:false, timed:true,  unit:"15 min",   name:"Sensory integrative techniques",
+   desc:"Sensory integration treatment to enhance sensory processing. Timed. Some payers don't cover it — check the matrix; when covered, it's often more accurate than 97530 for SI sessions."},
+  {code:"97535", disc:"OT", eval:false, timed:true,  unit:"15 min",   name:"Self-care / home management training",
+   desc:"ADL training — dressing, feeding (OT scope), hygiene, home programs, caregiver training. Timed. Frequently under-used for ADL-focused sessions."},
+  {code:"97150", disc:"OT", eval:false, timed:false, unit:"per session", name:"Group therapeutic procedures (2+)",
+   desc:"OT group treatment. Untimed."},
+  {code:"97755", disc:"OT", eval:true,  timed:true,  unit:"15 min",   name:"Assistive technology assessment",
+   desc:"Assessment for adaptive equipment / assistive tech to restore function. Timed."},
+];
+const codeMap = {}; CODES.forEach(c=>codeMap[c.code]=c);
+
+/* ══════════════════ DATA: ADVISOR SERVICES ══════════════════ */
+/* Each service the front desk / therapist can tick, mapped to code(s). */
+const SERVICES = {
+  ST: [
+    {id:"st_tx",    label:"Individual speech/language treatment", detail:"Artic, language, fluency, voice, AP — the standard 1:1 session", codes:["92507"]},
+    {id:"st_group", label:"Group speech treatment (2+ kids)", detail:"Bill 92508 per child — not 92507", codes:["92508"]},
+    {id:"st_feed",  label:"Feeding / swallowing treatment", detail:"Oral-motor feeding work, dysphagia tx", codes:["92526"]},
+    {id:"st_cog",   label:"Cognitive intervention (attention, memory, executive function)", detail:"Timed — enter total minutes", codes:["97129"], timed:true},
+    {id:"st_aac_tx",label:"AAC device therapy / programming", detail:"Low-tech → 92606 · speech-generating device → 92609", codes:["92606","92609"], pick:true},
+    {id:"st_ev_full",label:"EVAL — speech sound + language (full eval)", detail:"The standard full pediatric eval → 92523", codes:["92523"]},
+    {id:"st_ev_artic",label:"EVAL — speech sound only (no language testing)", detail:"92522 — use 92523 instead if language was assessed", codes:["92522"]},
+    {id:"st_ev_flu", label:"EVAL — fluency", detail:"Stuttering/cluttering", codes:["92521"]},
+    {id:"st_ev_voice",label:"EVAL — voice / resonance", detail:"", codes:["92524"]},
+    {id:"st_ev_swal",label:"EVAL — feeding / swallowing", detail:"Clinical swallow eval", codes:["92610"]},
+    {id:"st_ev_aac", label:"EVAL — AAC device", detail:"Low-tech → 92605 · SGD → 92607 (+92608 per extra 30 min)", codes:["92605","92607"], pick:true},
+    {id:"st_cogtest",label:"Standardized cognitive testing", detail:"96125 — timed, per hour, needs ≥31 min. Enter total minutes incl. scoring/report", codes:["96125"], timed:true},
+  ],
+  OT: [
+    {id:"ot_thact", label:"Therapeutic activities (functional / play-based tasks)", detail:"97530 — timed", codes:["97530"], timed:true},
+    {id:"ot_si",    label:"Sensory integration treatment", detail:"97533 — timed; check payer coverage", codes:["97533"], timed:true},
+    {id:"ot_ex",    label:"Therapeutic exercise (strength, ROM, endurance)", detail:"97110 — timed", codes:["97110"], timed:true},
+    {id:"ot_neuro", label:"Neuromuscular re-ed (balance, coordination, posture)", detail:"97112 — timed", codes:["97112"], timed:true},
+    {id:"ot_adl",   label:"Self-care / ADL training (dressing, feeding, hygiene, caregiver training)", detail:"97535 — timed", codes:["97535"], timed:true},
+    {id:"ot_cog",   label:"Cognitive intervention (OT plan)", detail:"97129 — timed", codes:["97129"], timed:true},
+    {id:"ot_group", label:"Group OT (2+ kids)", detail:"97150 per child", codes:["97150"]},
+    {id:"ot_ev_lo", label:"EVAL — low complexity", detail:"1–3 deficits", codes:["97165"]},
+    {id:"ot_ev_mod",label:"EVAL — moderate complexity", detail:"3–5 deficits — most common pediatric level", codes:["97166"]},
+    {id:"ot_ev_hi", label:"EVAL — high complexity", detail:"5+ deficits, multiple standardized tools", codes:["97167"]},
+    {id:"ot_ev_re", label:"RE-evaluation", detail:"Status change on existing plan", codes:["97168"]},
+    {id:"ot_at",    label:"Assistive technology assessment", detail:"97755 — timed", codes:["97755"], timed:true},
+  ]
+};
+
+/* ══════════════════ DATA: SAME-DAY COMBO RULES ══════════════════ */
+/* level: never | edit (needs mod 59 + distinct session) | caution | ok */
+const COMBOS = [
+  {a:"92522", b:"92523", level:"never", note:"92523 INCLUDES speech sound production testing — never bill both. If language was assessed, bill 92523 alone (it also pays more)."},
+  {a:"92507", b:"92526", level:"edit",  note:"NCCI edit pair. Payable together only as two genuinely separate, separately documented sessions the same day — modifier 59 on 92526. Many Medicaid plans still bundle; log outcomes per payer."},
+  {a:"92507", b:"97129", level:"edit",  note:"NCCI edit pair. Same clinician same day generally denies; distinct sessions + modifier 59 may pay on some payers. If the cognitive work is under an OT plan (GO), the pair is cross-discipline — see ST+OT co-treatment rules."},
+  {a:"92507", b:"92508", level:"never", note:"Individual and group speech treatment for the same client on the same day — pick the one that reflects the session."},
+  {a:"92507", b:"96125", level:"edit",  note:"NCCI edit — testing and treatment same day needs distinct sessions + modifier 59; several payers deny regardless."},
+  {a:"92523", b:"92507", level:"caution", note:"Eval + treatment on the same day is allowed by CPT but many payers (esp. Medicaid) pay only the eval on day one. Check your matrix / log."},
+  {a:"92610", b:"92526", level:"caution", note:"Swallow eval + swallow treatment same day: allowed when documented as distinct, but several payers bundle. Verify per payer."},
+  {a:"92607", b:"92608", level:"ok",   note:"92608 is the designed add-on: one unit per additional 30 min of the SGD eval beyond the first hour."},
+  {a:"97129", b:"97130", level:"ok",   note:"97130 is the add-on to 97129 — one unit per additional 15 minutes of cognitive intervention."},
+  {a:"97165", b:"97530", level:"edit", note:"NCCI edit: OT eval + therapeutic activities same day needs modifier 59 on 97530 and distinct documentation. Same applies to 97166/97167."},
+  {a:"97166", b:"97530", level:"edit", note:"NCCI edit — modifier 59 on 97530 with distinct documentation."},
+  {a:"97167", b:"97530", level:"edit", note:"NCCI edit — modifier 59 on 97530 with distinct documentation."},
+  {a:"97530", b:"97533", level:"edit", note:"NCCI edit pair. Both same day requires distinct time blocks + modifier 59; minutes cannot overlap. Some payers deny the pair outright."},
+  {a:"97110", b:"97530", level:"ok",   note:"Payable together — separate, non-overlapping minutes for each; both count toward the 8-minute-rule total."},
+  {a:"97112", b:"97530", level:"ok",   note:"Payable together with separate, non-overlapping minutes."},
+  {a:"97110", b:"97112", level:"ok",   note:"Payable together with separate, non-overlapping minutes."},
+  {a:"97535", b:"97530", level:"ok",   note:"Payable together with separate, non-overlapping minutes. Use 97535 for the ADL portion instead of stretching 97530 across everything."},
+  {a:"97535", b:"97533", level:"edit", note:"NCCI edit — modifier 59 with distinct time blocks."},
+  {a:"92507", b:"97530", level:"ok",   note:"Cross-discipline ST + OT same day is fine: ST codes carry GN, OT codes carry GO, and each discipline's minutes/sessions must be separate (co-treatment time can't be billed twice)."},
+  {a:"92526", b:"97535", level:"caution", note:"ST feeding (92526) + OT self-care feeding (97535) same day: allowed as separate disciplines (GN/GO) with separate times, but document distinctly — feeding overlap draws review."},
+  {a:"92507", b:"97150", level:"ok",   note:"ST individual + OT group same day is cross-discipline — fine with GN/GO and separate times."},
+];
+function comboFor(a,b){ return COMBOS.find(c=>(c.a===a&&c.b===b)||(c.a===b&&c.b===a)); }
+
+/* ══════════════════ STORAGE ══════════════════ */
+const LS = {
+  settings:"hd_settings", payers:"hd_payers", matrix:"hd_matrix", denials:"hd_denials"
+};
+function load(k, fb){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):fb; }catch(e){ return fb; } }
+function save(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
+
+let settings = load(LS.settings, {name:"Hopes and Dreams Speech Therapy", loc1:"Location 1", loc2:"Location 2"});
+let payers   = load(LS.payers, [
+  {id:"p1", name:"Medicaid (set your state)", loc:"BOTH"},
+  {id:"p2", name:"BCBS", loc:"BOTH"},
+  {id:"p3", name:"Private pay", loc:"BOTH"},
+]);
+let matrix   = load(LS.matrix, {});   // matrix[payerId][code] = {s:"cov|pa|no|unk", rate:"", note:""}
+let denials  = load(LS.denials, []);  // {id,date,loc,payer,client,codes,outcome,reason}
+
+function cell(pid, code){ return (matrix[pid]&&matrix[pid][code]) || {s:"unk", rate:"", note:""}; }
+function setCell(pid, code, patch){
+  matrix[pid] = matrix[pid]||{};
+  matrix[pid][code] = Object.assign({}, cell(pid,code), patch);
+  save(LS.matrix, matrix);
+}
+function locName(key){ return key==="L1"?settings.loc1 : key==="L2"?settings.loc2 : "Both locations"; }
+function esc(s){ return String(s??"").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+
+/* Denial-log stats per payer+code */
+function logStats(payerName, code){
+  let ok=0, no=0;
+  const base = code.split("-")[0];
+  denials.forEach(d=>{
+    if(d.payer!==payerName) return;
+    const hit = d.codes.some(c=>c.split("-")[0]===base);
+    if(!hit) return;
+    if(d.outcome==="paid") ok++;
+    else if(d.outcome==="denied") no++;
+    else { ok++; no++; } // partial counts as both a pay and a problem signal
+  });
+  return {ok,no};
+}
+
+/* ══════════════════ TABS ══════════════════ */
+document.getElementById("nav").addEventListener("click", e=>{
+  const b=e.target.closest("button[data-tab]"); if(!b) return;
+  document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("active",x===b));
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.id==="tab-"+b.dataset.tab));
+});
+
+/* ══════════════════ RENDER HELPERS ══════════════════ */
+function payerOptions(sel, includeBlank){
+  sel.innerHTML = (includeBlank?'<option value="">All payers</option>':"") +
+    payers.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}${p.loc!=="BOTH"?" — "+esc(locName(p.loc)):""}</option>`).join("");
+}
+function locOptions(sel, bothLabel){
+  sel.innerHTML = `<option value="L1">${esc(settings.loc1)}</option><option value="L2">${esc(settings.loc2)}</option>` +
+    (bothLabel?`<option value="BOTH">${esc(bothLabel)}</option>`:"");
+}
+function statusBadge(s){
+  return s==="cov"?'<span class="badge b-cov">Covered</span>'
+       : s==="pa" ?'<span class="badge b-pa">Prior auth</span>'
+       : s==="no" ?'<span class="badge b-no">Not covered</span>'
+       :           '<span class="badge b-unk">Unknown</span>';
+}
+
+/* ══════════════════ ADVISOR ══════════════════ */
+let advDisc = {ST:true, OT:false};
+let advTele=false, advHab=false;
+
+function renderServices(){
+  ["ST","OT"].forEach(d=>{
+    const box = document.getElementById("svc"+d);
+    box.innerHTML = SERVICES[d].map(s=>{
+      const pickSel = s.pick ? `<select data-pick="${s.id}" style="width:auto;margin-top:4px;font-size:12px;padding:4px 6px">`+
+        s.codes.map(c=>`<option value="${c}">${c} — ${esc(codeMap[c].name)}</option>`).join("")+`</select>` : "";
+      return `<label class="svc" data-svc="${s.id}">
+        <input type="checkbox" data-chk="${s.id}">
+        <span style="flex:1"><span class="t">${esc(s.label)}</span><br><span class="d">${esc(s.detail)}</span>${pickSel}</span>
+        ${s.timed?`<span class="mins">min <input type="number" min="0" step="1" data-min="${s.id}" placeholder="0"></span>`:""}
+      </label>`;
+    }).join("");
+  });
+  document.querySelectorAll(".svc input[type=checkbox]").forEach(chk=>{
+    chk.addEventListener("change", ()=> chk.closest(".svc").classList.toggle("checked", chk.checked));
+  });
+  // Don't let clicking the minutes input or pick dropdown toggle the checkbox
+  document.querySelectorAll(".svc input[type=number], .svc select").forEach(el=>{
+    el.addEventListener("click", e=>e.stopPropagation());
+  });
+}
+
+function chip(el, on){ el.classList.toggle("on", on); }
+document.getElementById("chipST").onclick = function(){ advDisc.ST=!advDisc.ST; chip(this,advDisc.ST); document.getElementById("advColST").style.display=advDisc.ST?"":"none"; };
+document.getElementById("chipOT").onclick = function(){ advDisc.OT=!advDisc.OT; chip(this,advDisc.OT); this.classList.toggle("otchip",advDisc.OT); document.getElementById("advColOT").style.display=advDisc.OT?"":"none"; };
+document.getElementById("chipTele").onclick = function(){ advTele=!advTele; chip(this,advTele); };
+document.getElementById("chipHab").onclick = function(){ advHab=!advHab; chip(this,advHab); };
+
+/* 8-minute rule: total timed minutes → total units; allocate by biggest-minutes-first */
+function eightMinuteUnits(items){ // items: [{code, minutes}]
+  const total = items.reduce((s,i)=>s+i.minutes,0);
+  let totalUnits = Math.floor(total/15) + ((total%15)>=8 ? 1 : 0);
+  const out = items.map(i=>({code:i.code, minutes:i.minutes, units:Math.floor(i.minutes/15), rem:i.minutes%15}));
+  let assigned = out.reduce((s,i)=>s+i.units,0);
+  const byRem = [...out].sort((a,b)=>b.rem-a.rem || b.minutes-a.minutes);
+  for(const o of byRem){ if(assigned>=totalUnits) break; if(o.rem>0){ o.units++; assigned++; } }
+  // ensure any code with ≥8 min that got 0 units gets its unit if budget allows
+  for(const o of out){ if(o.units===0 && o.minutes>=8 && assigned<totalUnits){ o.units=1; assigned++; } }
+  return {total, totalUnits, lines:out};
+}
+
+document.getElementById("btnAdvise").onclick = ()=>{
+  const payer = document.getElementById("advPayer").value;
+  const pObj  = payers.find(p=>p.name===payer);
+  const picked = []; // {code, disc, minutes|null, svcLabel}
+  ["ST","OT"].forEach(d=>{
+    if(!advDisc[d]) return;
+    SERVICES[d].forEach(s=>{
+      const chk = document.querySelector(`[data-chk="${s.id}"]`);
+      if(!chk || !chk.checked) return;
+      let code = s.codes[0];
+      if(s.pick){ const sel=document.querySelector(`[data-pick="${s.id}"]`); if(sel) code=sel.value; }
+      let minutes = null;
+      if(s.timed){ const mi=document.querySelector(`[data-min="${s.id}"]`); minutes = Math.max(0, parseInt(mi&&mi.value||"0",10)||0); }
+      picked.push({code, disc:d, minutes, label:s.label});
+    });
+  });
+
+  const R = document.getElementById("advResult");
+  if(!picked.length){ R.innerHTML = `<div class="alert warn">Nothing selected — tick the services that were performed.</div>`; return; }
+
+  const alerts=[], hints=[];
+
+  // Cognitive add-on: 97129 minutes >30 → split into 97129 + 97130 units
+  const cogIdx = picked.findIndex(p=>p.code==="97129");
+  let cogNote = "";
+  if(cogIdx>=0){
+    const m = picked[cogIdx].minutes||0;
+    if(m>=23){ // ≥23 min = initial 15 + ≥8 more → add-on units
+      const addl = Math.floor((m-15)/15) + (((m-15)%15)>=8?1:0);
+      if(addl>0){ picked.push({code:"97130", disc:picked[cogIdx].disc, minutes:0, label:"Cognitive intervention add-on", fixedUnits:addl});
+        cogNote = `Cognitive: ${m} min → 97129 ×1 + 97130 ×${addl}.`; }
+    }
+    picked[cogIdx].fixedUnits = 1; picked[cogIdx].cogMin = m;
+  }
+
+  // 96125: per-hour, ≥31 min threshold
+  const ct = picked.find(p=>p.code==="96125");
+  if(ct){
+    const m=ct.minutes||0;
+    const u = m<31 ? 0 : Math.floor(m/60) + (((m%60)>=31)?1:0);
+    ct.fixedUnits = Math.max(u, 0);
+    if(m>0 && m<31) alerts.push({cls:"bad", txt:`96125 needs at least 31 minutes to bill — you entered ${m}. It cannot go on this claim.`});
+  }
+
+  // Timed 15-min codes (exclude ones with fixedUnits already computed)
+  const timed15 = picked.filter(p=>{
+    const c=codeMap[p.code];
+    return c && c.timed && c.unit==="15 min" && p.fixedUnits===undefined && (p.minutes||0)>0;
+  });
+  const zeroMin = picked.filter(p=>{ const c=codeMap[p.code]; return c&&c.timed&&c.unit==="15 min"&&p.fixedUnits===undefined&&(p.minutes||0)===0; });
+  zeroMin.forEach(p=>alerts.push({cls:"warn", txt:`${p.code} (${codeMap[p.code].name}) is a timed code but has 0 minutes entered — it will show 0 units until you add minutes.`}));
+  const emr = eightMinuteUnits(timed15.map(p=>({code:p.code, minutes:p.minutes})));
+  const unitsByCode={}; emr.lines.forEach(l=>unitsByCode[l.code]=l.units);
+  timed15.forEach(p=>{ if((unitsByCode[p.code]||0)===0 && p.minutes>0) alerts.push({cls:"warn", txt:`${p.code}: ${p.minutes} min is under the 8-minute threshold within the total — 0 units. Consider whether minutes were recorded correctly.`}); });
+
+  // Combo checks across everything picked
+  const codesPicked = [...new Set(picked.map(p=>p.code))];
+  const modBy59 = new Set();
+  for(let i=0;i<codesPicked.length;i++) for(let j=i+1;j<codesPicked.length;j++){
+    const cb = comboFor(codesPicked[i], codesPicked[j]);
+    if(!cb) continue;
+    if(cb.level==="never") alerts.push({cls:"bad", txt:`✋ ${cb.a} + ${cb.b}: ${cb.note}`});
+    else if(cb.level==="edit"){ alerts.push({cls:"warn", txt:`⚠ ${cb.a} + ${cb.b}: ${cb.note}`}); modBy59.add(cb.b===codesPicked[i]?cb.b:cb.b); modBy59.add(cb.b); }
+    else if(cb.level==="caution") alerts.push({cls:"warn", txt:`⚠ ${cb.a} + ${cb.b}: ${cb.note}`});
+  }
+
+  // Missed-opportunity hints
+  const has = c=>codesPicked.includes(c);
+  if(has("92522")) hints.push("Was language also formally assessed? If yes, this is 92523 (includes speech sound testing and reimburses higher).");
+  if(has("92507") && advDisc.OT && !picked.some(p=>p.disc==="OT")) hints.push("OT discipline is on but no OT services are ticked — if OT also treated today, its codes bill separately under GO.");
+  if(has("97530") && (picked.find(p=>p.code==="97530").minutes||0)>=38 && codesPicked.filter(c=>codeMap[c].disc==="OT"&&codeMap[c].timed).length===1)
+    hints.push("All OT minutes are on 97530. If part of the session was ADL/self-care (97535), exercise (97110), or sensory integration (97533), splitting minutes to the accurate codes is better documentation — and some pay differently.");
+  if(has("92607")) hints.push("SGD evals over an hour: bill 92608 for each additional 30 minutes — commonly missed.");
+  if(has("92526") && has("92507")) hints.push("If feeding and speech were ONE continuous session, bill only the code matching the primary service — 59 is only for genuinely separate sessions.");
+
+  // Build result lines
+  const lines = picked.map(p=>{
+    const c = codeMap[p.code];
+    let units;
+    if(p.fixedUnits!==undefined) units=p.fixedUnits;
+    else if(c.timed && c.unit==="15 min") units = unitsByCode[p.code]||0;
+    else units = 1;
+    const mods=[];
+    mods.push(p.disc==="ST"?"GN":"GO");
+    if(modBy59.has(p.code)) mods.push("59*");
+    if(advTele) mods.push("95");
+    if(advHab) mods.push("96");
+    const st = pObj ? cell(pObj.id, p.code) : {s:"unk"};
+    const stats = logStats(payer, p.code);
+    return {code:p.code, name:c.name, disc:p.disc, minutes:p.minutes, units, mods, cov:st.s, rate:st.rate, stats};
+  }).filter(l=>l.units>0 || l.minutes===null || l.minutes===undefined || l.minutes>0);
+
+  const covWarn = lines.filter(l=>l.cov==="no");
+  covWarn.forEach(l=>alerts.push({cls:"bad", txt:`${l.code} is marked NOT COVERED by ${payer} in your Payer Matrix.`}));
+  lines.filter(l=>l.cov==="pa").forEach(l=>alerts.push({cls:"warn", txt:`${l.code} requires PRIOR AUTH from ${payer} — confirm an auth is on file before the visit is billed.`}));
+  lines.filter(l=>l.cov==="unk").forEach(l=>hints.push(`${l.code}: coverage for ${payer} is Unknown in your matrix — verify once, set it, and this warning goes away.`));
+
+  const fusionTxt = lines.filter(l=>l.units>0).map(l=>`${l.code}${l.mods.length?" "+l.mods.join(" "):""} ×${l.units}`).join("  |  ");
+
+  R.innerHTML = `<div class="resultbox">
+    <h3 style="margin-top:0">Billable codes for this session</h3>
+    ${cogNote?`<p class="note">${esc(cogNote)}</p>`:""}
+    <div class="scrollwrap" style="margin:8px 0"><table>
+      <thead><tr><th>Code</th><th>Disc.</th><th>Minutes</th><th>Units</th><th>Modifiers</th><th>${esc(payer)} coverage</th><th>Your history</th></tr></thead>
+      <tbody>${lines.map(l=>`<tr>
+        <td><b>${l.code}</b><br><span class="note">${esc(l.name)}</span></td>
+        <td><span class="badge ${l.disc==="ST"?"b-st":"b-ot"}">${l.disc}</span></td>
+        <td>${l.minutes!=null?l.minutes:"—"}</td>
+        <td><b>${l.units}</b></td>
+        <td>${l.mods.join(", ")}</td>
+        <td>${statusBadge(l.cov)}${l.rate?`<br><span class="note">$${esc(l.rate)}</span>`:""}</td>
+        <td class="statline">${l.stats.ok||l.stats.no?`<span class="ok">✓${l.stats.ok}</span> <span class="no">✗${l.stats.no}</span>`:'<span class="note">no log yet</span>'}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+    ${emr.total? `<p class="note"><b>8-minute rule:</b> ${emr.total} total timed minutes → <b>${emr.totalUnits} units</b> allowed across timed 15-min codes (allocated largest-remainder first).</p>`:""}
+    <p class="note">* 59 = only when the services were genuinely separate sessions with separate documentation. GN = speech plan of care, GO = OT plan of care.</p>
+    ${alerts.map(a=>`<div class="alert ${a.cls}">${esc(a.txt)}</div>`).join("")}
+    ${hints.length?`<div class="alert info"><b>Don't leave money on the table:</b><ul style="margin:4px 0 0 18px">${hints.map(h=>`<li>${esc(h)}</li>`).join("")}</ul></div>`:""}
+    <h3>Enter into Fusion</h3>
+    <div class="copybox" id="fusionLine">${esc(fusionTxt||"— nothing billable yet —")}</div>
+    <div style="margin-top:8px"><button class="btn secondary small" id="btnCopyFusion">Copy line</button></div>
+  </div>`;
+  const cp=document.getElementById("btnCopyFusion");
+  if(cp) cp.onclick=()=>{ navigator.clipboard.writeText(fusionTxt).then(()=>{cp.textContent="Copied ✓"; setTimeout(()=>cp.textContent="Copy line",1500);}); };
+};
+
+/* ══════════════════ CODE LIBRARY ══════════════════ */
+let codeFilter="ALL";
+function renderCodes(){
+  const q=(document.getElementById("codeSearch").value||"").toLowerCase();
+  const tb=document.querySelector("#codeTable tbody");
+  tb.innerHTML = CODES.filter(c=>{
+    if(codeFilter==="ST"&&c.disc==="OT") return false;
+    if(codeFilter==="OT"&&c.disc==="ST") return false;
+    if(codeFilter==="EVAL"&&!c.eval) return false;
+    if(q && !(c.code.includes(q)||c.name.toLowerCase().includes(q)||c.desc.toLowerCase().includes(q))) return false;
+    return true;
+  }).map(c=>`<tr>
+    <td><b>${c.code}</b></td>
+    <td>${c.disc==="BOTH"?'<span class="badge b-st">ST</span> <span class="badge b-ot">OT</span>':`<span class="badge ${c.disc==="ST"?"b-st":"b-ot"}">${c.disc}</span>`}</td>
+    <td>${esc(c.name)}</td>
+    <td><span class="badge ${c.timed?"b-timed":"b-untimed"}">${c.timed?"Timed":"Untimed"}</span><br><span class="note">${esc(c.unit)}</span></td>
+    <td class="note" style="color:var(--ink)">${esc(c.desc)}</td>
+  </tr>`).join("");
+}
+document.getElementById("codeSearch").addEventListener("input", renderCodes);
+document.querySelectorAll("[data-cf]").forEach(b=>b.addEventListener("click", ()=>{
+  codeFilter=b.dataset.cf;
+  document.querySelectorAll("[data-cf]").forEach(x=>x.classList.toggle("on",x===b));
+  renderCodes();
+}));
+
+/* ══════════════════ PAYER MATRIX ══════════════════ */
+function renderMatrix(){
+  const thead=document.querySelector("#matrixTable thead");
+  const tbody=document.querySelector("#matrixTable tbody");
+  thead.innerHTML = `<tr><th style="min-width:210px">Code</th>${payers.map(p=>
+    `<th style="min-width:150px">${esc(p.name)}${p.loc!=="BOTH"?`<br><span style="font-weight:400;text-transform:none">${esc(locName(p.loc))}</span>`:""}
+     <br><button class="btn danger small" data-delpayer="${p.id}" style="margin-top:4px">remove</button></th>`).join("")}</tr>`;
+  tbody.innerHTML = CODES.map(c=>`<tr>
+    <td><b>${c.code}</b> <span class="badge ${c.disc==="OT"?"b-ot":"b-st"}">${c.disc}</span><br><span class="note">${esc(c.name)}</span></td>
+    ${payers.map(p=>{
+      const st=cell(p.id,c.code); const stats=logStats(p.name,c.code);
+      return `<td class="matrix-cell">
+        <select data-mx="${p.id}|${c.code}">
+          <option value="unk" ${st.s==="unk"?"selected":""}>Unknown</option>
+          <option value="cov" ${st.s==="cov"?"selected":""}>Covered</option>
+          <option value="pa"  ${st.s==="pa" ?"selected":""}>Prior auth</option>
+          <option value="no"  ${st.s==="no" ?"selected":""}>Not covered</option>
+        </select>
+        <input type="text" data-mxr="${p.id}|${c.code}" placeholder="rate $" value="${esc(st.rate)}">
+        ${stats.ok||stats.no?`<div class="statline"><span class="ok">✓${stats.ok} paid</span> · <span class="no">✗${stats.no} denied</span></div>`:""}
+      </td>`;
+    }).join("")}
+  </tr>`).join("");
+  tbody.querySelectorAll("[data-mx]").forEach(sel=>sel.addEventListener("change",()=>{
+    const [pid,code]=sel.dataset.mx.split("|"); setCell(pid,code,{s:sel.value});
+  }));
+  tbody.querySelectorAll("[data-mxr]").forEach(inp=>inp.addEventListener("change",()=>{
+    const [pid,code]=inp.dataset.mxr.split("|"); setCell(pid,code,{rate:inp.value.replace(/[^0-9.]/g,"")});
+  }));
+  thead.querySelectorAll("[data-delpayer]").forEach(b=>b.addEventListener("click",()=>{
+    const p=payers.find(x=>x.id===b.dataset.delpayer);
+    if(!confirm(`Remove payer "${p.name}" and its coverage settings?`)) return;
+    payers=payers.filter(x=>x.id!==p.id); delete matrix[p.id];
+    save(LS.payers,payers); save(LS.matrix,matrix); refreshAll();
+  }));
+}
+document.getElementById("btnAddPayer").onclick=()=>{
+  const name=document.getElementById("newPayerName").value.trim();
+  if(!name) return alert("Enter a payer name.");
+  payers.push({id:"p"+Date.now(), name, loc:document.getElementById("newPayerLoc").value});
+  save(LS.payers,payers);
+  document.getElementById("newPayerName").value="";
+  refreshAll();
+};
+
+/* ══════════════════ COMBO CHECKER ══════════════════ */
+function comboVerdictBadge(level){
+  return level==="never"?'<span class="badge b-no">Never together</span>'
+       : level==="edit" ?'<span class="badge b-pa">Needs mod 59 + distinct sessions</span>'
+       : level==="caution"?'<span class="badge b-pa">Payer-dependent</span>'
+       : '<span class="badge b-cov">OK together</span>';
+}
+function renderComboTools(){
+  const opts = CODES.map(c=>`<option value="${c.code}">${c.code} — ${esc(c.name)}</option>`).join("");
+  document.getElementById("comboA").innerHTML=opts;
+  document.getElementById("comboB").innerHTML=opts;
+  document.querySelector("#comboTable tbody").innerHTML = COMBOS.map(c=>`<tr>
+    <td><b>${c.a}</b> + <b>${c.b}</b><br><span class="note">${esc(codeMap[c.a].name)} / ${esc(codeMap[c.b].name)}</span></td>
+    <td>${comboVerdictBadge(c.level)}</td><td>${esc(c.note)}</td></tr>`).join("");
+}
+document.getElementById("btnCombo").onclick=()=>{
+  const a=document.getElementById("comboA").value, b=document.getElementById("comboB").value;
+  const R=document.getElementById("comboResult");
+  if(a===b){ R.innerHTML=`<div class="alert warn">Pick two different codes.</div>`; return; }
+  const cb=comboFor(a,b);
+  if(!cb){ R.innerHTML=`<div class="alert info"><b>${a} + ${b}:</b> no known NCCI edit between these. Cross-discipline pairs (ST+OT) are generally fine with GN/GO and separate times; same-discipline timed codes need separate, non-overlapping minutes. If a payer denies this pair, log it — that's your real answer.</div>`; return; }
+  const cls = cb.level==="never"?"bad":cb.level==="ok"?"good":"warn";
+  R.innerHTML=`<div class="alert ${cls}"><b>${cb.a} + ${cb.b}</b> — ${comboVerdictBadge(cb.level)}<br>${esc(cb.note)}</div>`;
+};
+
+/* ══════════════════ DENIAL LOG ══════════════════ */
+function renderDenials(){
+  const fp=document.getElementById("dFilterPayer").value;
+  const fo=document.getElementById("dFilterOutcome").value;
+  const rows=denials.filter(d=>(!fp||d.payer===fp)&&(!fo||d.outcome===fo)).sort((a,b)=>b.date.localeCompare(a.date));
+  document.querySelector("#denialTable tbody").innerHTML = rows.map(d=>`<tr>
+    <td>${esc(d.date)}</td><td>${esc(locName(d.loc))}</td><td>${esc(d.payer)}</td><td>${esc(d.client)}</td>
+    <td><b>${d.codes.map(esc).join(", ")}</b></td>
+    <td>${d.outcome==="paid"?'<span class="badge b-cov">Paid</span>':d.outcome==="denied"?'<span class="badge b-no">Denied</span>':'<span class="badge b-pa">Partial</span>'}</td>
+    <td class="note" style="color:var(--ink)">${esc(d.reason)}</td>
+    <td><button class="btn danger small" data-deld="${d.id}">✕</button></td>
+  </tr>`).join("") || `<tr><td colspan="8" class="note">No entries yet.</td></tr>`;
+  document.querySelectorAll("[data-deld]").forEach(b=>b.addEventListener("click",()=>{
+    denials=denials.filter(x=>x.id!==b.dataset.deld); save(LS.denials,denials); refreshAll();
+  }));
+  const paid=denials.filter(d=>d.outcome==="paid").length,
+        den =denials.filter(d=>d.outcome==="denied").length,
+        part=denials.filter(d=>d.outcome==="partial").length;
+  document.getElementById("denKpi").innerHTML=`
+    <div class="k"><div class="n">${denials.length}</div><div class="l">Logged claims</div></div>
+    <div class="k"><div class="n" style="color:var(--good)">${paid}</div><div class="l">Paid in full</div></div>
+    <div class="k"><div class="n" style="color:var(--warn)">${part}</div><div class="l">Partial</div></div>
+    <div class="k"><div class="n" style="color:var(--bad)">${den}</div><div class="l">Denied</div></div>`;
+}
+document.getElementById("btnAddDenial").onclick=()=>{
+  const date=document.getElementById("dDate").value;
+  const codes=document.getElementById("dCodes").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
+  if(!date||!codes.length) return alert("Need at least a date and one code.");
+  denials.push({
+    id:"d"+Date.now(), date,
+    loc:document.getElementById("dLoc").value,
+    payer:document.getElementById("dPayer").value,
+    client:document.getElementById("dClient").value.trim(),
+    codes, outcome:document.getElementById("dOutcome").value,
+    reason:document.getElementById("dReason").value.trim()
+  });
+  save(LS.denials,denials);
+  document.getElementById("dCodes").value=""; document.getElementById("dReason").value=""; document.getElementById("dClient").value="";
+  refreshAll();
+};
+document.getElementById("dFilterPayer").addEventListener("change",renderDenials);
+document.getElementById("dFilterOutcome").addEventListener("change",renderDenials);
+
+/* ══════════════════ SETTINGS / BACKUP ══════════════════ */
+function renderSettings(){
+  document.getElementById("setName").value=settings.name;
+  document.getElementById("setLoc1").value=settings.loc1;
+  document.getElementById("setLoc2").value=settings.loc2;
+  document.getElementById("hdrName").textContent=settings.name;
+}
+document.getElementById("btnSaveSettings").onclick=()=>{
+  settings={name:document.getElementById("setName").value.trim()||"Hopes and Dreams Speech Therapy",
+            loc1:document.getElementById("setLoc1").value.trim()||"Location 1",
+            loc2:document.getElementById("setLoc2").value.trim()||"Location 2"};
+  save(LS.settings,settings); refreshAll();
+};
+document.getElementById("btnExport").onclick=()=>{
+  const blob=new Blob([JSON.stringify({settings,payers,matrix,denials,exported:new Date().toISOString(),app:"hd_billing_tool"},null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="hopes_dreams_billing_backup_"+new Date().toISOString().slice(0,10)+".json"; a.click();
+};
+document.getElementById("btnImport").onclick=()=>document.getElementById("importFile").click();
+document.getElementById("importFile").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{
+    const d=JSON.parse(r.result);
+    if(d.app!=="hd_billing_tool") throw new Error("Not a Hopes and Dreams backup file.");
+    if(!confirm("Import will REPLACE all current data in this browser. Continue?")) return;
+    settings=d.settings; payers=d.payers; matrix=d.matrix; denials=d.denials;
+    save(LS.settings,settings); save(LS.payers,payers); save(LS.matrix,matrix); save(LS.denials,denials);
+    refreshAll(); alert("Backup imported.");
+  }catch(err){ alert("Import failed: "+err.message); } };
+  r.readAsText(f); e.target.value="";
+});
+document.getElementById("btnWipe").onclick=()=>{
+  if(!confirm("Erase ALL saved data (payers, matrix, denial log, settings) from this browser?")) return;
+  Object.values(LS).forEach(k=>localStorage.removeItem(k));
+  location.reload();
+};
+
+/* ══════════════════ REFRESH ══════════════════ */
+function refreshAll(){
+  renderSettings();
+  locOptions(document.getElementById("advLoc"));
+  locOptions(document.getElementById("dLoc"));
+  locOptions(document.getElementById("newPayerLoc"),"Both locations");
+  payerOptions(document.getElementById("advPayer"));
+  payerOptions(document.getElementById("dPayer"));
+  payerOptions(document.getElementById("dFilterPayer"),true);
+  renderCodes(); renderMatrix(); renderComboTools(); renderDenials();
+}
+renderServices();
+refreshAll();
+const today=new Date(); const iso=today.toISOString().slice(0,10);
+document.getElementById("advDate").value=iso;
+document.getElementById("dDate").value=iso;
+</script>
+</body>
+</html>
