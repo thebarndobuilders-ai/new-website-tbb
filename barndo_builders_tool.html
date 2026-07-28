@@ -2158,7 +2158,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v177</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v178</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3818,6 +3818,7 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
           <button onclick="wxSetLocation()" style="font-size:11px;" title="Pulls a 16-day forecast (needs internet) and flags rain risk on outdoor phases">⛅ Set</button>
         </span>
       </div>
+      <div id="wx-forecast" style="margin-bottom:8px;"></div>
       <div id="wx-warnings" style="margin-bottom:10px;"></div>
       <div id="sched-digest" style="margin-bottom:14px;"></div>
       <div id="sched-builds"></div>
@@ -7319,7 +7320,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v177';
+const BB_VERSION = 'v178';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -7698,11 +7699,11 @@ async function wxFetch() {
   if (!wxLoc) return;
   try {
     const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + wxLoc.lat + '&longitude=' + wxLoc.lon +
-      '&daily=precipitation_probability_max,temperature_2m_max,temperature_2m_min&forecast_days=16&temperature_unit=fahrenheit&timezone=auto';
+      '&daily=precipitation_probability_max,temperature_2m_max,temperature_2m_min,weathercode&forecast_days=16&temperature_unit=fahrenheit&timezone=auto';
     const d = await (await fetch(u)).json();
     wxDays = {};
     ((d.daily && d.daily.time) || []).forEach((iso, k) => {
-      wxDays[iso] = { pp: d.daily.precipitation_probability_max[k] || 0, tmax: Math.round(d.daily.temperature_2m_max[k]), tmin: Math.round(d.daily.temperature_2m_min[k]) };
+      wxDays[iso] = { pp: d.daily.precipitation_probability_max[k] || 0, tmax: Math.round(d.daily.temperature_2m_max[k]), tmin: Math.round(d.daily.temperature_2m_min[k]), code: (d.daily.weathercode || [])[k] };
     });
   } catch (e) { /* offline — leave wxDays empty */ }
 }
@@ -7723,7 +7724,46 @@ function wxRainRisks() {
   });
   return risks.sort((a, b) => a.date.localeCompare(b.date));
 }
+// WMO weather code → icon + short label
+function wxIcon(code) {
+  if (code === 0) return ['☀️', 'Sunny'];
+  if (code === 1 || code === 2) return ['🌤', 'Partly cloudy'];
+  if (code === 3) return ['☁️', 'Cloudy'];
+  if (code === 45 || code === 48) return ['🌫', 'Fog'];
+  if (code >= 51 && code <= 57) return ['🌦', 'Drizzle'];
+  if (code >= 61 && code <= 67) return ['🌧', 'Rain'];
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return ['🌨', 'Snow'];
+  if (code >= 80 && code <= 82) return ['🌧', 'Showers'];
+  if (code >= 95) return ['⛈', 'Storms'];
+  return ['·', ''];
+}
+// Full 16-day forecast strip — one card per day, rain-risk days ringed blue.
+function renderWxForecast() {
+  const box = document.getElementById('wx-forecast'); if (!box) return;
+  const days = Object.keys(wxDays).sort();
+  if (!wxLoc || !days.length) { box.innerHTML = ''; return; }
+  const today = sdISO(new Date());
+  const cards = days.map(iso => {
+    const w = wxDays[iso];
+    const d = sdParse(iso);
+    const [icon, lbl] = wxIcon(w.code);
+    const risky = w.pp >= 50;
+    return `<div title="${lbl} · ${w.pp}% rain" style="flex:0 0 auto; min-width:74px; text-align:center; padding:8px 6px; border-radius:8px;
+        background:${risky ? 'rgba(30,123,255,0.14)' : 'var(--surface-2)'};
+        border:1px solid ${risky ? 'rgba(30,123,255,0.65)' : (iso === today ? 'var(--copper)' : 'var(--hairline)')};">
+      <div style="font-size:10px; color:var(--text-3); text-transform:uppercase;">${d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+      <div style="font-family:var(--font-mono); font-size:11px; color:var(--text-2);">${d.getMonth() + 1}/${d.getDate()}</div>
+      <div style="font-size:20px; line-height:1.35;">${icon}</div>
+      <div style="font-family:var(--font-mono); font-size:12px;"><b>${w.tmax}°</b> <span style="color:var(--text-3);">${w.tmin}°</span></div>
+      <div style="font-family:var(--font-mono); font-size:11px; color:${risky ? '#7db5ff' : 'var(--text-3)'};">💧${w.pp}%</div>
+    </div>`;
+  }).join('');
+  box.innerHTML = `
+    <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--copper); margin-bottom:4px;">16-day forecast — ${wxLoc.name} <span style="color:var(--text-3); text-transform:none; letter-spacing:0;">(blue ring = 50%+ rain)</span></div>
+    <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:4px;">${cards}</div>`;
+}
 function renderWxWarnings() {
+  try { renderWxForecast(); } catch (e) {}
   const box = document.getElementById('wx-warnings'); if (!box) return;
   const locEl = document.getElementById('wx-loc');
   if (locEl && wxLoc && !locEl.value) locEl.value = wxLoc.name;
