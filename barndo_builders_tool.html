@@ -2160,7 +2160,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v180</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v181</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -7322,7 +7322,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v180';
+const BB_VERSION = 'v181';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17816,9 +17816,13 @@ if (typeof origSwitchTab === 'function') {
       // SCREEN shows nothing. Keeping the backing store small fixes that class
       // of failure for good; zoom level itself is unlimited by canvas size.
       const base = page.getViewport({ scale: 1 });
+      // 4096x4096 (16.7M px) is the universal GPU texture floor — every card
+      // made since ~2008 composites it. 48M px still failed on the builder's
+      // machine, so the backing store now never exceeds this; CSS scaling
+      // carries all remaining zoom.
       const pixCap = Math.max(0.25, Math.min(8,
-        Math.sqrt(48000000 / Math.max(1, base.width * base.height)),
-        10000 / base.width, 10000 / base.height));
+        Math.sqrt(16000000 / Math.max(1, base.width * base.height)),
+        4096 / base.width, 4096 / base.height));
       TO.pixelScale = Math.min(TO.renderScale, pixCap);
       const vp = page.getViewport({ scale: TO.pixelScale });
       TO.vp = vp;
