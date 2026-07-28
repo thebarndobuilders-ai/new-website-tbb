@@ -2116,6 +2116,41 @@
 #tab-calcs .qbs-note { font-size: 13px; }
 </style>
 
+<!-- Script-error alarm: registered before every other script so ANY error —
+     including a parse error from a corrupted/truncated download — shows a
+     visible red banner instead of silently killing features. -->
+<script>
+(function () {
+  var shown = 0;
+  function bbShowError(msg) {
+    try {
+      if (shown >= 3) return;   // don't stack endlessly
+      shown++;
+      var d = document.createElement('div');
+      d.style.cssText = 'position:fixed;top:' + ((shown - 1) * 58) + 'px;left:0;right:0;z-index:2147483647;background:#7f1d1d;color:#fff;font:600 13px/1.4 Arial,sans-serif;padding:9px 14px;border-bottom:2px solid #ef4444;';
+      d.textContent = '⚠ SCRIPT ERROR — this copy of the file is damaged or failed to load. Tell Claude: ' + msg;
+      var x = document.createElement('span');
+      x.textContent = '  ✕';
+      x.style.cssText = 'float:right;cursor:pointer;';
+      x.onclick = function () { d.remove(); };
+      d.appendChild(x);
+      (document.body || document.documentElement).appendChild(d);
+    } catch (e) {}
+  }
+  window.addEventListener('error', function (e) {
+    var m = (e.message || 'unknown error') + (e.lineno ? ' @ line ' + e.lineno : '');
+    // ignore benign resource-load errors (fonts, supabase CDN offline)
+    if (e.target && e.target !== window && !e.message) return;
+    bbShowError(m);
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason; var m = (r && (r.message || String(r))) || 'unhandled promise rejection';
+    // network fetch rejections (weather offline etc.) are expected — skip
+    if (/fetch|network|Failed to load/i.test(m)) return;
+    bbShowError(m);
+  });
+})();
+</script>
 <!-- Supabase JS SDK (loaded before the main app script) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -2160,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v181</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v182</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -7322,7 +7357,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v181';
+const BB_VERSION = 'v182';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
