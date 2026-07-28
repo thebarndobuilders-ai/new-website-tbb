@@ -5394,6 +5394,9 @@ const MATERIALS = [
     priceCost: 16, priceSell: 22,
     formula: i => {
       if (i.roofProduct === 'shingles') return 0;
+      // Metal siding jobs get the large outside-corner rake trim instead
+      // (large_corner_gable_custom) — never bill both for the same rakes.
+      if (i.sidingProduct === 'tuffrib_29' || i.sidingProduct === 'mbb_26') return 0;
       // Full rake length (eave corner to ridge), truss-table aware
       const rakeLength = rakeTrimRunFt(i);
       if (rakeLength <= 0) return 0;
