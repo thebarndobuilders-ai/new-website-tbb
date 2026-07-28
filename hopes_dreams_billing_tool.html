@@ -180,6 +180,7 @@
   <div class="card">
     <h2>Same-Day Combination Checker</h2>
     <p class="note">Pick two codes to see whether they can be billed on the same date of service, and what it takes (distinct sessions, modifier 59). These reflect common NCCI edits and general payer behavior — your Denial Log is the final word for each payer.</p>
+    <div style="margin:10px 0"><button class="btn secondary" id="btnCheat">🖨 Print ST same-day cheat sheet</button> <span class="note">one page — pin it at each front desk</span></div>
     <div class="grid g3" style="margin:10px 0">
       <div><label class="fld">Code A</label><select id="comboA"></select></div>
       <div><label class="fld">Code B</label><select id="comboB"></select></div>
@@ -362,6 +363,11 @@ const COMBOS = [
   {a:"92523", b:"92507", level:"caution", note:"Eval + treatment on the same day is allowed by CPT but many payers (esp. Medicaid) pay only the eval on day one. Check your matrix / log."},
   {a:"92610", b:"92526", level:"caution", note:"Swallow eval + swallow treatment same day: allowed when documented as distinct, but several payers bundle. Verify per payer."},
   {a:"92607", b:"92608", level:"ok",   note:"92608 is the designed add-on: one unit per additional 30 min of the SGD eval beyond the first hour."},
+  {a:"92605", b:"92607", level:"edit", note:"Low-tech AAC eval + SGD eval the same session: generally treated as one AAC evaluation — bill the code matching the device direction you're recommending. Both only if two genuinely distinct evals were performed and documented (mod 59), and expect payer pushback."},
+  {a:"92607", b:"92507", level:"edit", note:"NCCI bundles routine speech treatment into the SGD eval on the same day. A truly separate treatment session (separate time, separate note) may pay with 59 on 92507 — several payers deny regardless. Safest: eval day is eval day."},
+  {a:"92607", b:"92523", level:"caution", note:"Speech-language eval + SGD eval same day: two different assessment domains, both billable when both were fully performed and separately documented. Some payers cap at one eval per day — verify and log."},
+  {a:"92607", b:"92609", level:"edit", note:"SGD eval + SGD programming/training the same day generally bundles (the eval includes device trial/setup). Distinct later session with 59 may pay on some payers."},
+  {a:"92605", b:"92523", level:"caution", note:"Speech-language eval + non-SGD AAC eval same day: different domains, both billable when both are real, separately documented evals. Payer one-eval-per-day caps apply — verify."},
   {a:"97129", b:"97130", level:"ok",   note:"97130 is the add-on to 97129 — one unit per additional 15 minutes of cognitive intervention."},
   {a:"97165", b:"97530", level:"edit", note:"NCCI edit: OT eval + therapeutic activities same day needs modifier 59 on 97530 and distinct documentation. Same applies to 97166/97167."},
   {a:"97166", b:"97530", level:"edit", note:"NCCI edit — modifier 59 on 97530 with distinct documentation."},
@@ -706,6 +712,66 @@ document.getElementById("btnCombo").onclick=()=>{
   if(!cb){ R.innerHTML=`<div class="alert info"><b>${a} + ${b}:</b> no known NCCI edit between these. Cross-discipline pairs (ST+OT) are generally fine with GN/GO and separate times; same-discipline timed codes need separate, non-overlapping minutes. If a payer denies this pair, log it — that's your real answer.</div>`; return; }
   const cls = cb.level==="never"?"bad":cb.level==="ok"?"good":"warn";
   R.innerHTML=`<div class="alert ${cls}"><b>${cb.a} + ${cb.b}</b> — ${comboVerdictBadge(cb.level)}<br>${esc(cb.note)}</div>`;
+};
+
+/* ══════════════════ ST CHEAT SHEET (printable) ══════════════════ */
+document.getElementById("btnCheat").onclick = ()=>{
+  const w = window.open("", "_blank");
+  w.document.write(`<!DOCTYPE html><html><head><title>ST Same-Day Billing Cheat Sheet</title><style>
+    body{font-family:"Segoe UI",system-ui,sans-serif;font-size:12px;color:#1f2933;margin:24px;line-height:1.35}
+    h1{font-size:17px;color:#0a5c5b;margin-bottom:2px}
+    .sub{font-size:11px;color:#5f6b76;margin-bottom:10px}
+    h2{font-size:13px;color:#6b5b95;margin:10px 0 4px;border-bottom:1px solid #d9e2e8;padding-bottom:2px}
+    table{width:100%;border-collapse:collapse;margin-bottom:6px}
+    th{background:#e6f4f4;color:#0a5c5b;text-align:left;padding:3px 6px;font-size:10.5px}
+    td{padding:3px 6px;border-bottom:1px solid #e6ecef;vertical-align:top}
+    .y{color:#1a7f37;font-weight:700}.m{color:#9a6700;font-weight:700}.n{color:#b3261e;font-weight:700}
+    .box{border:1.5px solid #0e7c7b;border-radius:8px;padding:7px 10px;margin:8px 0;background:#f2f9f9}
+    .foot{font-size:10px;color:#5f6b76;margin-top:10px;border-top:1px solid #d9e2e8;padding-top:6px}
+    ul{margin:2px 0 4px 16px}li{margin-bottom:2px}
+    @media print{body{margin:10mm}}
+  </style></head><body>
+  <h1>${esc(settings.name)} — ST Same-Day Billing Cheat Sheet</h1>
+  <div class="sub">Speech codes, one client, one date of service · GN on every ST code · 59 only for genuinely separate sessions with separate notes</div>
+
+  <h2>Treatment day</h2>
+  <table>
+    <tr><th>Combo</th><th>Verdict</th><th>Rule</th></tr>
+    <tr><td>92507 alone</td><td class="y">STANDARD</td><td>1 unit regardless of session length (untimed)</td></tr>
+    <tr><td>92507 + 92526 (speech + feeding)</td><td class="m">MOD 59</td><td>Only as two separate documented sessions; 59 on 92526. One mixed session = bill the primary code only.</td></tr>
+    <tr><td>97129 + 97130 (cognitive)</td><td class="y">YES</td><td>Designed pair — 40 min = 97129 ×1 + 97130 ×2</td></tr>
+    <tr><td>92507 + 97129 (same clinician)</td><td class="n">AVOID</td><td>NCCI pair — usually denies even with 59. Different days is safest.</td></tr>
+    <tr><td>92507 + 92508 (indiv + group)</td><td class="n">NEVER</td><td>Pick the one that matches the session</td></tr>
+    <tr><td>92522 + 92523</td><td class="n">NEVER</td><td>92523 includes speech sound testing — bill 92523 alone (pays more)</td></tr>
+  </table>
+
+  <h2>Evaluation day — different domains stack</h2>
+  <table>
+    <tr><th>Combo</th><th>Verdict</th><th>Rule</th></tr>
+    <tr><td>92523 + 92524 / 92521 / 92610</td><td class="y">YES</td><td>Each is a different assessment domain (language · voice · fluency · swallowing) — bill each eval actually performed &amp; documented. Some payers cap 1 eval/day — check matrix.</td></tr>
+    <tr><td>92607 + 92608 (SGD eval &gt; 1 hr)</td><td class="y">YES</td><td>92608 = each additional 30 min. 2-hr AAC eval = 92607 ×1 + 92608 ×2. MOST-MISSED MONEY.</td></tr>
+    <tr><td>92523 + 92607 (lang eval + SGD eval)</td><td class="m">PAYER</td><td>Both billable as distinct documented evals; some payers cap 1 eval/day</td></tr>
+    <tr><td>92605 + 92607 (low-tech + SGD eval)</td><td class="m">MOD 59</td><td>Usually one AAC eval — bill the code matching the recommended device. Both only if truly two distinct evals.</td></tr>
+    <tr><td>92607 + 92507 (SGD eval + treatment)</td><td class="m">MOD 59</td><td>Treatment bundles into the eval same day — separate session + 59 may pay; many deny. Eval day = eval day.</td></tr>
+    <tr><td>92607 + 92609 (eval + programming)</td><td class="m">MOD 59</td><td>Programming bundles into the eval same day</td></tr>
+    <tr><td>Eval + treatment (92523 + 92507)</td><td class="m">PAYER</td><td>Many Medicaid plans pay only the eval on day one</td></tr>
+  </table>
+
+  <div class="box"><b>Don't leave money on the table — the big four:</b>
+    <ul>
+      <li>Feeding session? That's <b>92526</b>, not 92507.</li>
+      <li>Language assessed in the eval? That's <b>92523</b>, not 92522.</li>
+      <li>AAC eval ran past an hour? Add <b>92608</b> per extra 30 min.</li>
+      <li>Cognitive session past 22 min? Add <b>97130</b> per extra 15 min.</li>
+    </ul>
+  </div>
+
+  <h2>Adding OT the same day</h2>
+  <table><tr><td>Any ST codes + any OT codes (97530, 97535, 97165-67…)</td><td class="y">YES</td><td>Different disciplines: GN on ST, GO on OT, separate times. Co-treatment time bills once, one discipline.</td></tr></table>
+
+  <div class="foot">Codes must reflect services actually delivered and documented. NCCI edits &amp; payer rules change quarterly — when this sheet and current payer policy disagree, payer policy wins. Log every approval/denial in the Billing Code Advisor so the matrix learns. Printed ${new Date().toLocaleDateString()}.</div>
+  <script>window.print()<\/script></body></html>`);
+  w.document.close();
 };
 
 /* ══════════════════ DENIAL LOG ══════════════════ */
