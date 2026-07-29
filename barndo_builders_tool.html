@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v192</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v193</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -4068,6 +4068,99 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
       <div id="st_results" style="margin-top:12px;"></div>
       <div class="qbs-note" style="margin-top:8px;">Model follows vCalc "Studs for a Wall": studs = (L ÷ spacing) + 1, rounded up. Field studs for ONE straight wall — corners, T-intersections, and opening king/jack studs are extra. Plate rows shown for convenience (vCalc excludes them).</div>
     </div>
+
+    <!-- ── Concrete Slab (vCalc-style) ───────────────────────────────── -->
+    <div class="qbs-card" style="margin-top:20px;">
+      <h3>Concrete Slab <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field"><label>(L) Slab length (ft)</label><input type="number" id="cs_len" value="60" step="0.5" oninput="csCalc()" /></div>
+        <div class="qbs-field"><label>(W) Slab width (ft)</label><input type="number" id="cs_wid" value="40" step="0.5" oninput="csCalc()" /></div>
+        <div class="qbs-field"><label>(T) Thickness (in)</label><input type="number" id="cs_thk" value="4" step="0.5" oninput="csCalc()" /></div>
+        <div class="qbs-field"><label>Waste / over-order (%)</label><input type="number" id="cs_waste" value="5" step="1" oninput="csCalc()" /></div>
+        <div class="qbs-field"><label>Rebar grid spacing (in, 0 = mesh instead)</label><input type="number" id="cs_rebar" value="0" step="1" oninput="csCalc()" /></div>
+      </div>
+      <div id="cs_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">Model follows vCalc "Concrete Slab": volume = L × W × T, returned in yd³ plus 40/60/80&nbsp;lb bag equivalents (0.30 / 0.45 / 0.60 ft³ per bag) and form-board LF (perimeter). Mesh = 5×10 sheets ÷ 42&nbsp;ft² effective; rebar = grid at your spacing +10% laps.</div>
+    </div>
+
+    <!-- ── Post Hole Concrete (vCalc-style) ──────────────────────────── -->
+    <div class="qbs-card" style="margin-top:20px;">
+      <h3>Post Hole Concrete — embedded posts <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field"><label>(N) Number of holes</label><input type="number" id="ph_n" value="24" step="1" oninput="phCalc()" /></div>
+        <div class="qbs-field"><label>(D) Hole diameter (in)</label><input type="number" id="ph_dia" value="18" step="1" oninput="phCalc()" /></div>
+        <div class="qbs-field"><label>(H) Hole depth (ft)</label><input type="number" id="ph_dep" value="4" step="0.5" oninput="phCalc()" /></div>
+        <div class="qbs-field"><label>Post size (in × in)</label>
+          <div style="display:flex; gap:6px;"><input type="number" id="ph_pw" value="6" step="1" oninput="phCalc()" style="width:70px;" /><span style="align-self:center;">×</span><input type="number" id="ph_pd" value="6" step="1" oninput="phCalc()" style="width:70px;" /></div>
+        </div>
+        <div class="qbs-field"><label>Concrete fill depth (ft, ≤ hole depth)</label><input type="number" id="ph_fill" value="2" step="0.5" oninput="phCalc()" /></div>
+      </div>
+      <div id="ph_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">Standard post-hole model (vCalc form): fill volume = hole cylinder − post displacement over the fill depth, × number of holes. Returned in yd³ and 50 / 60 / 80&nbsp;lb bag counts (0.375 / 0.45 / 0.60 ft³ per bag), rounded up per HOLE so no hole comes up short.</div>
+    </div>
+
+    <!-- ── Rafter Length (vCalc model) ───────────────────────────────── -->
+    <div class="qbs-card" style="margin-top:20px;">
+      <h3>Rafter Length <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field"><label>(S) Building span (ft)</label><input type="number" id="rf_span" value="40" step="0.5" oninput="rfCalc()" /></div>
+        <div class="qbs-field"><label>(P) Pitch</label>
+          <select id="rf_pitch" onchange="rfCalc()">
+            <option value="1">1/12</option><option value="2">2/12</option><option value="3">3/12</option>
+            <option value="4" selected>4/12</option><option value="5">5/12</option><option value="6">6/12</option>
+            <option value="7">7/12</option><option value="8">8/12</option><option value="9">9/12</option>
+            <option value="10">10/12</option><option value="12">12/12</option><option value="14">14/12</option>
+          </select>
+        </div>
+        <div class="qbs-field"><label>(oH) Overhang — horizontal (in)</label><input type="number" id="rf_oh" value="12" step="1" oninput="rfCalc()" /></div>
+        <div class="qbs-field"><label>Ridge board thickness (in)</label><input type="number" id="rf_ridge" value="1.75" step="0.25" oninput="rfCalc()" /></div>
+      </div>
+      <div id="rf_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">Model follows vCalc "Rafter Length": run = (span − ridge thickness) ÷ 2, rafter = run × slope factor + overhang along the slope. Also returns the board length to buy (next even 2&nbsp;ft) before angle cuts, rise, and roof angle.</div>
+    </div>
+
+    <!-- ── Gravel / Stone Pad (vCalc-style) ──────────────────────────── -->
+    <div class="qbs-card" style="margin-top:20px;">
+      <h3>Gravel / Stone Pad <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field"><label>(L) Pad length (ft)</label><input type="number" id="gp_len" value="70" step="1" oninput="gpCalc()" /></div>
+        <div class="qbs-field"><label>(W) Pad width (ft)</label><input type="number" id="gp_wid" value="50" step="1" oninput="gpCalc()" /></div>
+        <div class="qbs-field"><label>(D) Compacted depth (in)</label><input type="number" id="gp_dep" value="6" step="1" oninput="gpCalc()" /></div>
+        <div class="qbs-field"><label>Compaction factor (%)</label><input type="number" id="gp_comp" value="20" step="1" oninput="gpCalc()" /><div class="qbs-note">Crusher run compacts ~15–25%: order loose to end up at the compacted depth.</div></div>
+        <div class="qbs-field"><label>Density (tons / yd³)</label><input type="number" id="gp_den" value="1.4" step="0.05" oninput="gpCalc()" /><div class="qbs-note">Crusher run / #57 ≈ 1.35–1.5. Ask the quarry for their number.</div></div>
+      </div>
+      <div id="gp_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">Volume = L × W × depth, bumped by the compaction factor, returned in loose yd³ and TONS (yd³ × density). Truck loads shown at 18 tons per tandem.</div>
+    </div>
+
+    <!-- ── Drywall (vCalc-style) ─────────────────────────────────────── -->
+    <div class="qbs-card" style="margin-top:20px;">
+      <h3>Drywall <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field"><label>Wall area (ft²) — total LF of wall × height</label><input type="number" id="dw_wall" value="2800" step="10" oninput="dwCalc()" /></div>
+        <div class="qbs-field"><label>Ceiling area (ft², 0 = none)</label><input type="number" id="dw_ceil" value="2400" step="10" oninput="dwCalc()" /></div>
+        <div class="qbs-field"><label>Sheet size</label>
+          <select id="dw_sheet" onchange="dwCalc()"><option value="32">4 × 8 (32 ft²)</option><option value="48" selected>4 × 12 (48 ft²)</option></select>
+        </div>
+        <div class="qbs-field"><label>Waste (%)</label><input type="number" id="dw_waste" value="10" step="1" oninput="dwCalc()" /></div>
+      </div>
+      <div id="dw_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">Sheets = area ÷ sheet size with waste. Screws at 32/sheet, joint tape at 370&nbsp;LF and ready-mix mud at 4.5&nbsp;gal (approx. 61&nbsp;lb) per 1,000&nbsp;ft² — standard USG coverage figures.</div>
+    </div>
+
+    <!-- ── Board Feet (vCalc-style) ──────────────────────────────────── -->
+    <div class="qbs-card" style="margin-top:20px;">
+      <h3>Board Feet <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field"><label>Quantity (pcs)</label><input type="number" id="bf_qty" value="50" step="1" oninput="bfCalc()" /></div>
+        <div class="qbs-field"><label>Thickness (in, nominal)</label><input type="number" id="bf_t" value="2" step="0.25" oninput="bfCalc()" /></div>
+        <div class="qbs-field"><label>Width (in, nominal)</label><input type="number" id="bf_w" value="6" step="0.25" oninput="bfCalc()" /></div>
+        <div class="qbs-field"><label>Length (ft)</label><input type="number" id="bf_l" value="16" step="1" oninput="bfCalc()" /></div>
+        <div class="qbs-field"><label>Price per board foot ($, 0 = skip)</label><input type="number" id="bf_p" value="0" step="0.05" oninput="bfCalc()" /></div>
+      </div>
+      <div id="bf_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">BF = thickness(in) × width(in) × length(ft) ÷ 12, × quantity — nominal dimensions, the lumberyard standard. Price fills in total cost when set.</div>
+    </div>
   </div>
 
   <!-- SETTINGS -->
@@ -4693,6 +4786,115 @@ function swCalc() {
   box.innerHTML = '<table style="width:100%; border-collapse:collapse;">' + rows.map(r =>
     `<tr><td style="padding:5px 10px; border-bottom:1px solid var(--hairline); color:var(--text-2); white-space:nowrap;">${r[0]}</td>` +
     `<td style="padding:5px 10px; border-bottom:1px solid var(--hairline); font-variant-numeric:tabular-nums;">${r[1]}</td></tr>`).join('') + '</table>';
+}
+
+// ---- Six additional reference calculators (vCalc-style models) ----
+function _calcRows(boxId, rows) {
+  const box = document.getElementById(boxId); if (!box) return;
+  box.innerHTML = '<table style="width:100%; border-collapse:collapse;">' + rows.map(r =>
+    `<tr><td style="padding:5px 10px; border-bottom:1px solid var(--hairline); color:var(--text-2); white-space:nowrap;">${r[0]}</td>` +
+    `<td style="padding:5px 10px; border-bottom:1px solid var(--hairline); font-variant-numeric:tabular-nums;">${r[1]}</td></tr>`).join('') + '</table>';
+}
+function _cn(id) { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; }
+
+function csCalc() {   // Concrete Slab
+  const L = _cn('cs_len'), W = _cn('cs_wid'), T = _cn('cs_thk') / 12, waste = 1 + _cn('cs_waste') / 100;
+  if (L <= 0 || W <= 0 || T <= 0) return _calcRows('cs_results', [['—', 'Enter length, width and thickness.']]);
+  const ft3 = L * W * T, yd3 = ft3 / 27 * waste;
+  const rows = [
+    ['Slab area', Math.round(L * W).toLocaleString() + ' ft²'],
+    ['Volume', ft3.toFixed(0) + ' ft³ = ' + (ft3 / 27).toFixed(2) + ' yd³'],
+    ['Order (with waste)', '<b>' + yd3.toFixed(2) + ' yd³</b> — order ' + (Math.ceil(yd3 * 4) / 4).toFixed(2) + ' yd³'],
+    ['80 lb bags', Math.ceil(ft3 * waste / 0.60).toLocaleString() + ' bags'],
+    ['60 lb bags', Math.ceil(ft3 * waste / 0.45).toLocaleString() + ' bags'],
+    ['40 lb bags', Math.ceil(ft3 * waste / 0.30).toLocaleString() + ' bags'],
+    ['Form boards', Math.ceil((L + W) * 2) + ' LF (perimeter)'],
+  ];
+  const rb = _cn('cs_rebar');
+  if (rb > 0) {
+    const runsL = Math.floor(W * 12 / rb) + 1, runsW = Math.floor(L * 12 / rb) + 1;
+    const lf = (runsL * L + runsW * W) * 1.10;
+    rows.push(['Rebar @ ' + rb + '" grid', Math.ceil(lf).toLocaleString() + " LF (+10% laps) = " + Math.ceil(lf / 20) + " sticks @ 20'"]);
+  } else {
+    rows.push(['Wire mesh (5×10 sheets)', Math.ceil(L * W / 42) + ' sheets (42 ft² effective each)']);
+  }
+  _calcRows('cs_results', rows);
+}
+
+function phCalc() {   // Post Hole Concrete
+  const n = _cn('ph_n'), dia = _cn('ph_dia') / 12, dep = _cn('ph_dep');
+  const pw = _cn('ph_pw') / 12, pd = _cn('ph_pd') / 12;
+  let fill = _cn('ph_fill'); if (fill <= 0 || fill > dep) fill = dep;
+  if (n <= 0 || dia <= 0 || dep <= 0) return _calcRows('ph_results', [['—', 'Enter holes, diameter and depth.']]);
+  const holeV = Math.PI * (dia / 2) * (dia / 2) * fill;
+  const postV = Math.min(pw * pd * fill, holeV * 0.9);
+  const per = Math.max(0, holeV - postV);
+  const tot = per * n;
+  _calcRows('ph_results', [
+    ['Fill per hole', per.toFixed(2) + ' ft³ (hole ' + holeV.toFixed(2) + ' − post ' + postV.toFixed(2) + ')'],
+    ['Total concrete', '<b>' + tot.toFixed(1) + ' ft³ = ' + (tot / 27).toFixed(2) + ' yd³</b>'],
+    ['80 lb bags', (Math.ceil(per / 0.60)) + ' / hole → ' + (Math.ceil(per / 0.60) * n).toLocaleString() + ' total'],
+    ['60 lb bags', (Math.ceil(per / 0.45)) + ' / hole → ' + (Math.ceil(per / 0.45) * n).toLocaleString() + ' total'],
+    ['50 lb bags', (Math.ceil(per / 0.375)) + ' / hole → ' + (Math.ceil(per / 0.375) * n).toLocaleString() + ' total'],
+  ]);
+}
+
+function rfCalc() {   // Rafter Length (vCalc model: ridge board considered, overhang adder)
+  const S = _cn('rf_span'), P = _cn('rf_pitch'), oh = _cn('rf_oh') / 12, ridge = _cn('rf_ridge') / 12;
+  if (S <= 0 || P <= 0) return _calcRows('rf_results', [['—', 'Enter span and pitch.']]);
+  const p = P / 12, sf = Math.sqrt(1 + p * p);
+  const run = (S - ridge) / 2;
+  const rafter = run * sf;
+  const withOH = rafter + oh * sf;
+  const board = Math.ceil(withOH / 2) * 2;
+  _calcRows('rf_results', [
+    ['Run (to ridge face)', run.toFixed(2) + " ft"],
+    ['Rise', (run * p).toFixed(2) + " ft"],
+    ['Rafter length (no overhang)', rafter.toFixed(2) + " ft"],
+    ['Rafter incl. overhang', '<b>' + withOH.toFixed(2) + " ft</b> (" + ftIn(withOH) + ')'],
+    ['Board to buy (before cuts)', "<b>" + board + " ft stock</b>"],
+    ['Roof angle', (Math.atan(p) * 180 / Math.PI).toFixed(1) + '°'],
+  ]);
+}
+
+function gpCalc() {   // Gravel / Stone Pad
+  const L = _cn('gp_len'), W = _cn('gp_wid'), D = _cn('gp_dep') / 12;
+  const comp = 1 + _cn('gp_comp') / 100, den = _cn('gp_den') || 1.4;
+  if (L <= 0 || W <= 0 || D <= 0) return _calcRows('gp_results', [['—', 'Enter pad dimensions.']]);
+  const yd3c = L * W * D / 27, yd3loose = yd3c * comp, tons = yd3loose * den;
+  _calcRows('gp_results', [
+    ['Pad area', Math.round(L * W).toLocaleString() + ' ft²'],
+    ['Compacted volume', yd3c.toFixed(1) + ' yd³'],
+    ['Loose to order', '<b>' + yd3loose.toFixed(1) + ' yd³</b>'],
+    ['Tons', '<b>' + tons.toFixed(1) + ' tons</b> @ ' + den + ' t/yd³'],
+    ['Tandem loads', Math.ceil(tons / 18) + ' loads @ 18 t'],
+  ]);
+}
+
+function dwCalc() {   // Drywall
+  const area = (_cn('dw_wall') + _cn('dw_ceil')) * (1 + _cn('dw_waste') / 100);
+  const sheet = _cn('dw_sheet') || 48;
+  if (area <= 0) return _calcRows('dw_results', [['—', 'Enter wall / ceiling area.']]);
+  const sheets = Math.ceil(area / sheet);
+  _calcRows('dw_results', [
+    ['Area incl. waste', Math.round(area).toLocaleString() + ' ft²'],
+    ['Sheets', '<b>' + sheets + '</b> @ ' + (sheet === 32 ? '4×8' : '4×12')],
+    ['Screws', (sheets * 32).toLocaleString() + ' (32/sheet) — ' + Math.ceil(sheets * 32 / 1000) + ' × 1 lb box'],
+    ['Joint tape', Math.ceil(area / 1000 * 370).toLocaleString() + ' LF (' + Math.ceil(area / 1000 * 370 / 500) + ' × 500\' rolls)'],
+    ['Ready-mix mud', Math.ceil(area / 1000 * 4.5) + ' gal (' + Math.ceil(area / 1000 * 4.5 / 4.5) + ' × 4.5 gal buckets)'],
+  ]);
+}
+
+function bfCalc() {   // Board Feet
+  const q = _cn('bf_qty'), t = _cn('bf_t'), w = _cn('bf_w'), l = _cn('bf_l'), p = _cn('bf_p');
+  if (q <= 0 || t <= 0 || w <= 0 || l <= 0) return _calcRows('bf_results', [['—', 'Enter quantity and dimensions.']]);
+  const bfEach = t * w * l / 12, bf = bfEach * q;
+  const rows = [
+    ['Per piece', bfEach.toFixed(2) + ' BF (' + t + '×' + w + ' × ' + l + "')"],
+    ['Total', '<b>' + bf.toFixed(1) + ' board feet</b>'],
+  ];
+  if (p > 0) rows.push(['Cost @ $' + p.toFixed(2) + '/BF', '<b>$' + (bf * p).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</b>']);
+  _calcRows('bf_results', rows);
 }
 
 // Studs for a Wall (vCalc model): studs = (L / oC) + 1, rounded up. Field studs only.
@@ -7386,7 +7588,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v192';
+const BB_VERSION = 'v193';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -8158,7 +8360,7 @@ function switchTab(name) {
   if (name === 'settings') renderDefaultPrices();
   if (name === 'schedule') { try { renderSchedule(); } catch (e) {} }
   if (name === 'quote') { try { renderDrawSchedule(); renderChangeOrders(); } catch (e) {} }
-  if (name === 'calcs') { try { grCalc(); } catch(e) {} try { gsCalc(); } catch(e) {} try { shCalc(); } catch(e) {} try { swCalc(); } catch(e) {} try { stCalc(); } catch(e) {} }
+  if (name === 'calcs') { ['grCalc','gsCalc','shCalc','swCalc','stCalc','csCalc','phCalc','rfCalc','gpCalc','dwCalc','bfCalc'].forEach(f => { try { window[f] ? window[f]() : eval(f + '()'); } catch (e) {} }); }
   if (name === 'takeoff' && typeof takeoffInit === 'function') takeoffInit();
   if (name === 'subs') {
     try { renderFramingLaborGrid(); } catch(e) { console.error('framing grid', e); }
