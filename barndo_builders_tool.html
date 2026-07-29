@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v182</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v183</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -7357,7 +7357,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v182';
+const BB_VERSION = 'v183';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -18063,6 +18063,10 @@ if (typeof origSwitchTab === 'function') {
     updateToolStatus('TEST X DRAWN — do you SEE a big blue X and border over the blueprint? Tell Claude YES or NO. (It clears on the next zoom or measure.)');
   };
 
+  // internal state peek for diagnostics (read-only)
+  window._toDebug = function () {
+    return { mouseBase: TO.mouseBase, tool: TO.tool, pdf: !!TO.pdfDoc, hasPE: HAS_PE, evMove: EV_MOVE, pixelScale: TO.pixelScale, inited: TO.inited };
+  };
   // Shared scale-line completion (used by both two-click and press-drag flows)
   function scaleComplete(p1, p2) {
     const px = dist(p1, p2);
@@ -18187,7 +18191,9 @@ if (typeof origSwitchTab === 'function') {
   }
   function onDblClick(ev) { if (TO.tool !== 'pan' && TO.tool !== 'scale') takeoffFinish(); }
   function onMove(ev) {
-    if (TO.tool !== 'scale' && TO.tool !== 'measure' && TO.tool !== 'edit') return;
+    // Crosshair guides follow the pointer in EVERY tool (the builder works by
+    // them) — pan included, not just scale/measure/edit.
+    if (!TO.pdfDoc) return;
     TO.mouseBase = toBase(ev); scheduleRedraw();
   }
   // Max zoom that keeps the canvases inside the browser's hard limits.
@@ -18363,10 +18369,10 @@ if (typeof origSwitchTab === 'function') {
         ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
       });
     }
-    // Crosshair guide lines in scale/measure/edit modes — full-canvas hairlines that
-    // follow the pointer, so you always see exactly where you're clicking even when
-    // the OS hides the custom cursor (common with Windows display scaling).
-    if (TO.mouseBase && (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit')) {
+    // Crosshair guide lines — full-canvas dashed hairlines that follow the
+    // pointer in EVERY tool. This is the "cursor" the builder works by; do not
+    // gate it behind specific tools again.
+    if (TO.mouseBase) {
       const mx = TO.mouseBase.x * S, my = TO.mouseBase.y * S;
       ctx.save();
       ctx.strokeStyle = 'rgba(30,123,255,0.8)';   // blue guides in every tool, matching the drag band
