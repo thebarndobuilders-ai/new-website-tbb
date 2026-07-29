@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v185</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v186</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3258,6 +3258,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <button onclick="takeoffOpenAdd('area')">▱ Area</button>
         <button onclick="takeoffOpenAdd('linear')">／ Linear</button>
         <button onclick="takeoffOpenTruss()">◉ Truss count</button>
+        <button id="to-tool-pan" onclick="takeoffTool('pan')">✋ Pan</button>
         <button onclick="takeoffFinish()">✓ Finish</button>
         <button onclick="takeoffUndoPt()">↶ Undo point</button>
         <button onclick="takeoffClearAll()" title="Clear all measurements and scale">✕ Clear</button>
@@ -3266,7 +3267,6 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-2);" title="Zero the quote before pushing so ONLY measured items drive it — otherwise the push lands on top of whatever building is already entered (including the default one)"><input type="checkbox" id="to-clean-start" checked> Blank quote first — quote only measured items</label>
         <button onclick="takeoffPushTrusses()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;">◉ Push trusses → truss tool</button>
       </div>
-      <div id="to-tool-status" style="position:sticky; top:0; z-index:30; font-family:var(--font-mono); font-size:12px; color:var(--copper); background:#241a10; border:1px solid rgba(251,146,60,0.45); border-radius:6px; padding:6px 10px; margin-bottom:8px;">Load a PDF to start.</div>
 
       <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px; border-top:1px solid var(--hairline); padding-top:8px;">
         <label style="font-size:11px; color:var(--text-2);">Save under lead</label>
@@ -3309,24 +3309,9 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
             </span>
           </div>
           <div id="to-canvas-wrap" style="position:relative; width:100%; height:600px; overflow:auto; background:#2a2a2a; border:1px solid var(--hairline); border-radius:6px;">
-            <div id="to-scale-banner" style="display:none; position:sticky; top:0; left:0; z-index:12; background:rgba(30,123,255,0.92); color:#fff; font-family:var(--font-mono); font-size:13px; font-weight:700; padding:7px 12px; border-radius:0 0 8px 8px; width:fit-content; max-width:96%;">⟂ SET SCALE ARMED — press &amp; DRAG along a known dimension (blue line follows)</div>
             <div id="to-stage" style="position:relative;">
               <canvas id="to-pdf-canvas" style="display:block;"></canvas>
-              <canvas id="to-draw-canvas" style="position:absolute; left:0; top:0; touch-action:none;"></canvas>
-              <!-- DOM/SVG guide layer: crosshair + scale band rendered OUTSIDE the
-                   canvas pipeline, so they show even where canvas compositing fails -->
-              <svg id="to-guides" style="position:absolute; left:0; top:0; pointer-events:none; overflow:visible;">
-                <line id="to-gv" stroke="#1e7bff" stroke-opacity="0.85" stroke-width="1.5" stroke-dasharray="7 5" visibility="hidden"/>
-                <line id="to-gh" stroke="#1e7bff" stroke-opacity="0.85" stroke-width="1.5" stroke-dasharray="7 5" visibility="hidden"/>
-                <circle id="to-gc" r="4" fill="#ff3b30" stroke="#fff" stroke-width="1.5" visibility="hidden"/>
-                <line id="to-band-halo" stroke="rgba(0,0,0,0.55)" stroke-width="8" stroke-linecap="round" visibility="hidden"/>
-                <line id="to-band" stroke="#1e7bff" stroke-width="4" stroke-linecap="round" visibility="hidden"/>
-                <line id="to-sl-halo" stroke="rgba(0,0,0,0.5)" stroke-width="6" stroke-linecap="round" visibility="hidden"/>
-                <line id="to-sl" stroke="#3ad67b" stroke-width="3" stroke-linecap="round" visibility="hidden"/>
-                <circle id="to-sl-a" r="5" fill="#3ad67b" stroke="#fff" stroke-width="1.5" visibility="hidden"/>
-                <circle id="to-sl-b" r="5" fill="#3ad67b" stroke="#fff" stroke-width="1.5" visibility="hidden"/>
-                <text id="to-sl-t" fill="#3ad67b" font-family="Arial" font-size="13" font-weight="bold" stroke="rgba(0,0,0,0.85)" stroke-width="3" paint-order="stroke" text-anchor="middle" visibility="hidden"></text>
-              </svg>
+              <canvas id="to-draw-canvas" style="position:absolute; left:0; top:0;"></canvas>
             </div>
             <div id="to-empty" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#888; font-size:13px;">No PDF loaded — click “Load PDF”.</div>
           </div>
@@ -7369,7 +7354,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v185';
+const BB_VERSION = 'v186';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17541,8 +17526,8 @@ if (typeof origSwitchTab === 'function') {
   const TO = {
     inited: false,
     pdfDoc: null, pageNum: 1, pageCount: 0,
-    renderScale: 1.5, pixelScale: 1.5, vp: null,
-    tool: 'scale', measureAs: 'lf',   // PAN TOOL DELETED per builder — starts ready to work; right-drag/scroll pans
+    renderScale: 1.5, vp: null,
+    tool: 'scale', measureAs: 'lf',
     pages: {},            // pageNum -> { unitsPerFoot }
     measures: [],         // { page, mode, basePts:[{x,y}], color }
     draft: null,          // { mode, basePts:[...] }
@@ -17661,27 +17646,12 @@ if (typeof origSwitchTab === 'function') {
       const dc = $('to-draw-canvas');
       dc.addEventListener('click', onClick);
       dc.addEventListener('dblclick', onDblClick);
-      // BOTH event families, pointer-priority: some Windows input stacks
-      // deliver one family but not the other. If a pointer event arrived in
-      // the last 400ms the duplicate compat mouse event is skipped; when
-      // pointer events are absent entirely, mouse events drive everything.
-      let _peDown = 0, _peMove = 0, _peWrapDown = 0;
-      dc.addEventListener('pointerdown', (e) => { _peDown = Date.now(); onDown(e); });
-      dc.addEventListener('mousedown', (e) => { if (Date.now() - _peDown > 400) onDown(e); });
-      dc.addEventListener('pointermove', (e) => { _peMove = Date.now(); onMove(e); });
-      dc.addEventListener('mousemove', (e) => { if (Date.now() - _peMove > 400) onMove(e); });
-      dc.addEventListener('mouseleave', () => { TO.mouseBase = null; guideHide(true); scheduleRedraw(); });
+      dc.addEventListener('mousemove', onMove);
+      dc.addEventListener('mouseleave', () => { TO.mouseBase = null; redraw(); });
+      dc.addEventListener('mousedown', onDown);
       dc.addEventListener('contextmenu', (e) => e.preventDefault());
       const wrap = $('to-canvas-wrap');
       wrap.addEventListener('contextmenu', (e) => e.preventDefault());
-      // Right/middle-drag pans from ANYWHERE in the viewer, including the gray
-      // margin around the sheet (dc only covers the page itself).
-      const wrapDown = (e) => {
-        if (e.target === dc) return;                       // dc listener already handled it
-        if (e.button === 2 || e.button === 1) onDown(e);
-      };
-      wrap.addEventListener('pointerdown', (e) => { _peWrapDown = Date.now(); wrapDown(e); });
-      wrap.addEventListener('mousedown', (e) => { if (Date.now() - _peWrapDown > 400) wrapDown(e); });
       wrap.addEventListener('wheel', onWheel, { passive: false });
       document.addEventListener('keydown', (e) => {
         if ($('tab-takeoff').style.display === 'none') return;
@@ -17729,7 +17699,7 @@ if (typeof origSwitchTab === 'function') {
     if (!opts.silent && hasWork && !confirm('Clear all measurements and the scale on this takeoff? (The loaded plan stays open.)')) return;
     TO.measures = []; TO.pages = {}; TO.pageNames = {}; TO.draft = null;
     TO.editIndex = null; TO.selVertex = null; TO.dragVertex = null; TO.colorIdx = 0;
-    TO.tool = 'scale';
+    TO.tool = 'pan';
     if (typeof redraw === 'function') redraw();
     if (typeof renderResults === 'function') renderResults();
     if (typeof renderPagesList === 'function') renderPagesList();
@@ -17804,7 +17774,6 @@ if (typeof origSwitchTab === 'function') {
       pdfjsLib.getDocument({ data }).promise.then(doc => {
         TO.pdfDoc = doc; TO.pageCount = doc.numPages; TO.pageNum = 1;
         TO.pages = {}; TO.measures = []; TO.draft = null; TO.pageNames = {};
-        TO.tool = 'scale'; highlightTool();   // ready to set scale immediately (pan tool deleted)
         const e = $('to-empty'); if (e) e.style.display = 'none';
         renderPage(); renderPagesList();
         takeoffAutoNamePages(doc);
@@ -17855,52 +17824,18 @@ if (typeof origSwitchTab === 'function') {
 
   function renderPage() {
     if (!TO.pdfDoc) return;
-    // Serialize pdf.js renders: rapid zoom/page flips used to start overlapping
-    // render() calls on the same canvas, which throws and leaves the sheet
-    // half-drawn (and the measure/scale overlay dead). Cancel the in-flight
-    // render before starting a new one; ignore the cancellation rejection.
-    if (TO._renderTask) { try { TO._renderTask.cancel(); } catch (e) {} TO._renderTask = null; }
     TO.pdfDoc.getPage(TO.pageNum).then(page => {
-      // GPU-safe rendering: the canvas BACKING STORE is capped to a size every
-      // graphics card can composite (~48M px, 10000px/side); deeper zoom is
-      // done by CSS-scaling the canvas up. Weak/integrated Windows GPUs stop
-      // COMPOSITING large canvases long before Chrome's official 268M-px
-      // limit — the canvas rasters fine internally (pixel tests pass) but the
-      // SCREEN shows nothing. Keeping the backing store small fixes that class
-      // of failure for good; zoom level itself is unlimited by canvas size.
-      const base = page.getViewport({ scale: 1 });
-      // 4096x4096 (16.7M px) is the universal GPU texture floor — every card
-      // made since ~2008 composites it. 48M px still failed on the builder's
-      // machine, so the backing store now never exceeds this; CSS scaling
-      // carries all remaining zoom.
-      const pixCap = Math.max(0.25, Math.min(8,
-        Math.sqrt(16000000 / Math.max(1, base.width * base.height)),
-        4096 / base.width, 4096 / base.height));
-      TO.pixelScale = Math.min(TO.renderScale, pixCap);
-      const vp = page.getViewport({ scale: TO.pixelScale });
+      const vp = page.getViewport({ scale: TO.renderScale });
       TO.vp = vp;
       const pc = $('to-pdf-canvas'), dc = $('to-draw-canvas');
       pc.width = vp.width; pc.height = vp.height;
       dc.width = vp.width; dc.height = vp.height;
-      const cssW = Math.round(base.width * TO.renderScale), cssH = Math.round(base.height * TO.renderScale);
-      pc.style.width = cssW + 'px'; pc.style.height = cssH + 'px';
-      dc.style.width = cssW + 'px'; dc.style.height = cssH + 'px';
-      $('to-stage').style.width = cssW + 'px';
-      $('to-stage').style.height = cssH + 'px';
-      const gsvg = $('to-guides');
-      if (gsvg) { gsvg.setAttribute('width', cssW); gsvg.setAttribute('height', cssH); gsvg.style.width = cssW + 'px'; gsvg.style.height = cssH + 'px'; }
+      $('to-stage').style.width = vp.width + 'px';
+      $('to-stage').style.height = vp.height + 'px';
       const ctx = pc.getContext('2d');
-      const task = page.render({ canvasContext: ctx, viewport: vp });
-      TO._renderTask = task;
-      task.promise.then(() => {
-        if (TO._renderTask === task) TO._renderTask = null;
+      page.render({ canvasContext: ctx, viewport: vp }).promise.then(() => {
         redraw(); updateHud();
         if (TO._afterRender) { const f = TO._afterRender; TO._afterRender = null; f(); }
-      }).catch(err => {
-        if (TO._renderTask === task) TO._renderTask = null;
-        // RenderingCancelledException is expected when zooming fast — a newer
-        // render owns the canvas. Anything else: repaint the overlay anyway.
-        if (!err || err.name !== 'RenderingCancelledException') { try { redraw(); updateHud(); } catch (e) {} }
       });
     });
   }
@@ -17953,200 +17888,26 @@ if (typeof origSwitchTab === 'function') {
     TO.tool = t; TO.draft = null; redraw(); highlightTool();
   };
   function highlightTool() {
-    [['scale', 'to-tool-scale']].forEach(([t, id]) => {
+    [['scale', 'to-tool-scale'], ['pan', 'to-tool-pan']].forEach(([t, id]) => {
       const b = $(id); if (!b) return;
       const on = TO.tool === t;
       b.style.background = on ? 'var(--copper)' : '';
       b.style.color = on ? 'var(--bg-deep)' : '';
     });
     const dc = $('to-draw-canvas');
-    // Native OS cursors only — custom image cursors (the old SVG cross) go
-    // invisible on Windows display scaling, which reads as "my cursor is gone".
-    // The canvas-drawn crosshair guides stay as the precision aid.
     if (dc) dc.style.cursor = (TO.tool === 'pan') ? 'grab'
-      : (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit') ? 'crosshair' : 'default';
-    const bn = $('to-scale-banner');
-    if (bn) bn.style.display = (TO.tool === 'scale') ? 'block' : 'none';
-    updateToolStatus();
-  }
-  // Live status readout so the toolbar always says what the tool is waiting
-  // for. Plain HTML on purpose — visible even if canvas drawing ever fails.
-  function updateToolStatus(override) {
-    const el = $('to-tool-status'); if (!el) return;
-    const ver = (typeof BB_VERSION !== 'undefined') ? BB_VERSION + ' · ' : '';
-    if (override) { el.textContent = ver + override; return; }
-    let msg = '';
-    if (!TO.pdfDoc) msg = 'Load a PDF to start.';
-    else if (TO.tool === 'scale') msg = (TO.draft && TO.draft.basePts.length === 1)
-      ? 'SCALE: point 1 set ✓ — now click or release at the other end.'
-      : 'SCALE: press at one end of a known dimension, DRAG, release at the other end (two clicks also work).';
-    else if (TO.tool === 'measure') msg = 'MEASURE: click points · double-click to finish. Right-drag pans.';
-    else if (TO.tool === 'edit') msg = 'EDIT: drag points to move · click a line to add a point.';
-    else msg = 'READY — right-drag to pan · scroll to zoom · use the buttons above to scale/measure.';
-    el.textContent = ver + msg;
+      : (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit') ? BLUE_CROSS : 'default';
   }
 
   function isPolygon(mode) { return mode === 'floor' || mode === 'roof'; }
 
-  // ---- mouse / pointer ----
-  // Pointer events where available (all modern browsers); mouse fallback kept.
-  const HAS_PE = typeof window.PointerEvent !== 'undefined';
-  const EV_DOWN = HAS_PE ? 'pointerdown' : 'mousedown';
-  const EV_MOVE = HAS_PE ? 'pointermove' : 'mousemove';
-  const EV_UP = HAS_PE ? 'pointerup' : 'mouseup';
-  function capturePointer(ev) {
-    if (HAS_PE && ev.pointerId != null && ev.target && ev.target.setPointerCapture) {
-      try { ev.target.setPointerCapture(ev.pointerId); } catch (e) {}
-    }
-  }
-  // Repaints driven by pointer movement go through requestAnimationFrame —
-  // on big sheets a full-canvas redraw per move event makes the mouse feel dead.
-  let _rafPending = false;
-  function scheduleRedraw() {
-    if (_rafPending) return;
-    _rafPending = true;
-    requestAnimationFrame(() => { _rafPending = false; redraw(); });
-  }
+  // ---- mouse ----
   function toBase(ev) {
     const dc = $('to-draw-canvas'); const r = dc.getBoundingClientRect();
     const sx = dc.width / r.width, sy = dc.height / r.height;
-    return { x: (ev.clientX - r.left) * sx / (TO.pixelScale || TO.renderScale), y: (ev.clientY - r.top) * sy / (TO.pixelScale || TO.renderScale) };
-  }
-  // ---- self-test: proves whether mouse events + canvas drawing work on THIS
-  // machine, independent of the PDF/scale code. Pure diagnostics, no state. ----
-  window.takeoffSelfTest = function () {
-    const old = document.getElementById('to-selftest'); if (old) old.remove();
-    const ver = (typeof BB_VERSION !== 'undefined') ? BB_VERSION : '(unknown — OLD FILE)';
-    const wrap = document.createElement('div');
-    wrap.id = 'to-selftest';
-    wrap.style.cssText = 'position:fixed; inset:0; background:rgba(5,5,5,0.94); z-index:100000; display:flex; align-items:center; justify-content:center;';
-    wrap.innerHTML = `
-      <div style="background:#161310; border:2px solid var(--copper); border-radius:12px; padding:22px 26px; max-width:640px; width:92%;">
-        <div style="font-family:var(--font-headline); font-size:18px; color:var(--copper); font-weight:700; margin-bottom:4px;">Mouse &amp; display test — ${ver}</div>
-        <div style="font-size:12px; color:var(--text-2); margin-bottom:10px;">Step 1: You should see a <b style="color:#1e7bff;">blue line</b> already drawn in the box below.<br>Step 2: <b>Press the LEFT button inside the box and DRAG</b> — a blue line should follow your mouse.</div>
-        <canvas id="to-st-canvas" width="560" height="260" style="width:100%; background:#fff; border-radius:8px; cursor:crosshair; touch-action:none;"></canvas>
-        <div id="to-st-report" style="font-family:var(--font-mono); font-size:13px; margin-top:10px; line-height:1.7;">Waiting for your drag… <span style="color:var(--text-3)">(events seen: none yet)</span></div>
-        <div style="display:flex; justify-content:space-between; gap:8px; margin-top:12px;">
-          <button onclick="takeoffTestX()" title="Draws a huge blue X directly on the blueprint canvas — tells us whether drawings on the SHEET can reach your screen" style="background:#123; color:#7db5ff; border-color:#1e7bff; font-weight:600;">2️⃣ Draw test X on the blueprint</button>
-          <button onclick="document.getElementById('to-selftest').remove()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600;">✕ Close</button>
-        </div>
-      </div>`;
-    document.body.appendChild(wrap);
-    const cv = document.getElementById('to-st-canvas');
-    const rep = document.getElementById('to-st-report');
-    const cx = cv.getContext('2d');
-    const paintBase = () => {
-      cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
-      cx.strokeStyle = '#1e7bff'; cx.lineWidth = 4; cx.lineCap = 'round';
-      cx.beginPath(); cx.moveTo(30, 230); cx.lineTo(200, 30); cx.stroke();
-      cx.fillStyle = '#666'; cx.font = '12px Arial';
-      cx.fillText('static test line ↑ — now press & drag anywhere in here', 215, 40);
-    };
-    paintBase();
-    let downs = 0, moves = 0, ups = 0, start = null;
-    const pos = (e) => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; };
-    const report = (done) => {
-      rep.innerHTML = `press: ${downs ? '✓' : '—'} &nbsp; move: ${moves} &nbsp; release: ${ups ? '✓' : '—'}` + (done
-        ? (moves > 2
-          ? `<br><b style="color:#3ad67b;">✓ YOUR MOUSE AND DISPLAY WORK.</b> Drag-to-scale works on this machine in this file (${ver}). If scale still fails on the blueprint, tell Claude exactly what the orange bar says while you drag.`
-          : `<br><b style="color:#ff9b9b;">✗ Press/release arrived but almost no movement events.</b> Tell Claude this — it points at a mouse-driver or browser issue.`)
-        : '');
-    };
-    const dn = (e) => { if (e.button !== 0) return; downs++; start = pos(e); e.preventDefault(); if (cv.setPointerCapture && e.pointerId != null) { try { cv.setPointerCapture(e.pointerId); } catch (_) {} } report(false); };
-    const mv = (e) => { if (!start) return; moves++; const p = pos(e); paintBase(); cx.strokeStyle = '#1e7bff'; cx.lineWidth = 4; cx.beginPath(); cx.moveTo(start.x, start.y); cx.lineTo(p.x, p.y); cx.stroke(); if (moves % 3 === 0) report(false); };
-    const up = () => { if (!start) return; ups++; start = null; report(true); };
-    if (typeof window.PointerEvent !== 'undefined') {
-      cv.addEventListener('pointerdown', dn); cv.addEventListener('pointermove', mv); cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-    } else {
-      cv.addEventListener('mousedown', dn); cv.addEventListener('mousemove', mv); cv.addEventListener('mouseup', up);
-    }
-  };
-
-  // Phase-2 diagnostic: draw a huge blue X + border straight onto the
-  // blueprint overlay canvas. If the user can't see it, drawings on the sheet
-  // aren't reaching their screen — a rendering issue, not an input issue.
-  window.takeoffTestX = function () {
-    const st = document.getElementById('to-selftest'); if (st) st.remove();
-    if (!TO.pdfDoc) { alert('Load a PDF first, then run this test.'); return; }
-    const dc = $('to-draw-canvas');
-    const cx = dc.getContext('2d');
-    cx.save();
-    cx.strokeStyle = '#1e7bff';
-    cx.lineWidth = Math.max(10, dc.width / 100);
-    cx.lineCap = 'round';
-    cx.strokeRect(cx.lineWidth / 2, cx.lineWidth / 2, dc.width - cx.lineWidth, dc.height - cx.lineWidth);
-    cx.beginPath();
-    cx.moveTo(0, 0); cx.lineTo(dc.width, dc.height);
-    cx.moveTo(dc.width, 0); cx.lineTo(0, dc.height);
-    cx.stroke();
-    cx.restore();
-    updateToolStatus('TEST X DRAWN — do you SEE a big blue X and border over the blueprint? Tell Claude YES or NO. (It clears on the next zoom or measure.)');
-  };
-
-  // internal state peek for diagnostics (read-only)
-  window._toDebug = function () {
-    return { mouseBase: TO.mouseBase, tool: TO.tool, pdf: !!TO.pdfDoc, hasPE: HAS_PE, evMove: EV_MOVE, pixelScale: TO.pixelScale, inited: TO.inited };
-  };
-  // Shared scale-line completion (used by both two-click and press-drag flows)
-  function scaleComplete(p1, p2) {
-    const px = dist(p1, p2);
-    let feet = (TO.scaleEntry && TO.scaleEntry.feet) || 0;
-    if (!feet) { const s = prompt('Real length of this line, in feet (decimal ok):', '40'); feet = parseFloat(s); }
-    if (feet && feet > 0) {
-      const upf = px / feet;
-      // Keep the drawn scale line so it stays visible on the sheet afterwards.
-      const line = { p1: { x: p1.x, y: p1.y }, p2: { x: p2.x, y: p2.y }, feet };
-      if (TO.scaleEntry && TO.scaleEntry.applyAll) {
-        for (let pg = 1; pg <= TO.pageCount; pg++) TO.pages[pg] = { unitsPerFoot: upf };
-        TO.pages[TO.pageNum].scaleLine = line;
-      } else {
-        TO.pages[TO.pageNum] = { unitsPerFoot: upf, scaleLine: line };
-      }
-      // Clear the entered feet so a future re-scale can't silently reuse
-      // stale footage. Tool stays armed (pan tool deleted; right-drag pans).
-      TO.scaleEntry = null;
-      TO.draft = null; highlightTool(); redraw(); updateHud(); renderResults();
-      updateToolStatus('✓ SCALE SET — ' + feet + ' ft line locked in (green line on the sheet). Use ▱ Area / ／ Linear to measure; right-drag to pan.');
-      return;
-    }
-    // Canceled or invalid length — reset cleanly instead of leaving a stale
-    // "dragging..." status on screen.
-    TO.draft = null; redraw(); updateHud(); renderResults();
-    updateToolStatus('Scale canceled — press ⟂ Set scale to try again.');
+    return { x: (ev.clientX - r.left) * sx / TO.renderScale, y: (ev.clientY - r.top) * sy / TO.renderScale };
   }
   function onDown(ev) {
-    // Scale tool: press-drag-release draws the scale line in ONE motion
-    // (two separate clicks still work). The band follows the mouse live.
-    if (TO.tool === 'scale' && ev.button === 0 && TO.pdfDoc) {
-      ev.preventDefault();
-      capturePointer(ev);
-      updateToolStatus('SCALE: press ✓ — now DRAG to the far end and release…');
-      const startBase = toBase(ev);
-      const sx = ev.clientX, sy = ev.clientY;
-      let moved = false;
-      const mv = (e) => {
-        if (!moved && Math.hypot(e.clientX - sx, e.clientY - sy) > 8) {
-          moved = true;
-          TO.draft = { mode: 'scale', basePts: [startBase] };
-          updateToolStatus('SCALE: dragging — release at the far end of the known dimension…');
-        }
-        if (moved) { guideUpdate(e); TO.mouseBase = toBase(e); scheduleRedraw(); }
-      };
-      let ended = false;
-      const up = (e) => {
-        if (ended) return; ended = true;
-        ['pointermove', 'mousemove'].forEach(t => window.removeEventListener(t, mv));
-        ['pointerup', 'mouseup', 'pointercancel'].forEach(t => window.removeEventListener(t, up));
-        guideHide(true);
-        if (moved) {
-          TO._suppressClick = true; setTimeout(() => { TO._suppressClick = false; }, 80);
-          scaleComplete(startBase, toBase(e));
-        }
-      };
-      ['pointermove', 'mousemove'].forEach(t => window.addEventListener(t, mv));
-      ['pointerup', 'mouseup', 'pointercancel'].forEach(t => window.addEventListener(t, up));
-      return;
-    }
     // Edit mode: left-button on a vertex starts a drag-to-move
     if (TO.tool === 'edit' && ev.button === 0 && TO.editIndex != null) {
       const m = TO.measures[TO.editIndex];
@@ -18154,20 +17915,15 @@ if (typeof origSwitchTab === 'function') {
         const vi = hitVertex(m, toBase(ev));
         if (vi >= 0) {
           ev.preventDefault();
-          capturePointer(ev);
           TO.dragVertex = vi; TO.selVertex = vi; TO._dragMoved = false; redraw();
-          const mv = (e) => { const bp = toBase(e); m.basePts[vi] = { x: bp.x, y: bp.y }; TO._dragMoved = true; scheduleRedraw(); renderResults(); };
-          let vEnded = false;
+          const mv = (e) => { const bp = toBase(e); m.basePts[vi] = { x: bp.x, y: bp.y }; TO._dragMoved = true; redraw(); renderResults(); };
           const up = () => {
-            if (vEnded) return; vEnded = true;
             TO.dragVertex = null;
             if (TO._dragMoved) { TO._suppressClick = true; setTimeout(() => { TO._suppressClick = false; }, 50); }
-            ['pointermove', 'mousemove'].forEach(t => window.removeEventListener(t, mv));
-            ['pointerup', 'mouseup', 'pointercancel'].forEach(t => window.removeEventListener(t, up));
+            window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up);
             renderResults(); renderEditBar(); takeoffAutoPush();
           };
-          ['pointermove', 'mousemove'].forEach(t => window.addEventListener(t, mv));
-          ['pointerup', 'mouseup', 'pointercancel'].forEach(t => window.addEventListener(t, up));
+          window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
           return;
         }
       }
@@ -18175,25 +17931,12 @@ if (typeof origSwitchTab === 'function') {
     const panBtn = (ev.button === 2 || ev.button === 1);   // right OR middle button pans
     if (!panBtn && TO.tool !== 'pan') return;
     if (panBtn) ev.preventDefault();
-    capturePointer(ev);
     const wrap = $('to-canvas-wrap');
     wrap.style.cursor = 'grabbing';
     TO.pan = { x: ev.clientX, y: ev.clientY, sl: wrap.scrollLeft, st: wrap.scrollTop };
-    // Right-button release can land outside the viewer — swallow the one
-    // context menu that fires on mouseup anywhere on the page, then detach.
-    const ctxGuard = (e) => e.preventDefault();
-    if (panBtn) window.addEventListener('contextmenu', ctxGuard, true);
     const mv = (e) => { if (!TO.pan) return; wrap.scrollLeft = TO.pan.sl - (e.clientX - TO.pan.x); wrap.scrollTop = TO.pan.st - (e.clientY - TO.pan.y); };
-    let pEnded = false;
-    const up = () => {
-      if (pEnded) return; pEnded = true;
-      TO.pan = null; wrap.style.cursor = '';
-      ['pointermove', 'mousemove'].forEach(t => window.removeEventListener(t, mv));
-      ['pointerup', 'mouseup', 'pointercancel'].forEach(t => window.removeEventListener(t, up));
-      if (panBtn) setTimeout(() => window.removeEventListener('contextmenu', ctxGuard, true), 150);
-    };
-    ['pointermove', 'mousemove'].forEach(t => window.addEventListener(t, mv));
-    ['pointerup', 'mouseup', 'pointercancel'].forEach(t => window.addEventListener(t, up));
+    const up = () => { TO.pan = null; wrap.style.cursor = ''; window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
   }
   function onClick(ev) {
     if (!TO.pdfDoc || TO.tool === 'pan') return;
@@ -18209,11 +17952,21 @@ if (typeof origSwitchTab === 'function') {
       TO.selVertex = null; redraw(); renderEditBar(); return;
     }
     if (TO.tool === 'scale') {
-      if (TO._suppressClick) return;      // a drag-to-scale just completed
       if (!TO.draft || TO.draft.mode !== 'scale') TO.draft = { mode: 'scale', basePts: [] };
       TO.draft.basePts.push(p);
-      if (TO.draft.basePts.length === 2) { scaleComplete(TO.draft.basePts[0], TO.draft.basePts[1]); return; }
-      redraw(); updateToolStatus(); return;
+      if (TO.draft.basePts.length === 2) {
+        const px = dist(TO.draft.basePts[0], TO.draft.basePts[1]);
+        let feet = (TO.scaleEntry && TO.scaleEntry.feet) || 0;
+        if (!feet) { const s = prompt('Real length of this line, in feet (decimal ok):', '40'); feet = parseFloat(s); }
+        if (feet && feet > 0) {
+          const upf = px / feet;
+          if (TO.scaleEntry && TO.scaleEntry.applyAll) { for (let pg = 1; pg <= TO.pageCount; pg++) TO.pages[pg] = { unitsPerFoot: upf }; }
+          else { TO.pages[TO.pageNum] = { unitsPerFoot: upf }; }
+        }
+        TO.draft = null; redraw(); updateHud(); renderResults();
+        return;
+      }
+      redraw(); return;
     }
     // measure
     if (TO.measureAs !== 'count' && !uPerFt()) { alert('Set the scale on this page first (⟂ Set scale).'); return; }
@@ -18222,72 +17975,9 @@ if (typeof origSwitchTab === 'function') {
     redraw();
   }
   function onDblClick(ev) { if (TO.tool !== 'pan' && TO.tool !== 'scale') takeoffFinish(); }
-  // DOM/SVG crosshair + scale-band overlay. Rendered as page elements, NOT
-  // canvas pixels, so they display even on machines where canvas compositing
-  // over the sheet fails. This IS the takeoff cursor — keep it always on.
-  function guideUpdate(ev) {
-    const svg = $('to-guides'); if (!svg || !TO.pdfDoc) return;
-    const st = $('to-stage').getBoundingClientRect();
-    const x = ev.clientX - st.left, y = ev.clientY - st.top;
-    const gv = $('to-gv'), gh = $('to-gh'), gc = $('to-gc');
-    if (!gv) return;
-    gv.setAttribute('x1', x); gv.setAttribute('x2', x); gv.setAttribute('y1', 0); gv.setAttribute('y2', st.height);
-    gh.setAttribute('x1', 0); gh.setAttribute('x2', st.width); gh.setAttribute('y1', y); gh.setAttribute('y2', y);
-    gc.setAttribute('cx', x); gc.setAttribute('cy', y);
-    gv.setAttribute('visibility', 'visible'); gh.setAttribute('visibility', 'visible'); gc.setAttribute('visibility', 'visible');
-    // live scale band: from the armed first point to the pointer
-    const bh = $('to-band-halo'), bd = $('to-band');
-    const start = (TO.draft && TO.draft.mode === 'scale' && TO.draft.basePts.length >= 1) ? TO.draft.basePts[0] : null;
-    if (start && bh && bd) {
-      const bx = start.x * TO.renderScale, by = start.y * TO.renderScale;
-      [bh, bd].forEach(el => {
-        el.setAttribute('x1', bx); el.setAttribute('y1', by);
-        el.setAttribute('x2', x); el.setAttribute('y2', y);
-        el.setAttribute('visibility', 'visible');
-      });
-    } else if (bh && bd) {
-      bh.setAttribute('visibility', 'hidden'); bd.setAttribute('visibility', 'hidden');
-    }
-  }
-  // Persistent green scale line as SVG (survives canvas-compositing failures)
-  function syncScaleLineSVG() {
-    const ids = ['to-sl-halo', 'to-sl', 'to-sl-a', 'to-sl-b', 'to-sl-t'];
-    const sl = TO.pdfDoc ? (TO.pages[TO.pageNum] || {}).scaleLine : null;
-    if (!sl) { ids.forEach(id => { const el = $(id); if (el) el.setAttribute('visibility', 'hidden'); }); return; }
-    const R = TO.renderScale;
-    const x1 = sl.p1.x * R, y1 = sl.p1.y * R, x2 = sl.p2.x * R, y2 = sl.p2.y * R;
-    [['to-sl-halo'], ['to-sl']].forEach(([id]) => {
-      const el = $(id); if (!el) return;
-      el.setAttribute('x1', x1); el.setAttribute('y1', y1); el.setAttribute('x2', x2); el.setAttribute('y2', y2);
-      el.setAttribute('visibility', 'visible');
-    });
-    const a = $('to-sl-a'), b = $('to-sl-b'), t = $('to-sl-t');
-    if (a) { a.setAttribute('cx', x1); a.setAttribute('cy', y1); a.setAttribute('visibility', 'visible'); }
-    if (b) { b.setAttribute('cx', x2); b.setAttribute('cy', y2); b.setAttribute('visibility', 'visible'); }
-    if (t) { t.setAttribute('x', (x1 + x2) / 2); t.setAttribute('y', (y1 + y2) / 2 - 12); t.textContent = sl.feet + "' scale"; t.setAttribute('visibility', 'visible'); }
-  }
-  function guideHide(all) {
-    ['to-gv', 'to-gh', 'to-gc'].concat(all ? ['to-band-halo', 'to-band'] : []).forEach(id => {
-      const el = $(id); if (el) el.setAttribute('visibility', 'hidden');
-    });
-  }
   function onMove(ev) {
-    // Crosshair guides follow the pointer in EVERY tool (the builder works by
-    // them) — pan included, not just scale/measure/edit.
-    if (!TO.pdfDoc) return;
-    guideUpdate(ev);
-    TO.mouseBase = toBase(ev); scheduleRedraw();
-  }
-  // Max zoom that keeps the canvases inside the browser's hard limits.
-  // Chrome silently KILLS a canvas whose area exceeds ~268M px (16384²) —
-  // no error, it just stops drawing. A full-size architectural sheet
-  // (24×36 / 36×48) zoomed past ~4-6× crosses that line, which made the
-  // overlay (bands, crosshairs, measures) go invisible while clicks still
-  // registered. Cap zoom by the PAGE's base size so it can never happen.
-  function maxZoomForPage() {
-    // Display zoom is no longer limited by canvas size — the backing store is
-    // capped separately in renderPage and CSS-scaled up. 8x stays the UX cap.
-    return 8;
+    if (TO.tool !== 'scale' && TO.tool !== 'measure' && TO.tool !== 'edit') return;
+    TO.mouseBase = toBase(ev); redraw();
   }
   function zoomAt(factor, clientX, clientY) {
     if (!TO.pdfDoc) return;
@@ -18296,7 +17986,7 @@ if (typeof origSwitchTab === 'function') {
     const ax = (clientX != null) ? clientX : wr.left + wrap.clientWidth / 2;
     const ay = (clientY != null) ? clientY : wr.top + wrap.clientHeight / 2;
     const bx = (ax - r.left) / TO.renderScale, by = (ay - r.top) / TO.renderScale;
-    const ns = Math.max(0.25, Math.min(maxZoomForPage(), TO.renderScale * factor));
+    const ns = Math.max(0.25, Math.min(8, TO.renderScale * factor));
     if (ns === TO.renderScale) return;
     const viewX = ax - wr.left, viewY = ay - wr.top;
     TO.renderScale = ns;
@@ -18332,7 +18022,7 @@ if (typeof origSwitchTab === 'function') {
     highlightTool(); renderEditBar(); renderResults(); redraw();
   };
   window.takeoffEditDone = function () {
-    TO.tool = 'scale'; TO.editIndex = null; TO.selVertex = null; TO.dragVertex = null;
+    TO.tool = 'pan'; TO.editIndex = null; TO.selVertex = null; TO.dragVertex = null;
     highlightTool(); renderEditBar(); renderResults(); redraw();
   };
   window.takeoffDeletePoint = function () {
@@ -18393,53 +18083,15 @@ if (typeof origSwitchTab === 'function') {
   function redraw() {
     const dc = $('to-draw-canvas'); if (!dc) return;
     const ctx = dc.getContext('2d'); ctx.clearRect(0, 0, dc.width, dc.height);
-    const S = TO.pixelScale || TO.renderScale;   // canvas-pixel units per base unit
+    const S = TO.renderScale;
     // committed measures on this page (skip hidden)
     TO.measures.filter(m => m.page === TO.pageNum && m.visible !== false).forEach(m => drawMeasure(ctx, m, S, m.color, false));
-    // persistent scale line — stays on the sheet after the scale is set
-    const _sl = (TO.pages[TO.pageNum] || {}).scaleLine;
-    if (_sl) {
-      const a = { x: _sl.p1.x * S, y: _sl.p1.y * S }, b2 = { x: _sl.p2.x * S, y: _sl.p2.y * S };
-      ctx.save();
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 6;
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y); ctx.stroke();
-      ctx.strokeStyle = '#3ad67b'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b2.x, b2.y); ctx.stroke();
-      [a, b2].forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); ctx.fillStyle = '#3ad67b'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.stroke(); });
-      const mx = (a.x + b2.x) / 2, my = (a.y + b2.y) / 2;
-      const lbl = _sl.feet + "' scale";
-      ctx.font = 'bold 12px Arial'; const tw = ctx.measureText(lbl).width;
-      ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(mx - tw / 2 - 5, my - 20, tw + 10, 16);
-      ctx.fillStyle = '#3ad67b'; ctx.fillText(lbl, mx - tw / 2, my - 8);
-      ctx.restore();
-    }
     // draft (live)
     if (TO.draft) {
       const isScale = TO.draft.mode === 'scale';
       const pts = TO.draft.basePts.slice();
       const live = (TO.mouseBase && pts.length && TO.draft.mode !== 'count') ? pts.concat([TO.mouseBase]) : pts;
-      if (isScale && live.length) {
-        // High-contrast rubber band for the scale line — dark halo + thick
-        // BLUE stroke + outlined endpoints, readable on any blueprint.
-        const P = live.map(p => ({ x: p.x * S, y: p.y * S }));
-        ctx.save();
-        ctx.lineCap = 'round';
-        if (P.length >= 2) {
-          ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 7;
-          ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y); ctx.lineTo(P[1].x, P[1].y); ctx.stroke();
-          ctx.strokeStyle = '#1e7bff'; ctx.lineWidth = 3.5;
-          ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y); ctx.lineTo(P[1].x, P[1].y); ctx.stroke();
-        }
-        P.forEach(p => {
-          ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-          ctx.fillStyle = '#1e7bff'; ctx.fill();
-          ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
-        });
-        ctx.restore();
-      } else {
-        drawMeasure(ctx, { mode: TO.draft.mode, basePts: live }, S, isScale ? '#ffd27f' : '#1e7bff', true);
-      }
+      drawMeasure(ctx, { mode: TO.draft.mode, basePts: live }, S, isScale ? '#ffd27f' : '#1e7bff', true);
     }
     // edit handles
     if (TO.tool === 'edit' && TO.editIndex != null && TO.measures[TO.editIndex]) {
@@ -18451,9 +18103,23 @@ if (typeof origSwitchTab === 'function') {
         ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
       });
     }
-    // NOTE: the crosshair guides + scale band + persistent scale line are
-    // rendered in the #to-guides SVG layer (see guideUpdate/syncScaleLineSVG),
-    // NOT on this canvas — SVG shows even where canvas compositing fails.
+    // Crosshair guide lines in scale/measure/edit modes — full-canvas hairlines that
+    // follow the pointer, so you always see exactly where you're clicking even when
+    // the OS hides the custom cursor (common with Windows display scaling).
+    if (TO.mouseBase && (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit')) {
+      const mx = TO.mouseBase.x * S, my = TO.mouseBase.y * S;
+      ctx.save();
+      ctx.strokeStyle = (TO.tool === 'scale') ? 'rgba(255,210,127,0.85)' : 'rgba(30,123,255,0.75)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.moveTo(mx, 0); ctx.lineTo(mx, dc.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(dc.width, my); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(mx, my, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#ff3b30'; ctx.fill();
+      ctx.lineWidth = 1; ctx.strokeStyle = '#fff'; ctx.stroke();
+      ctx.restore();
+    }
   }
   function drawMeasure(ctx, m, S, color, draft) {
     const pts = m.basePts.map(p => ({ x: p.x * S, y: p.y * S }));
@@ -18530,13 +18196,11 @@ if (typeof origSwitchTab === 'function') {
   }
   function updateHud() {
     $('to-page-ind').textContent = TO.pdfDoc ? (pageLabel(TO.pageNum) + '  (' + TO.pageNum + '/' + TO.pageCount + ')') : '— / —';
-    updateToolStatus();
     const upf = uPerFt();
     const ro = $('to-scale-readout');
     if (ro) ro.innerHTML = upf
       ? `Scale set on page ${TO.pageNum} — drawing scale <strong style="color:var(--copper);">${archScale(upf)}</strong>. Check that against the title block; if it's off, re-set scale off the longest dimensioned line.`
       : 'Scale: not set on this page — use <strong>Set scale</strong>, click two ends of a known dimension, then type its real length.';
-    try { syncScaleLineSVG(); } catch (e) {}
   }
 
   // ---- results + push to quote ----
@@ -18591,7 +18255,7 @@ if (typeof origSwitchTab === 'function') {
       </div>`;
     renderCatTotals();
   }
-  window.takeoffDelete = function (i) { TO.measures.splice(i, 1); if (TO.editIndex != null) { TO.tool = 'scale'; TO.editIndex = null; TO.selVertex = null; highlightTool(); renderEditBar(); } redraw(); renderResults(); renderPagesList(); takeoffAutoPush(); };
+  window.takeoffDelete = function (i) { TO.measures.splice(i, 1); if (TO.editIndex != null) { TO.tool = 'pan'; TO.editIndex = null; TO.selVertex = null; highlightTool(); renderEditBar(); } redraw(); renderResults(); renderPagesList(); takeoffAutoPush(); };
   window.takeoffRename = function (i, name) { if (TO.measures[i]) { TO.measures[i].name = name; redraw(); } };
   window.takeoffToggleVis = function (i) { if (TO.measures[i]) { TO.measures[i].visible = (TO.measures[i].visible === false); redraw(); renderResults(); } };
 
@@ -18736,12 +18400,12 @@ if (typeof origSwitchTab === 'function') {
     if (!TO.pdfDoc) { alert('Load a PDF first.'); return; }
     $('to-modal-title').textContent = 'Set scale — page ' + TO.pageNum;
     $('to-modal-body').innerHTML =
-      `<div style="color:var(--text-2);">Enter the real length of a known dimension, click <strong>Start</strong>, then <strong>press at one end and DRAG to the other end</strong> of that dimension on the plan (two separate clicks work too). A blue line follows your mouse.</div>
+      `<div style="color:var(--text-2);">Enter the real length of a known dimension, then click <strong>Start</strong> and click its two endpoints on the plan.</div>
        <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
-         ${fieldRow('Feet', `<input type="number" id="to-sc-ft" value="40" style="width:72px;" onkeydown="if(event.key==='Enter')takeoffScaleStart()">`)}
-         ${fieldRow('Inches', `<input type="number" id="to-sc-in" value="0" style="width:62px;" onkeydown="if(event.key==='Enter')takeoffScaleStart()">`)}
-         ${fieldRow('Frac num', `<input type="number" id="to-sc-fn" value="0" style="width:62px;" onkeydown="if(event.key==='Enter')takeoffScaleStart()">`)}
-         ${fieldRow('Frac den', `<input type="number" id="to-sc-fd" value="0" style="width:62px;" onkeydown="if(event.key==='Enter')takeoffScaleStart()">`)}
+         ${fieldRow('Feet', `<input type="number" id="to-sc-ft" value="40" style="width:72px;">`)}
+         ${fieldRow('Inches', `<input type="number" id="to-sc-in" value="0" style="width:62px;">`)}
+         ${fieldRow('Frac num', `<input type="number" id="to-sc-fn" value="0" style="width:62px;">`)}
+         ${fieldRow('Frac den', `<input type="number" id="to-sc-fd" value="0" style="width:62px;">`)}
        </div>
        <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="to-sc-all"> Apply same scale to all pages</label>`;
     setFoot([['▶ Start', 'takeoffScaleStart()', true], ['Close', 'takeoffCloseDialog()', false]]);
