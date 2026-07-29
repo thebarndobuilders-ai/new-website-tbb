@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v194</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v195</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2236,6 +2236,7 @@
     <div class="qbs-tab" data-tab="schedule" onclick="switchTab('schedule')">Schedule</div>
     <div class="qbs-tab" data-tab="flitch" onclick="switchTab('flitch')">Pricing master</div>
     <div class="qbs-tab" data-tab="calcs" onclick="switchTab('calcs')">Calculators</div>
+    <div class="qbs-tab" data-tab="vendors" onclick="switchTab('vendors')">Vendors</div>
     <div class="qbs-tab" data-tab="settings" onclick="switchTab('settings')">Settings</div>
     <div class="qbs-tab" data-tab="saved" onclick="switchTab('saved')">Saved</div>
   </div>
@@ -4253,6 +4254,30 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
       </div>
       <div id="ws_results" style="margin-top:12px;"></div>
       <div class="qbs-note" style="margin-top:8px;">Wall area = perimeter × height + gable triangles (W² × pitch ÷ 48 each) − openings. 1 square = 100&nbsp;ft². Panel LF shown for 36" coverage (÷3) and 12" board &amp; batten (÷1).</div>
+    </div>
+  </div>
+
+  <!-- VENDORS -->
+  <div class="qbs-tab-content" id="tab-vendors" style="display:none">
+    <div class="qbs-card">
+      <h3>Vendor list <span class="badge">Saved in this browser · rides in the full backup</span></h3>
+      <p class="qbs-sub" style="margin-bottom:10px;">Starter list of suppliers within ~300 miles — <b>verify phone, contact, and terms before ordering</b>; distances are approximate road miles from home base. Add, edit, and work the list until it's dialed in.</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+        <label style="font-size:11px;">Home base <input id="vend-home" style="width:130px; font-size:12px;" onchange="vendSetHome(this.value)"></label>
+        <select id="vend-filter" onchange="renderVendors()" style="font-size:12px;">
+          <option value="">All categories</option>
+        </select>
+        <input id="vend-search" placeholder="Search name / city / notes…" oninput="renderVendors()" style="min-width:200px; font-size:12px;">
+        <button onclick="vendAdd()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600;">+ Add vendor</button>
+        <button onclick="vendExportCSV()">⬇ CSV</button>
+        <span id="vend-count" class="qbs-note" style="margin:0;"></span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="qbs-table" style="width:100%; font-size:12px; min-width:1100px;">
+          <thead><tr><th>Vendor</th><th>Category</th><th>City</th><th>~Mi</th><th>Phone</th><th>Website</th><th>Contact / acct</th><th>Status</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="vend-tbody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -7781,7 +7806,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v194';
+const BB_VERSION = 'v195';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -8418,6 +8443,101 @@ function renderSchedule() {
 schedLoad();
 
 // =============================================================
+// VENDORS — supplier list with categories, status pipeline, CSV.
+// Stored under bb_vendors_v1 (rides in the full backup). Seeded once
+// with real regional suppliers (~300 mi of Selmer, TN) — VERIFY each
+// before ordering; phones intentionally left blank, no guessed numbers.
+// =============================================================
+const VEND_KEY = 'bb_vendors_v1';
+const VEND_CATS = ['Lumber & full-line', 'Windows & doors', 'Drywall & interior', 'Trim & millwork', 'Roofing & exterior', 'Metal panels', 'Masonry & block', 'Big-box pro desk', 'Other'];
+const VEND_STATUS = ['prospect', 'contacted', 'quoted', 'ACTIVE', 'pass'];
+const VEND_SEED = [
+  { n: "Lowe's Pro Desk", c: 'Big-box pro desk', city: 'Columbia, TN', mi: 30, web: 'lowes.com', note: 'Closest big-box pro desk — volume pricing' },
+  { n: 'Home Depot Pro', c: 'Big-box pro desk', city: 'Columbia, TN', mi: 30, web: 'homedepot.com', note: 'Pro Xtra account' },
+  { n: '84 Lumber', c: 'Lumber & full-line', city: 'Nashville, TN', mi: 80, web: '84lumber.com', note: 'Lumber, doors, moulding; national account possible — verify nearest yard' },
+  { n: 'Builders FirstSource', c: 'Lumber & full-line', city: 'Lebanon / Nashville, TN', mi: 95, web: 'bldr.com', note: 'National full-line + trusses, drywall, windows/doors — verify nearest yard' },
+  { n: 'ABC Supply Co', c: 'Roofing & exterior', city: 'Nashville, TN', mi: 80, web: 'abcsupply.com', note: 'Roofing, siding, exterior — multiple Middle-TN branches' },
+  { n: 'L&W Supply', c: 'Drywall & interior', city: 'Nashville, TN', mi: 80, web: 'lwsupply.com', note: 'Drywall / steel / insulation distributor — verify nearest branch' },
+  { n: 'Pella Windows & Doors', c: 'Windows & doors', city: 'Nashville, TN', mi: 80, web: 'pella.com', note: 'Branded showroom — verify branch' },
+  { n: 'Window World of Middle TN', c: 'Windows & doors', city: 'Nashville area, TN', mi: 80, web: 'windowworld.com', note: 'Franchise — verify territory' },
+  { n: 'City Lumber Company', c: 'Lumber & full-line', city: 'Jackson, TN', mi: 90, web: 'clc-tn.com', note: 'Full line: lumber, doors/windows, millwork & trim, gypsum, roofing' },
+  { n: 'Cherokee Building Materials', c: 'Drywall & interior', city: 'Jackson, TN', mi: 90, web: 'cherbmi.com', note: 'Drywall / interior specialty yard' },
+  { n: 'Northside Lumber', c: 'Lumber & full-line', city: 'Jackson, TN', mi: 90, web: '', note: '' },
+  { n: 'Home Outlet', c: 'Windows & doors', city: 'Jackson, TN', mi: 90, web: 'homeoutlet.com', note: 'Discount doors, windows, cabinets' },
+  { n: 'Acme Brick Tile & Stone', c: 'Masonry & block', city: 'Jackson, TN', mi: 90, web: 'brick.com', note: '' },
+  { n: 'Jimmy Whittington Lumber', c: 'Lumber & full-line', city: 'Memphis, TN', mi: 170, web: 'whittingtonlumber.com', note: 'Family owned since 1966 — Memphis-metro lumber house' },
+  { n: 'Harrison Wholesale', c: 'Windows & doors', city: 'Memphis, TN', mi: 170, web: '', note: 'Wholesale millwork / windows / doors' },
+  { n: 'Bolen-Brunson-Bell', c: 'Trim & millwork', city: 'Memphis, TN', mi: 170, web: '', note: 'Millwork house' },
+  { n: "Reed's Metals", c: 'Metal panels', city: 'Tupelo, MS', mi: 150, web: 'reedsmetals.com', note: 'Post-frame metal, cut-to-length — verify branch' },
+];
+let vendState = null;
+function vendLoad() {
+  try { vendState = JSON.parse(localStorage.getItem(VEND_KEY)); } catch (e) { vendState = null; }
+  if (!vendState || !Array.isArray(vendState.list)) {
+    vendState = { home: 'Hohenwald, TN 38462', list: VEND_SEED.map((v, i) => ({ id: 'v' + i, name: v.n, cat: v.c, city: v.city, mi: v.mi, phone: '', web: v.web, contact: '', status: 'prospect', notes: v.note })) };
+    vendSave();
+  }
+}
+function vendSave() { try { localStorage.setItem(VEND_KEY, JSON.stringify(vendState)); } catch (e) {} }
+function vendSetHome(v) { vendState.home = v.trim(); vendSave(); }
+function vendAdd() {
+  vendState.list.unshift({ id: 'v' + Date.now(), name: '', cat: 'Lumber & full-line', city: '', mi: 0, phone: '', web: '', contact: '', status: 'prospect', notes: '' });
+  vendSave(); renderVendors();
+}
+function vendSet(id, f, val) {
+  const v = vendState.list.find(x => x.id === id); if (!v) return;
+  v[f] = (f === 'mi') ? (parseFloat(val) || 0) : val;
+  vendSave();
+  if (f === 'status' || f === 'cat') renderVendors();
+}
+function vendDel(id) {
+  const v = vendState.list.find(x => x.id === id); if (!v) return;
+  if (!confirm('Remove vendor "' + (v.name || 'unnamed') + '"?')) return;
+  vendState.list = vendState.list.filter(x => x.id !== id);
+  vendSave(); renderVendors();
+}
+function vendExportCSV() {
+  let csv = 'Name,Category,City,Miles,Phone,Website,Contact,Status,Notes\n';
+  vendState.list.forEach(v => {
+    csv += [v.name, v.cat, v.city, v.mi, v.phone, v.web, v.contact, v.status, v.notes].map(x => '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"').join(',') + '\n';
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = 'vendors.csv'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+function renderVendors() {
+  if (!vendState) vendLoad();
+  const home = document.getElementById('vend-home');
+  if (home && !home.value) home.value = vendState.home || '';
+  const filt = document.getElementById('vend-filter');
+  if (filt && filt.options.length <= 1) VEND_CATS.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; filt.appendChild(o); });
+  const fc = filt ? filt.value : '';
+  const q = ((document.getElementById('vend-search') || {}).value || '').toLowerCase();
+  const tb = document.getElementById('vend-tbody'); if (!tb) return;
+  const stColor = s => s === 'ACTIVE' ? '#3ad67b' : s === 'quoted' ? 'var(--copper)' : s === 'pass' ? '#888' : 'var(--text-2)';
+  const rows = vendState.list.filter(v =>
+    (!fc || v.cat === fc) &&
+    (!q || (v.name + ' ' + v.city + ' ' + v.notes + ' ' + v.cat).toLowerCase().includes(q)));
+  tb.innerHTML = rows.map(v => `
+    <tr>
+      <td><input value="${(v.name || '').replace(/"/g, '&quot;')}" placeholder="vendor name" onchange="vendSet('${v.id}','name',this.value)" style="width:100%; min-width:160px; font-weight:600;"></td>
+      <td><select onchange="vendSet('${v.id}','cat',this.value)" style="font-size:11px;">${VEND_CATS.map(c => `<option ${v.cat === c ? 'selected' : ''}>${c}</option>`).join('')}</select></td>
+      <td><input value="${(v.city || '').replace(/"/g, '&quot;')}" onchange="vendSet('${v.id}','city',this.value)" style="width:110px;"></td>
+      <td><input type="number" value="${v.mi || ''}" onchange="vendSet('${v.id}','mi',this.value)" style="width:52px; text-align:right;"></td>
+      <td><input value="${(v.phone || '').replace(/"/g, '&quot;')}" placeholder="—" onchange="vendSet('${v.id}','phone',this.value)" style="width:110px;"></td>
+      <td><input value="${(v.web || '').replace(/"/g, '&quot;')}" placeholder="—" onchange="vendSet('${v.id}','web',this.value)" style="width:140px;"></td>
+      <td><input value="${(v.contact || '').replace(/"/g, '&quot;')}" placeholder="rep / acct #" onchange="vendSet('${v.id}','contact',this.value)" style="width:120px;"></td>
+      <td><select onchange="vendSet('${v.id}','status',this.value)" style="color:${stColor(v.status)}; font-weight:600; font-size:11px;">${VEND_STATUS.map(s => `<option ${v.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select></td>
+      <td><input value="${(v.notes || '').replace(/"/g, '&quot;')}" onchange="vendSet('${v.id}','notes',this.value)" style="width:100%; min-width:180px;"></td>
+      <td><button onclick="vendDel('${v.id}')" style="padding:2px 7px !important; background:#3a1414; color:#ff9b9b; border-color:#5a1f1f;">✕</button></td>
+    </tr>`).join('');
+  const ct = document.getElementById('vend-count');
+  if (ct) ct.textContent = rows.length + ' of ' + vendState.list.length + ' vendors · ' + vendState.list.filter(v => v.status === 'ACTIVE').length + ' active';
+}
+vendLoad();
+
+
+// =============================================================
 // DRAW SCHEDULE + CHANGE ORDERS — additive layer over the quote.
 // Reads window._lastCalc.grand; never writes into quote math.
 // Draw milestones: one editable template (bb_draw_schedule_v1).
@@ -8553,6 +8673,7 @@ function switchTab(name) {
   if (name === 'settings') renderDefaultPrices();
   if (name === 'schedule') { try { renderSchedule(); } catch (e) {} }
   if (name === 'quote') { try { renderDrawSchedule(); renderChangeOrders(); } catch (e) {} }
+  if (name === 'vendors') { try { renderVendors(); } catch (e) {} }
   if (name === 'calcs') { ['grCalc','gsCalc','shCalc','swCalc','stCalc','csCalc','phCalc','rfCalc','gpCalc','dwCalc','bfCalc','cbCalc','cfCalc','rsCalc','wsCalc'].forEach(f => { try { window[f] ? window[f]() : eval(f + '()'); } catch (e) {} }); }
   if (name === 'takeoff' && typeof takeoffInit === 'function') takeoffInit();
   if (name === 'subs') {
@@ -19140,5 +19261,19 @@ if (typeof origSwitchTab === 'function') {
     }, 120);
     alert('Pushed to the Truss configuration tool:\n\n' + lines.join('\n') + '\n\nEach is a new row (manual qty) on the Dimensions tab.');
   };
+  // STARTUP BIND (the builder's discovery): the app opens on the Takeoff tab,
+  // but the startup switchTab('takeoff') runs BEFORE this script exists, so
+  // its takeoffInit type-check silently failed — tab visible, mouse dead,
+  // until the user left the tab and came back. Bind here at startup, and if
+  // the strip marks Takeoff active while its content is still hidden, finish
+  // the job switchTab started.
+  setTimeout(function () {
+    try { window.takeoffInit(); } catch (e) {}
+    try {
+      const act = document.querySelector('.qbs-tab.active');
+      const tk = document.getElementById('tab-takeoff');
+      if (act && act.dataset.tab === 'takeoff' && tk && tk.style.display === 'none' && typeof switchTab === 'function') switchTab('takeoff');
+    } catch (e) {}
+  }, 0);
 })();
 </script>
