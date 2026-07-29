@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v187</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v188</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3332,8 +3332,14 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           </div>
           <div id="to-canvas-wrap" style="position:relative; width:100%; height:600px; overflow:auto; background:#2a2a2a; border:1px solid var(--hairline); border-radius:6px;">
             <div id="to-stage" style="position:relative;">
-              <canvas id="to-pdf-canvas" style="display:block;"></canvas>
-              <canvas id="to-draw-canvas" style="position:absolute; left:0; top:0;"></canvas>
+              <canvas id="to-pdf-canvas" style="display:block; position:relative; z-index:1;"></canvas>
+              <canvas id="to-draw-canvas" style="position:absolute; left:0; top:0; z-index:2;"></canvas>
+              <!-- DOM crosshair: plain divs (same layer as buttons/text) so the
+                   cursor guides show even if canvas overlay drawing ever fails -->
+              <div id="to-xh-v" style="display:none; position:absolute; top:0; width:0; border-left:2px dashed #1e7bff; box-shadow:0 0 0 1px rgba(0,0,0,0.45); z-index:6; pointer-events:none;"></div>
+              <div id="to-xh-h" style="display:none; position:absolute; left:0; height:0; border-top:2px dashed #1e7bff; box-shadow:0 0 0 1px rgba(0,0,0,0.45); z-index:6; pointer-events:none;"></div>
+              <div id="to-xh-d" style="display:none; position:absolute; width:11px; height:11px; margin:-6px 0 0 -6px; border-radius:50%; background:#ff3b30; border:2px solid #fff; z-index:7; pointer-events:none;"></div>
+              <div id="to-xh-band" style="display:none; position:absolute; height:0; border-top:4px solid #1e7bff; box-shadow:0 0 0 2px rgba(0,0,0,0.5); transform-origin:0 0; z-index:6; pointer-events:none;"></div>
             </div>
             <div id="to-empty" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#888; font-size:13px;">No PDF loaded — click “Load PDF”.</div>
           </div>
@@ -7376,7 +7382,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v187';
+const BB_VERSION = 'v188';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17669,7 +17675,7 @@ if (typeof origSwitchTab === 'function') {
       dc.addEventListener('click', onClick);
       dc.addEventListener('dblclick', onDblClick);
       dc.addEventListener('mousemove', onMove);
-      dc.addEventListener('mouseleave', () => { TO.mouseBase = null; redraw(); });
+      dc.addEventListener('mouseleave', () => { TO.mouseBase = null; xhHide(); redraw(); });
       dc.addEventListener('mousedown', onDown);
       dc.addEventListener('contextmenu', (e) => e.preventDefault());
       const wrap = $('to-canvas-wrap');
@@ -17930,6 +17936,40 @@ if (typeof origSwitchTab === 'function') {
     return { x: (ev.clientX - r.left) * sx / TO.renderScale, y: (ev.clientY - r.top) * sy / TO.renderScale };
   }
   function onDown(ev) {
+    // SCALE: press-and-DRAG in one motion (the natural gesture). Two separate
+    // clicks still work via onClick. The DOM band follows the pointer live.
+    if (TO.tool === 'scale' && ev.button === 0 && TO.pdfDoc) {
+      ev.preventDefault();
+      const startBase = toBase(ev);
+      const sx = ev.clientX, sy = ev.clientY;
+      let moved = false;
+      const mv = (e) => {
+        if (!moved && Math.hypot(e.clientX - sx, e.clientY - sy) > 6) {
+          moved = true;
+          TO.draft = { mode: 'scale', basePts: [startBase] };   // arms the band
+        }
+        if (moved) { xhUpdate(e); TO.mouseBase = toBase(e); redraw(); }
+      };
+      const up = (e) => {
+        window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up);
+        if (!moved) return;                       // a plain click -> let onClick handle it
+        TO._suppressClick = true; setTimeout(() => { TO._suppressClick = false; }, 80);
+        const endBase = toBase(e);
+        const px = dist(startBase, endBase);
+        let feet = (TO.scaleEntry && TO.scaleEntry.feet) || 0;
+        if (!feet) { const s = prompt('Real length of this line, in feet (decimal ok):', '40'); feet = parseFloat(s); }
+        if (feet && feet > 0) {
+          const upf = px / feet;
+          if (TO.scaleEntry && TO.scaleEntry.applyAll) { for (let pg = 1; pg <= TO.pageCount; pg++) TO.pages[pg] = { unitsPerFoot: upf }; }
+          else { TO.pages[TO.pageNum] = { unitsPerFoot: upf }; }
+        }
+        TO.draft = null;
+        const band = $('to-xh-band'); if (band) band.style.display = 'none';
+        redraw(); updateHud(); renderResults();
+      };
+      window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+      return;
+    }
     // Edit mode: left-button on a vertex starts a drag-to-move
     if (TO.tool === 'edit' && ev.button === 0 && TO.editIndex != null) {
       const m = TO.measures[TO.editIndex];
@@ -17974,6 +18014,7 @@ if (typeof origSwitchTab === 'function') {
       TO.selVertex = null; redraw(); renderEditBar(); return;
     }
     if (TO.tool === 'scale') {
+      if (TO._suppressClick) return;      // a drag-to-scale just completed
       if (!TO.draft || TO.draft.mode !== 'scale') TO.draft = { mode: 'scale', basePts: [] };
       TO.draft.basePts.push(p);
       if (TO.draft.basePts.length === 2) {
@@ -17997,7 +18038,36 @@ if (typeof origSwitchTab === 'function') {
     redraw();
   }
   function onDblClick(ev) { if (TO.tool !== 'pan' && TO.tool !== 'scale') takeoffFinish(); }
+  // DOM crosshair — positioned from raw client coords, no canvas involved.
+  function xhUpdate(ev) {
+    const stage = $('to-stage'); if (!stage || !TO.pdfDoc) return;
+    const r = stage.getBoundingClientRect();
+    const x = ev.clientX - r.left, y = ev.clientY - r.top;
+    const v = $('to-xh-v'), h = $('to-xh-h'), d = $('to-xh-d');
+    if (!v) return;
+    v.style.left = x + 'px'; v.style.height = r.height + 'px'; v.style.display = 'block';
+    h.style.top = y + 'px';  h.style.width  = r.width  + 'px'; h.style.display = 'block';
+    d.style.left = x + 'px'; d.style.top = y + 'px'; d.style.display = 'block';
+    // rubber band from the first scale point to the pointer
+    const band = $('to-xh-band');
+    const p0 = (TO.tool === 'scale' && TO.draft && TO.draft.mode === 'scale' && TO.draft.basePts.length === 1) ? TO.draft.basePts[0] : null;
+    if (band) {
+      if (p0) {
+        const x0 = p0.x * TO.renderScale, y0 = p0.y * TO.renderScale;
+        const dx = x - x0, dy = y - y0;
+        band.style.left = x0 + 'px'; band.style.top = y0 + 'px';
+        band.style.width = Math.sqrt(dx * dx + dy * dy) + 'px';
+        band.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
+        band.style.display = 'block';
+      } else { band.style.display = 'none'; }
+    }
+  }
+  function xhHide() {
+    ['to-xh-v', 'to-xh-h', 'to-xh-d', 'to-xh-band'].forEach(id => { const el = $(id); if (el) el.style.display = 'none'; });
+  }
   function onMove(ev) {
+    if (!TO.pdfDoc) return;
+    xhUpdate(ev);                      // crosshair follows in EVERY tool
     if (TO.tool !== 'scale' && TO.tool !== 'measure' && TO.tool !== 'edit') return;
     TO.mouseBase = toBase(ev); redraw();
   }
