@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v190</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v191</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -7383,7 +7383,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v190';
+const BB_VERSION = 'v191';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17688,9 +17688,23 @@ if (typeof origSwitchTab === 'function') {
         return e.clientX >= b.left && e.clientX <= b.right && e.clientY >= b.top && e.clientY <= b.bottom;
       };
       const wrapEl = $('to-canvas-wrap');
-      wrapEl.addEventListener('mousemove', (e) => { if (overCanvas(e)) onMove(e); });
-      wrapEl.addEventListener('click',     (e) => { if (overCanvas(e)) onClick(e); });
-      wrapEl.addEventListener('mousedown', (e) => { if (overCanvas(e)) onDown(e); });
+      wrapEl.addEventListener('mousemove', (e) => { if (!e._toH && overCanvas(e)) onMove(e); });
+      wrapEl.addEventListener('click',     (e) => { if (!e._toH && overCanvas(e)) onClick(e); });
+      wrapEl.addEventListener('mousedown', (e) => { if (!e._toH && overCanvas(e)) onDown(e); });
+      // LAST-RESORT input path: DOCUMENT-level capture. Runs before anything
+      // else in the page can see or swallow the event, so no overlay, layer,
+      // or extension can stand between the mouse and the sheet.
+      const docForward = (fn) => (e) => {
+        if (!TO.pdfDoc || e._toH || e.target === dc) return;
+        const tab = $('tab-takeoff'); if (!tab || tab.style.display === 'none') return;
+        const b = dc.getBoundingClientRect();
+        if (e.clientX < b.left || e.clientX > b.right || e.clientY < b.top || e.clientY > b.bottom) return;
+        e._toH = true;
+        fn(e);
+      };
+      document.addEventListener('mousemove', docForward(onMove), true);
+      document.addEventListener('mousedown', docForward(onDown), true);
+      document.addEventListener('click', docForward(onClick), true);
       const wrap = $('to-canvas-wrap');
       wrap.addEventListener('contextmenu', (e) => e.preventDefault());
       wrap.addEventListener('wheel', onWheel, { passive: false });
