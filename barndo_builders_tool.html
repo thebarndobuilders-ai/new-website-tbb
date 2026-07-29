@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v191</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v192</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3341,6 +3341,9 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
               <div id="to-xh-h" style="display:none; position:absolute; left:0; height:0; border-top:2px dashed #1e7bff; box-shadow:0 0 0 1px rgba(0,0,0,0.45); z-index:6; pointer-events:none;"></div>
               <div id="to-xh-d" style="display:none; position:absolute; width:11px; height:11px; margin:-6px 0 0 -6px; border-radius:50%; background:#ff3b30; border:2px solid #fff; z-index:7; pointer-events:none;"></div>
               <div id="to-xh-band" style="display:none; position:absolute; height:0; border-top:4px solid #1e7bff; box-shadow:0 0 0 2px rgba(0,0,0,0.5); transform-origin:0 0; z-index:6; pointer-events:none;"></div>
+              <!-- persistent scale line: stays on the sheet after locking -->
+              <div id="to-sl-line" style="display:none; position:absolute; height:0; border-top:4px solid #3ad67b; box-shadow:0 0 0 2px rgba(0,0,0,0.55); transform-origin:0 0; z-index:5; pointer-events:none;"></div>
+              <div id="to-sl-label" style="display:none; position:absolute; z-index:5; pointer-events:none; background:rgba(0,0,0,0.78); color:#3ad67b; font:bold 12px Arial,sans-serif; padding:2px 9px; border-radius:4px; transform:translate(-50%,-135%); white-space:nowrap;"></div>
             </div>
             <div id="to-empty" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#888; font-size:13px;">No PDF loaded — click “Load PDF”.</div>
           </div>
@@ -7383,7 +7386,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v191';
+const BB_VERSION = 'v192';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -18004,8 +18007,7 @@ if (typeof origSwitchTab === 'function') {
         if (!feet) { const s = prompt('Real length of this line, in feet (decimal ok):', '40'); feet = parseFloat(s); }
         if (feet && feet > 0) {
           const upf = px / feet;
-          if (TO.scaleEntry && TO.scaleEntry.applyAll) { for (let pg = 1; pg <= TO.pageCount; pg++) TO.pages[pg] = { unitsPerFoot: upf }; }
-          else { TO.pages[TO.pageNum] = { unitsPerFoot: upf }; }
+          scaleLockIn(startBase, endBase, feet, upf);
         }
         TO.draft = null;
         const band = $('to-xh-band'); if (band) band.style.display = 'none';
@@ -18068,8 +18070,7 @@ if (typeof origSwitchTab === 'function') {
         if (!feet) { const s = prompt('Real length of this line, in feet (decimal ok):', '40'); feet = parseFloat(s); }
         if (feet && feet > 0) {
           const upf = px / feet;
-          if (TO.scaleEntry && TO.scaleEntry.applyAll) { for (let pg = 1; pg <= TO.pageCount; pg++) TO.pages[pg] = { unitsPerFoot: upf }; }
-          else { TO.pages[TO.pageNum] = { unitsPerFoot: upf }; }
+          scaleLockIn(TO.draft.basePts[0], TO.draft.basePts[1], feet, upf);
         }
         TO.draft = null; redraw(); updateHud(); renderResults();
         return;
@@ -18084,6 +18085,48 @@ if (typeof origSwitchTab === 'function') {
   }
   function onDblClick(ev) { if (TO.tool !== 'pan' && TO.tool !== 'scale') takeoffFinish(); }
   // DOM crosshair — positioned from raw client coords, no canvas involved.
+  // Persistent green scale line (DOM) — stored in base units per page,
+  // repositioned on every zoom/page change via updateHud.
+  function syncScaleLineDom() {
+    const ln = $('to-sl-line'), lb = $('to-sl-label');
+    if (!ln || !lb) return;
+    const sl = TO.pdfDoc ? (TO.pages[TO.pageNum] || {}).scaleLine : null;
+    if (!sl) { ln.style.display = 'none'; lb.style.display = 'none'; return; }
+    const R = TO.renderScale;
+    const x1 = sl.p1.x * R, y1 = sl.p1.y * R, x2 = sl.p2.x * R, y2 = sl.p2.y * R;
+    const dx = x2 - x1, dy = y2 - y1;
+    ln.style.left = x1 + 'px'; ln.style.top = y1 + 'px';
+    ln.style.width = Math.sqrt(dx * dx + dy * dy) + 'px';
+    ln.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
+    ln.style.display = 'block';
+    lb.style.left = (x1 + x2) / 2 + 'px'; lb.style.top = (y1 + y2) / 2 + 'px';
+    lb.textContent = sl.feet + "' scale line";
+    lb.style.display = 'block';
+  }
+  // One place that LOCKS the scale: stores it, keeps the line visible,
+  // flashes an unmissable confirmation, refreshes every readout.
+  function scaleLockIn(p1, p2, feet, upf) {
+    const line = { p1: { x: p1.x, y: p1.y }, p2: { x: p2.x, y: p2.y }, feet: feet };
+    if (TO.scaleEntry && TO.scaleEntry.applyAll) {
+      for (let pg = 1; pg <= TO.pageCount; pg++) TO.pages[pg] = { unitsPerFoot: upf };
+      TO.pages[TO.pageNum].scaleLine = line;
+    } else {
+      TO.pages[TO.pageNum] = { unitsPerFoot: upf, scaleLine: line };
+    }
+    TO.scaleEntry = null;         // never silently reuse old footage
+    let toast = $('to-scale-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'to-scale-toast';
+      toast.style.cssText = 'position:fixed; top:18px; left:50%; transform:translateX(-50%); z-index:2147483000; background:#0e2b18; color:#3ad67b; border:2px solid #3ad67b; border-radius:10px; padding:14px 26px; font:bold 17px Arial,sans-serif; box-shadow:0 6px 30px rgba(0,0,0,0.6); display:none;';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = '✓ SCALE LOCKED — ' + feet + ' ft · ' + archScale(upf).replace('≈ ', '') + ' · page ' + TO.pageNum;
+    toast.style.display = 'block';
+    clearTimeout(TO._toastT);
+    TO._toastT = setTimeout(() => { toast.style.display = 'none'; }, 3500);
+    setTimeout(() => { try { liveStatus(null); } catch (e) {} }, 0);   // after draft clears
+  }
   function liveStatus(ev) {
     const el = $('to-live'); if (!el) return;
     const pts = (TO.draft && TO.draft.basePts) ? TO.draft.basePts.length : 0;
@@ -18351,6 +18394,7 @@ if (typeof origSwitchTab === 'function') {
     return `≈ ${ipf.toFixed(3)}" = 1' (non-standard — recheck)`;
   }
   function updateHud() {
+    try { syncScaleLineDom(); } catch (e) {}
     $('to-page-ind').textContent = TO.pdfDoc ? (pageLabel(TO.pageNum) + '  (' + TO.pageNum + '/' + TO.pageCount + ')') : '— / —';
     const upf = uPerFt();
     const ro = $('to-scale-readout');
