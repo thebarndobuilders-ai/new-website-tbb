@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v188</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v189</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -7382,7 +7382,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v188';
+const BB_VERSION = 'v189';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17852,7 +17852,16 @@ if (typeof origSwitchTab === 'function') {
 
   function renderPage() {
     if (!TO.pdfDoc) return;
+    // SERIALIZE pdf.js renders. Page flips and zooms fire renderPage rapidly;
+    // starting a second render on the same canvas throws "Cannot use the same
+    // canvas during multiple render() operations", the promise rejects, the
+    // completion handler never runs, and the OVERLAY canvas is left blank —
+    // which kills the crosshair/scale line on screen. Cancel the in-flight
+    // render first and always repaint the overlay, even on failure.
+    if (TO._renderTask) { try { TO._renderTask.cancel(); } catch (e) {} TO._renderTask = null; }
+    const myToken = (TO._renderToken = (TO._renderToken || 0) + 1);
     TO.pdfDoc.getPage(TO.pageNum).then(page => {
+      if (myToken !== TO._renderToken) return;         // a newer render superseded this one
       const vp = page.getViewport({ scale: TO.renderScale });
       TO.vp = vp;
       const pc = $('to-pdf-canvas'), dc = $('to-draw-canvas');
@@ -17861,11 +17870,19 @@ if (typeof origSwitchTab === 'function') {
       $('to-stage').style.width = vp.width + 'px';
       $('to-stage').style.height = vp.height + 'px';
       const ctx = pc.getContext('2d');
-      page.render({ canvasContext: ctx, viewport: vp }).promise.then(() => {
+      const task = page.render({ canvasContext: ctx, viewport: vp });
+      TO._renderTask = task;
+      task.promise.then(() => {
+        if (TO._renderTask === task) TO._renderTask = null;
         redraw(); updateHud();
         if (TO._afterRender) { const f = TO._afterRender; TO._afterRender = null; f(); }
+      }).catch(err => {
+        if (TO._renderTask === task) TO._renderTask = null;
+        // Cancellation is expected when zooming/flipping fast; repaint anyway
+        // so measures, the scale line and the crosshair never disappear.
+        try { redraw(); updateHud(); } catch (e) {}
       });
-    });
+    }).catch(() => { try { redraw(); updateHud(); } catch (e) {} });
   }
 
   window.takeoffPage = function (d) {
