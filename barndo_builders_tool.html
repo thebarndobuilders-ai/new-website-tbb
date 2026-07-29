@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v193</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v194</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -4161,6 +4161,99 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
       <div id="bf_results" style="margin-top:12px;"></div>
       <div class="qbs-note" style="margin-top:8px;">BF = thickness(in) × width(in) × length(ft) ÷ 12, × quantity — nominal dimensions, the lumberyard standard. Price fills in total cost when set.</div>
     </div>
+
+    <!-- ── Concrete Block Wall (CMU) ─────────────────────────────────── -->
+    <div class="qbs-card" style="margin-top:20px;">
+      <h3>Concrete Block Wall — 8" / 10" / 12" <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field"><label>Block size</label>
+          <select id="cb_size" onchange="cbCalc()">
+            <option value="8" selected>8" (8×8×16)</option>
+            <option value="10">10" (10×8×16)</option>
+            <option value="12">12" (12×8×16)</option>
+          </select>
+        </div>
+        <div class="qbs-field"><label>(L) Wall length (ft)</label><input type="number" id="cb_len" value="60" step="0.5" oninput="cbCalc()" /></div>
+        <div class="qbs-field"><label>(H) Wall height (ft)</label><input type="number" id="cb_hgt" value="4" step="0.5" oninput="cbCalc()" /></div>
+        <div class="qbs-field"><label>Openings to deduct (ft²)</label><input type="number" id="cb_open" value="0" step="1" oninput="cbCalc()" /></div>
+        <div class="qbs-field"><label>Waste (%)</label><input type="number" id="cb_waste" value="5" step="1" oninput="cbCalc()" /></div>
+      </div>
+      <div id="cb_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">All three sizes lay a 16" × 8" face = 1.125 blocks per ft² — the width changes mortar, weight, and core fill, not the count. Mortar at 1 bag (70&nbsp;lb masonry cement) per 28 blocks with 1 ton of masonry sand per 8 bags. Courses at 8" including joints; corner/half blocks not broken out.</div>
+    </div>
+
+    <!-- ── Block Core Fill (grout) ───────────────────────────────────── -->
+    <div class="qbs-card" style="margin-top:20px;">
+      <h3>Block Core Fill — grout <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field"><label>Block size</label>
+          <select id="cf_size" onchange="cfCalc()">
+            <option value="8" selected>8" (0.22 ft³/block full)</option>
+            <option value="10">10" (0.29 ft³/block full)</option>
+            <option value="12">12" (0.36 ft³/block full)</option>
+          </select>
+        </div>
+        <div class="qbs-field"><label>(L) Wall length (ft)</label><input type="number" id="cf_len" value="60" step="0.5" oninput="cfCalc()" /></div>
+        <div class="qbs-field"><label>(H) Wall height (ft)</label><input type="number" id="cf_hgt" value="4" step="0.5" oninput="cfCalc()" /></div>
+        <div class="qbs-field"><label>Fill pattern</label>
+          <select id="cf_mode" onchange="cfCalc()">
+            <option value="all" selected>ALL cells (solid grouted)</option>
+            <option value="16">Vertical cells @ 16" OC</option>
+            <option value="24">Vertical cells @ 24" OC</option>
+            <option value="32">Vertical cells @ 32" OC</option>
+            <option value="48">Vertical cells @ 48" OC</option>
+          </select>
+        </div>
+        <div class="qbs-field"><label>Bond beam courses (count, 0 = none)</label><input type="number" id="cf_bb" value="1" step="1" oninput="cfCalc()" /><div class="qbs-note">Filled horizontal courses (top bond beam = 1). Added on top of the vertical cells.</div></div>
+        <div class="qbs-field"><label>Waste (%)</label><input type="number" id="cf_waste" value="10" step="1" oninput="cfCalc()" /></div>
+      </div>
+      <div id="cf_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">Core volumes per NCMA-style fill tables: 8" = 0.22, 10" = 0.29, 12" = 0.36 ft³ per block fully grouted. Spaced fill = that volume × (8" ÷ spacing); bond beams add full-fill volume for each filled course. Rebar shown as one vertical per filled cell + 1 stick per bond-beam course per 20&nbsp;ft.</div>
+    </div>
+
+    <!-- ── Roof Squares — metal & shingles ───────────────────────────── -->
+    <div class="qbs-card" style="margin-top:20px;">
+      <h3>Roof Squares — metal &amp; shingles <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field"><label>(L) Ridge length — incl. rake overhang (ft)</label><input type="number" id="rs_len" value="62" step="0.5" oninput="rsCalc()" /></div>
+        <div class="qbs-field"><label>(S) Span of roof (ft)</label><input type="number" id="rs_span" value="40" step="0.5" oninput="rsCalc()" /></div>
+        <div class="qbs-field"><label>(P) Pitch</label>
+          <select id="rs_pitch" onchange="rsCalc()">
+            <option value="1">1/12</option><option value="2">2/12</option><option value="3">3/12</option>
+            <option value="4" selected>4/12</option><option value="5">5/12</option><option value="6">6/12</option>
+            <option value="7">7/12</option><option value="8">8/12</option><option value="9">9/12</option>
+            <option value="10">10/12</option><option value="12">12/12</option><option value="14">14/12</option>
+          </select>
+        </div>
+        <div class="qbs-field"><label>(oH) Eave overhang (in)</label><input type="number" id="rs_oh" value="12" step="1" oninput="rsCalc()" /></div>
+        <div class="qbs-field"><label>Shingle waste (%)</label><input type="number" id="rs_waste" value="10" step="1" oninput="rsCalc()" /><div class="qbs-note">10% straight gable · 15%+ with hips/valleys. Metal is shown without waste (panels cut to length).</div></div>
+      </div>
+      <div id="rs_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">Area = ridge length × slope width both sides (span/2 + overhang, stretched by the pitch factor). 1 square = 100&nbsp;ft². Shingles at 3 bundles/square, ridge cap at 30&nbsp;LF/bundle, starter along eaves + rakes, synthetic underlayment at 10 squares/roll (15# felt at 4), coil nails ≈ 2&nbsp;lb/square.</div>
+    </div>
+
+    <!-- ── Wall Squares — metal siding ───────────────────────────────── -->
+    <div class="qbs-card" style="margin-top:20px;">
+      <h3>Wall Squares — metal <span class="badge">Reference calc — separate from the quote</span></h3>
+      <div class="qbs-grid-2">
+        <div class="qbs-field"><label>(L) Building length (ft)</label><input type="number" id="ws_len" value="60" step="0.5" oninput="wsCalc()" /></div>
+        <div class="qbs-field"><label>(W) Building width (ft)</label><input type="number" id="ws_wid" value="40" step="0.5" oninput="wsCalc()" /></div>
+        <div class="qbs-field"><label>(H) Wall height (ft)</label><input type="number" id="ws_hgt" value="14" step="0.5" oninput="wsCalc()" /></div>
+        <div class="qbs-field"><label>(P) Pitch (for gable triangles)</label>
+          <select id="ws_pitch" onchange="wsCalc()">
+            <option value="0">flat / no gables</option>
+            <option value="1">1/12</option><option value="2">2/12</option><option value="3">3/12</option>
+            <option value="4" selected>4/12</option><option value="5">5/12</option><option value="6">6/12</option>
+            <option value="7">7/12</option><option value="8">8/12</option><option value="9">9/12</option>
+            <option value="10">10/12</option><option value="12">12/12</option>
+          </select>
+        </div>
+        <div class="qbs-field"><label>Gable ends</label><input type="number" id="ws_gables" value="2" step="1" oninput="wsCalc()" /></div>
+        <div class="qbs-field"><label>Openings to deduct (ft²)</label><input type="number" id="ws_open" value="0" step="1" oninput="wsCalc()" /><div class="qbs-note">Garage doors, man doors, windows. Many builders skip small openings — the cutouts become waste.</div></div>
+      </div>
+      <div id="ws_results" style="margin-top:12px;"></div>
+      <div class="qbs-note" style="margin-top:8px;">Wall area = perimeter × height + gable triangles (W² × pitch ÷ 48 each) − openings. 1 square = 100&nbsp;ft². Panel LF shown for 36" coverage (÷3) and 12" board &amp; batten (÷1).</div>
+    </div>
   </div>
 
   <!-- SETTINGS -->
@@ -4895,6 +4988,106 @@ function bfCalc() {   // Board Feet
   ];
   if (p > 0) rows.push(['Cost @ $' + p.toFixed(2) + '/BF', '<b>$' + (bf * p).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</b>']);
   _calcRows('bf_results', rows);
+}
+
+function cbCalc() {   // Concrete Block Wall
+  const L = _cn('cb_len'), H = _cn('cb_hgt'), open_ = _cn('cb_open'), waste = 1 + _cn('cb_waste') / 100;
+  const size = (document.getElementById('cb_size') || {}).value || '8';
+  if (L <= 0 || H <= 0) return _calcRows('cb_results', [['—', 'Enter wall length and height.']]);
+  const area = Math.max(0, L * H - open_);
+  const blocks = Math.ceil(area * 1.125 * waste);
+  const courses = Math.ceil(H / (8 / 12));
+  const perCourse = Math.ceil(L * 0.75);
+  const mortar = Math.ceil(blocks / 28);
+  const sand = mortar / 8;
+  const wLb = { '8': 33, '10': 42, '12': 50 }[size];
+  _calcRows('cb_results', [
+    ['Net wall area', Math.round(area).toLocaleString() + ' ft²'],
+    ['Blocks (' + size + '")', '<b>' + blocks.toLocaleString() + '</b> (1.125/ft² incl. waste)'],
+    ['Courses', courses + ' @ 8" — ' + perCourse + ' blocks per course'],
+    ['Mortar', mortar + ' bags (70 lb) @ 1 per 28 blocks'],
+    ['Masonry sand', sand.toFixed(1) + ' tons @ 1 t per 8 bags'],
+    ['Approx. weight', Math.round(blocks * wLb / 2000).toLocaleString() + ' tons of block (' + wLb + ' lb ea)'],
+  ]);
+}
+
+function cfCalc() {   // Block Core Fill (grout)
+  const L = _cn('cf_len'), H = _cn('cf_hgt'), waste = 1 + _cn('cf_waste') / 100;
+  const size = (document.getElementById('cf_size') || {}).value || '8';
+  const mode = (document.getElementById('cf_mode') || {}).value || 'all';
+  const bb = Math.max(0, Math.round(_cn('cf_bb')));
+  if (L <= 0 || H <= 0) return _calcRows('cf_results', [['—', 'Enter wall length and height.']]);
+  const perBlockFull = { '8': 0.22, '10': 0.29, '12': 0.36 }[size];
+  const blocks = L * H * 1.125;                       // no waste on count for grout math
+  const courses = Math.ceil(H / (8 / 12));
+  const fullFill = blocks * perBlockFull;             // ft3 if every cell filled
+  let vertFt3, vertLabel, cells;
+  if (mode === 'all') {
+    vertFt3 = fullFill; cells = Math.round(L * 1.5); vertLabel = 'ALL cells';
+  } else {
+    const sp = parseFloat(mode);
+    vertFt3 = fullFill * (8 / sp);
+    cells = Math.ceil(L * 12 / sp) + 1;
+    vertLabel = 'cells @ ' + sp + '" OC (' + cells + ' verticals)';
+  }
+  const bbFt3 = bb > 0 ? (blocks / courses) * perBlockFull * bb : 0;
+  const totalFt3 = (mode === 'all' ? vertFt3 : vertFt3 + bbFt3) * waste;
+  const yd3 = totalFt3 / 27;
+  const rows = [
+    ['Wall', Math.round(L * H).toLocaleString() + ' ft² · ' + Math.round(blocks).toLocaleString() + ' blocks (' + size + '") · ' + courses + ' courses'],
+    ['Vertical fill — ' + vertLabel, (mode === 'all' ? fullFill : vertFt3).toFixed(1) + ' ft³'],
+  ];
+  if (mode !== 'all' && bb > 0) rows.push(['Bond beams (' + bb + ' course' + (bb > 1 ? 's' : '') + ')', bbFt3.toFixed(1) + ' ft³']);
+  rows.push(['Grout to order (incl. waste)', '<b>' + totalFt3.toFixed(1) + ' ft³ = ' + yd3.toFixed(2) + ' yd³</b>']);
+  rows.push(['80 lb bags (0.60 ft³)', Math.ceil(totalFt3 / 0.60).toLocaleString() + ' bags']);
+  rows.push(['60 lb bags (0.45 ft³)', Math.ceil(totalFt3 / 0.45).toLocaleString() + ' bags']);
+  if (mode !== 'all') {
+    const rebarV = cells * (H + 1.5);
+    const rebarB = bb > 0 ? bb * Math.ceil(L / 20) * 20 : 0;
+    rows.push(['Rebar', Math.ceil(rebarV).toLocaleString() + " LF vertical (1/cell, +18\" lap)" + (rebarB ? ' + ' + rebarB + ' LF bond beam' : '')]);
+  }
+  _calcRows('cf_results', rows);
+}
+
+function rsCalc() {   // Roof Squares — metal & shingles
+  const L = _cn('rs_len'), S = _cn('rs_span'), P = _cn('rs_pitch'), oh = _cn('rs_oh') / 12;
+  const waste = 1 + _cn('rs_waste') / 100;
+  if (L <= 0 || S <= 0 || P <= 0) return _calcRows('rs_results', [['—', 'Enter ridge length, span and pitch.']]);
+  const p = P / 12, sf = Math.sqrt(1 + p * p);
+  const slope = (S / 2 + oh) * sf;              // one side, eave overhang stretched up the pitch
+  const area = L * slope * 2;
+  const sq = area / 100;
+  const eaves = L * 2, rakes = slope * 4;
+  _calcRows('rs_results', [
+    ['Slope width (per side)', slope.toFixed(2) + ' ft'],
+    ['Roof area', Math.ceil(area).toLocaleString() + ' ft²'],
+    ['SQUARES — metal (no waste)', '<b>' + sq.toFixed(2) + ' squares</b>'],
+    ['SQUARES — shingles (+' + _cn('rs_waste') + '%)', '<b>' + (sq * waste).toFixed(2) + ' squares</b>'],
+    ['Shingle bundles', Math.ceil(sq * waste * 3).toLocaleString() + ' bundles (3/square)'],
+    ['Ridge cap', Math.ceil(L) + ' LF — ' + Math.ceil(L / 30) + ' bundles @ 30 LF'],
+    ['Starter strip', Math.ceil(eaves + rakes) + ' LF (eaves + rakes)'],
+    ['Underlayment', Math.ceil(sq / 10) + ' synthetic rolls (10 sq) or ' + Math.ceil(sq / 4) + ' rolls 15# felt (4 sq)'],
+    ['Coil nails', Math.ceil(sq * waste * 2) + ' lb (≈2 lb/square)'],
+  ]);
+}
+
+function wsCalc() {   // Wall Squares — metal
+  const L = _cn('ws_len'), W = _cn('ws_wid'), H = _cn('ws_hgt'), P = _cn('ws_pitch');
+  const g = Math.max(0, Math.round(_cn('ws_gables'))), open_ = _cn('ws_open');
+  if (L <= 0 || W <= 0 || H <= 0) return _calcRows('ws_results', [['—', 'Enter length, width and wall height.']]);
+  const rect = (L + W) * 2 * H;
+  const tri = P > 0 ? (W * W * P / 48) * g : 0;
+  const net = Math.max(0, rect + tri - open_);
+  const sq = net / 100;
+  _calcRows('ws_results', [
+    ['Wall rectangle', Math.ceil(rect).toLocaleString() + ' ft² (perimeter ' + ((L + W) * 2) + "' × " + H + "')"],
+    ['Gable triangles', Math.ceil(tri).toLocaleString() + ' ft² (' + g + ' × W²·pitch÷48)'],
+    ['Openings deducted', '−' + Math.ceil(open_).toLocaleString() + ' ft²'],
+    ['Net wall area', Math.ceil(net).toLocaleString() + ' ft²'],
+    ['SQUARES', '<b>' + sq.toFixed(2) + ' squares</b>'],
+    ["Panel LF — 36\" coverage (TR)", Math.ceil(net / 3).toLocaleString() + ' LF'],
+    ["Panel LF — 12\" coverage (B&B)", Math.ceil(net / 1).toLocaleString() + ' LF'],
+  ]);
 }
 
 // Studs for a Wall (vCalc model): studs = (L / oC) + 1, rounded up. Field studs only.
@@ -7588,7 +7781,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v193';
+const BB_VERSION = 'v194';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -8360,7 +8553,7 @@ function switchTab(name) {
   if (name === 'settings') renderDefaultPrices();
   if (name === 'schedule') { try { renderSchedule(); } catch (e) {} }
   if (name === 'quote') { try { renderDrawSchedule(); renderChangeOrders(); } catch (e) {} }
-  if (name === 'calcs') { ['grCalc','gsCalc','shCalc','swCalc','stCalc','csCalc','phCalc','rfCalc','gpCalc','dwCalc','bfCalc'].forEach(f => { try { window[f] ? window[f]() : eval(f + '()'); } catch (e) {} }); }
+  if (name === 'calcs') { ['grCalc','gsCalc','shCalc','swCalc','stCalc','csCalc','phCalc','rfCalc','gpCalc','dwCalc','bfCalc','cbCalc','cfCalc','rsCalc','wsCalc'].forEach(f => { try { window[f] ? window[f]() : eval(f + '()'); } catch (e) {} }); }
   if (name === 'takeoff' && typeof takeoffInit === 'function') takeoffInit();
   if (name === 'subs') {
     try { renderFramingLaborGrid(); } catch(e) { console.error('framing grid', e); }
