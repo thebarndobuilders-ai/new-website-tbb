@@ -204,7 +204,10 @@
       <input type="text" id="newPayerName" placeholder="Add payer (e.g. Georgia Medicaid, BCBS)" style="max-width:280px">
       <select id="newPayerLoc" style="max-width:170px"></select>
       <button class="btn small" id="btnAddPayer">+ Add payer</button>
-      <span class="note">Tip: if the two locations are in different coverage areas, add the payer once per location.</span>
+      <button class="btn secondary small" id="btnRateSheet">🖨 Print rate sheet</button>
+      <button class="btn secondary small" id="btnImportRates">⬆ Import rates (CSV)</button>
+      <input type="file" id="ratesFile" accept=".csv" style="display:none">
+      <span class="note">Tip: if the two locations are in different coverage areas, add the payer once per location. Rates CSV format: <code>Payer,Code,Rate,Status</code> (status optional: covered / pa / no).</span>
     </div>
     <div class="scrollwrap" style="max-height:640px;overflow-y:auto"><table id="matrixTable"><thead></thead><tbody></tbody></table></div>
   </div>
@@ -355,6 +358,17 @@ const CODES = [
    desc:"Assessment for adaptive equipment / assistive tech to restore function. Timed."},
 ];
 const codeMap = {}; CODES.forEach(c=>codeMap[c.code]=c);
+
+/* Medicare 2026 national non-facility benchmarks (approximate). Reference only —
+   contracted MCO/commercial rates always win; these fill the gap until real
+   rates are entered in the Payer Matrix. */
+const BENCHMARK = {
+  "92507":85.53,"92508":40,"92521":150,"92522":140,"92523":223,"92524":150,
+  "92526":83,"92610":130,"92605":190,"92606":90,"92607":220,"92608":75,
+  "92609":102.60,"96125":110,"97129":40,"97130":37,
+  "97165":100,"97166":100,"97167":100,"97168":68,
+  "97110":31,"97112":35,"97530":39,"97533":37,"97535":36,"97150":25,"97755":40
+};
 
 /* ══════════════════ DATA: ADVISOR SERVICES ══════════════════ */
 /* Each service the front desk / therapist can tick, mapped to code(s). */
@@ -759,6 +773,73 @@ document.getElementById("btnAddPayer").onclick=()=>{
   document.getElementById("newPayerName").value="";
   refreshAll();
 };
+
+/* ══════════════════ RATE SHEET (printable) + RATES CSV IMPORT ══════════════════ */
+document.getElementById("btnRateSheet").onclick = ()=>{
+  const w = window.open("", "_blank");
+  const payerCols = payers.map(p=>`<th>${esc(p.name)}${p.loc!=="BOTH"?"<br><span style='font-weight:400'>"+esc(locName(p.loc))+"</span>":""}</th>`).join("");
+  const rows = CODES.map(c=>{
+    const cells = payers.map(p=>{
+      const st = cell(p.id, c.code);
+      const rate = st.rate ? "$"+st.rate : "—";
+      const mark = st.s==="no" ? " ✕" : st.s==="pa" ? " (PA)" : "";
+      return `<td style="text-align:right">${rate}${mark}</td>`;
+    }).join("");
+    const bm = BENCHMARK[c.code] ? "$"+BENCHMARK[c.code].toFixed(2) : "—";
+    return `<tr><td><b>${c.code}</b> <span style="color:#5f6b76">${c.disc}</span></td><td>${esc(c.name)}</td><td>${esc(c.unit)}</td><td style="text-align:right;color:#5f6b76">${bm}</td>${cells}</tr>`;
+  }).join("");
+  w.document.write(`<!DOCTYPE html><html><head><title>Rate Sheet</title><style>
+    body{font-family:"Segoe UI",system-ui,sans-serif;font-size:11px;color:#1f2933;margin:20px;line-height:1.3}
+    h1{font-size:16px;color:#0a5c5b;margin-bottom:2px}
+    .sub{font-size:10.5px;color:#5f6b76;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#e6f4f4;color:#0a5c5b;text-align:left;padding:4px 6px;font-size:10px}
+    td{padding:3px 6px;border-bottom:1px solid #e6ecef}
+    .foot{font-size:9.5px;color:#5f6b76;margin-top:10px;border-top:1px solid #d9e2e8;padding-top:5px}
+    @media print{body{margin:8mm}@page{size:landscape}}
+  </style></head><body>
+  <h1>${esc(settings.name)} — Rate Sheet${settings.state?" ("+esc(settings.state)+")":""}</h1>
+  <div class="sub">✕ = not covered · (PA) = prior auth required · Benchmark = approx. Medicare 2026 national, reference only — contracted rates govern</div>
+  <table><tr><th>Code</th><th>Service</th><th>Billing unit</th><th>Benchmark</th>${payerCols}</tr>${rows}</table>
+  <div class="foot">Printed ${new Date().toLocaleDateString()} · rates entered on the Payer Matrix tab of the Billing Code Advisor · update after any contract change</div>
+  <script>window.print()<\/script></body></html>`);
+  w.document.close();
+};
+
+document.getElementById("btnImportRates").onclick = ()=>document.getElementById("ratesFile").click();
+document.getElementById("ratesFile").addEventListener("change", e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    const statusMap = s=>{
+      s=(s||"").trim().toLowerCase();
+      if(!s) return null;
+      if(s.startsWith("cov")||s==="yes"||s==="y") return "cov";
+      if(s.startsWith("pa")||s.startsWith("prior")||s.startsWith("auth")) return "pa";
+      if(s.startsWith("no")||s.startsWith("not")||s==="n"||s.startsWith("den")) return "no";
+      return null;
+    };
+    let applied=0, skipped=0, newPayers=0;
+    r.result.split(/\r?\n/).forEach(line=>{
+      const parts=line.split(",").map(s=>s.trim().replace(/^"|"$/g,""));
+      if(parts.length<3) return;
+      const [pname, code, rate, status] = parts;
+      if(!/^\d{5}$/.test(code)){ if(pname&&code) skipped++; return; } // skips header rows too
+      if(!codeMap[code]){ skipped++; return; }
+      let payer = payers.find(p=>p.name.toLowerCase()===pname.toLowerCase());
+      if(!payer){ payer={id:"p"+Date.now()+"_"+Math.floor(1e5*(applied+1)), name:pname, loc:"BOTH"}; payers.push(payer); newPayers++; }
+      const patch={rate:String(rate).replace(/[^0-9.]/g,"")};
+      const st=statusMap(status);
+      if(st) patch.s=st; else if(patch.rate) patch.s=cell(payer.id,code).s==="unk"?"cov":cell(payer.id,code).s;
+      setCell(payer.id, code, patch);
+      applied++;
+    });
+    save(LS.payers, payers);
+    refreshAll();
+    alert(`Rates import: ${applied} rates applied${newPayers?", "+newPayers+" new payers added":""}${skipped?", "+skipped+" rows skipped (unknown code)":""}.`);
+  };
+  r.readAsText(f); e.target.value="";
+});
 
 /* ══════════════════ COMBO CHECKER ══════════════════ */
 function comboVerdictBadge(level){
