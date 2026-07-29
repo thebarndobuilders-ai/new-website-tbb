@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v183</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v184</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3259,7 +3259,6 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <button onclick="takeoffOpenAdd('linear')">／ Linear</button>
         <button onclick="takeoffOpenTruss()">◉ Truss count</button>
         <button id="to-tool-pan" onclick="takeoffTool('pan')">✋ Pan</button>
-        <button onclick="takeoffSelfTest()" title="Checks that your mouse clicks/drags reach the app and that lines can draw on your screen">🩺 Test mouse</button>
         <button onclick="takeoffFinish()">✓ Finish</button>
         <button onclick="takeoffUndoPt()">↶ Undo point</button>
         <button onclick="takeoffClearAll()" title="Clear all measurements and scale">✕ Clear</button>
@@ -3315,6 +3314,20 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
             <div id="to-stage" style="position:relative;">
               <canvas id="to-pdf-canvas" style="display:block;"></canvas>
               <canvas id="to-draw-canvas" style="position:absolute; left:0; top:0; touch-action:none;"></canvas>
+              <!-- DOM/SVG guide layer: crosshair + scale band rendered OUTSIDE the
+                   canvas pipeline, so they show even where canvas compositing fails -->
+              <svg id="to-guides" style="position:absolute; left:0; top:0; pointer-events:none; overflow:visible;">
+                <line id="to-gv" stroke="#1e7bff" stroke-opacity="0.85" stroke-width="1.5" stroke-dasharray="7 5" visibility="hidden"/>
+                <line id="to-gh" stroke="#1e7bff" stroke-opacity="0.85" stroke-width="1.5" stroke-dasharray="7 5" visibility="hidden"/>
+                <circle id="to-gc" r="4" fill="#ff3b30" stroke="#fff" stroke-width="1.5" visibility="hidden"/>
+                <line id="to-band-halo" stroke="rgba(0,0,0,0.55)" stroke-width="8" stroke-linecap="round" visibility="hidden"/>
+                <line id="to-band" stroke="#1e7bff" stroke-width="4" stroke-linecap="round" visibility="hidden"/>
+                <line id="to-sl-halo" stroke="rgba(0,0,0,0.5)" stroke-width="6" stroke-linecap="round" visibility="hidden"/>
+                <line id="to-sl" stroke="#3ad67b" stroke-width="3" stroke-linecap="round" visibility="hidden"/>
+                <circle id="to-sl-a" r="5" fill="#3ad67b" stroke="#fff" stroke-width="1.5" visibility="hidden"/>
+                <circle id="to-sl-b" r="5" fill="#3ad67b" stroke="#fff" stroke-width="1.5" visibility="hidden"/>
+                <text id="to-sl-t" fill="#3ad67b" font-family="Arial" font-size="13" font-weight="bold" stroke="rgba(0,0,0,0.85)" stroke-width="3" paint-order="stroke" text-anchor="middle" visibility="hidden"></text>
+              </svg>
             </div>
             <div id="to-empty" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#888; font-size:13px;">No PDF loaded — click “Load PDF”.</div>
           </div>
@@ -7357,7 +7370,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v183';
+const BB_VERSION = 'v184';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17654,7 +17667,7 @@ if (typeof origSwitchTab === 'function') {
       // so drags survive the pointer leaving the window.
       dc.addEventListener(EV_DOWN, onDown);
       dc.addEventListener(EV_MOVE, onMove);
-      dc.addEventListener('mouseleave', () => { TO.mouseBase = null; scheduleRedraw(); });
+      dc.addEventListener('mouseleave', () => { TO.mouseBase = null; guideHide(true); scheduleRedraw(); });
       dc.addEventListener('contextmenu', (e) => e.preventDefault());
       const wrap = $('to-canvas-wrap');
       wrap.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -17869,6 +17882,8 @@ if (typeof origSwitchTab === 'function') {
       dc.style.width = cssW + 'px'; dc.style.height = cssH + 'px';
       $('to-stage').style.width = cssW + 'px';
       $('to-stage').style.height = cssH + 'px';
+      const gsvg = $('to-guides');
+      if (gsvg) { gsvg.setAttribute('width', cssW); gsvg.setAttribute('height', cssH); gsvg.style.width = cssW + 'px'; gsvg.style.height = cssH + 'px'; }
       const ctx = pc.getContext('2d');
       const task = page.render({ canvasContext: ctx, viewport: vp });
       TO._renderTask = task;
@@ -18111,10 +18126,11 @@ if (typeof origSwitchTab === 'function') {
           TO.draft = { mode: 'scale', basePts: [startBase] };
           updateToolStatus('SCALE: dragging — release at the far end of the known dimension…');
         }
-        if (moved) { TO.mouseBase = toBase(e); scheduleRedraw(); }
+        if (moved) { guideUpdate(e); TO.mouseBase = toBase(e); scheduleRedraw(); }
       };
       const up = (e) => {
         window.removeEventListener(EV_MOVE, mv); window.removeEventListener(EV_UP, up); window.removeEventListener('pointercancel', up);
+        guideHide(true);
         if (moved) {
           TO._suppressClick = true; setTimeout(() => { TO._suppressClick = false; }, 80);
           scaleComplete(startBase, toBase(e));
@@ -18190,10 +18206,60 @@ if (typeof origSwitchTab === 'function') {
     redraw();
   }
   function onDblClick(ev) { if (TO.tool !== 'pan' && TO.tool !== 'scale') takeoffFinish(); }
+  // DOM/SVG crosshair + scale-band overlay. Rendered as page elements, NOT
+  // canvas pixels, so they display even on machines where canvas compositing
+  // over the sheet fails. This IS the takeoff cursor — keep it always on.
+  function guideUpdate(ev) {
+    const svg = $('to-guides'); if (!svg || !TO.pdfDoc) return;
+    const st = $('to-stage').getBoundingClientRect();
+    const x = ev.clientX - st.left, y = ev.clientY - st.top;
+    const gv = $('to-gv'), gh = $('to-gh'), gc = $('to-gc');
+    if (!gv) return;
+    gv.setAttribute('x1', x); gv.setAttribute('x2', x); gv.setAttribute('y1', 0); gv.setAttribute('y2', st.height);
+    gh.setAttribute('x1', 0); gh.setAttribute('x2', st.width); gh.setAttribute('y1', y); gh.setAttribute('y2', y);
+    gc.setAttribute('cx', x); gc.setAttribute('cy', y);
+    gv.setAttribute('visibility', 'visible'); gh.setAttribute('visibility', 'visible'); gc.setAttribute('visibility', 'visible');
+    // live scale band: from the armed first point to the pointer
+    const bh = $('to-band-halo'), bd = $('to-band');
+    const start = (TO.draft && TO.draft.mode === 'scale' && TO.draft.basePts.length >= 1) ? TO.draft.basePts[0] : null;
+    if (start && bh && bd) {
+      const bx = start.x * TO.renderScale, by = start.y * TO.renderScale;
+      [bh, bd].forEach(el => {
+        el.setAttribute('x1', bx); el.setAttribute('y1', by);
+        el.setAttribute('x2', x); el.setAttribute('y2', y);
+        el.setAttribute('visibility', 'visible');
+      });
+    } else if (bh && bd) {
+      bh.setAttribute('visibility', 'hidden'); bd.setAttribute('visibility', 'hidden');
+    }
+  }
+  // Persistent green scale line as SVG (survives canvas-compositing failures)
+  function syncScaleLineSVG() {
+    const ids = ['to-sl-halo', 'to-sl', 'to-sl-a', 'to-sl-b', 'to-sl-t'];
+    const sl = TO.pdfDoc ? (TO.pages[TO.pageNum] || {}).scaleLine : null;
+    if (!sl) { ids.forEach(id => { const el = $(id); if (el) el.setAttribute('visibility', 'hidden'); }); return; }
+    const R = TO.renderScale;
+    const x1 = sl.p1.x * R, y1 = sl.p1.y * R, x2 = sl.p2.x * R, y2 = sl.p2.y * R;
+    [['to-sl-halo'], ['to-sl']].forEach(([id]) => {
+      const el = $(id); if (!el) return;
+      el.setAttribute('x1', x1); el.setAttribute('y1', y1); el.setAttribute('x2', x2); el.setAttribute('y2', y2);
+      el.setAttribute('visibility', 'visible');
+    });
+    const a = $('to-sl-a'), b = $('to-sl-b'), t = $('to-sl-t');
+    if (a) { a.setAttribute('cx', x1); a.setAttribute('cy', y1); a.setAttribute('visibility', 'visible'); }
+    if (b) { b.setAttribute('cx', x2); b.setAttribute('cy', y2); b.setAttribute('visibility', 'visible'); }
+    if (t) { t.setAttribute('x', (x1 + x2) / 2); t.setAttribute('y', (y1 + y2) / 2 - 12); t.textContent = sl.feet + "' scale"; t.setAttribute('visibility', 'visible'); }
+  }
+  function guideHide(all) {
+    ['to-gv', 'to-gh', 'to-gc'].concat(all ? ['to-band-halo', 'to-band'] : []).forEach(id => {
+      const el = $(id); if (el) el.setAttribute('visibility', 'hidden');
+    });
+  }
   function onMove(ev) {
     // Crosshair guides follow the pointer in EVERY tool (the builder works by
     // them) — pan included, not just scale/measure/edit.
     if (!TO.pdfDoc) return;
+    guideUpdate(ev);
     TO.mouseBase = toBase(ev); scheduleRedraw();
   }
   // Max zoom that keeps the canvases inside the browser's hard limits.
@@ -18369,23 +18435,9 @@ if (typeof origSwitchTab === 'function') {
         ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
       });
     }
-    // Crosshair guide lines — full-canvas dashed hairlines that follow the
-    // pointer in EVERY tool. This is the "cursor" the builder works by; do not
-    // gate it behind specific tools again.
-    if (TO.mouseBase) {
-      const mx = TO.mouseBase.x * S, my = TO.mouseBase.y * S;
-      ctx.save();
-      ctx.strokeStyle = 'rgba(30,123,255,0.8)';   // blue guides in every tool, matching the drag band
-      ctx.lineWidth = 1;
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath(); ctx.moveTo(mx, 0); ctx.lineTo(mx, dc.height); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(dc.width, my); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.beginPath(); ctx.arc(mx, my, 3, 0, Math.PI * 2);
-      ctx.fillStyle = '#ff3b30'; ctx.fill();
-      ctx.lineWidth = 1; ctx.strokeStyle = '#fff'; ctx.stroke();
-      ctx.restore();
-    }
+    // NOTE: the crosshair guides + scale band + persistent scale line are
+    // rendered in the #to-guides SVG layer (see guideUpdate/syncScaleLineSVG),
+    // NOT on this canvas — SVG shows even where canvas compositing fails.
   }
   function drawMeasure(ctx, m, S, color, draft) {
     const pts = m.basePts.map(p => ({ x: p.x * S, y: p.y * S }));
@@ -18468,6 +18520,7 @@ if (typeof origSwitchTab === 'function') {
     if (ro) ro.innerHTML = upf
       ? `Scale set on page ${TO.pageNum} — drawing scale <strong style="color:var(--copper);">${archScale(upf)}</strong>. Check that against the title block; if it's off, re-set scale off the longest dimensioned line.`
       : 'Scale: not set on this page — use <strong>Set scale</strong>, click two ends of a known dimension, then type its real length.';
+    try { syncScaleLineSVG(); } catch (e) {}
   }
 
   // ---- results + push to quote ----
