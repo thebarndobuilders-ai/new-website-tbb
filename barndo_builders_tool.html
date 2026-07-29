@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v186</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v187</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3255,6 +3255,28 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
       <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px;">
         <input type="file" id="to-file" accept="application/pdf" style="display:none" onchange="takeoffLoadFile(event)">
         <button id="to-tool-scale" onclick="takeoffOpenScale()">⟂ Set scale</button>
+        <label style="display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--text-2); background:var(--copper-soft); border:1px solid rgba(251,146,60,0.45); border-radius:6px; padding:3px 8px;" title="Fastest way: read the scale off the plan's title block and pick it here. No clicking on the drawing.">
+          📐 Scale from title block
+          <select id="to-scale-preset" onchange="takeoffScalePreset(this.value)" style="font-family:var(--font-mono); font-size:12px;">
+            <option value="">— pick —</option>
+            <option value="0.0625">1/16" = 1'</option>
+            <option value="0.09375">3/32" = 1'</option>
+            <option value="0.125">1/8" = 1'</option>
+            <option value="0.1875">3/16" = 1'</option>
+            <option value="0.25">1/4" = 1'</option>
+            <option value="0.375">3/8" = 1'</option>
+            <option value="0.5">1/2" = 1'</option>
+            <option value="0.75">3/4" = 1'</option>
+            <option value="1">1" = 1'</option>
+            <option value="1.5">1-1/2" = 1'</option>
+            <option value="3">3" = 1'</option>
+            <option value="0.1">1" = 10' (eng)</option>
+            <option value="0.05">1" = 20' (eng)</option>
+            <option value="0.0333333">1" = 30' (eng)</option>
+            <option value="0.025">1" = 40' (eng)</option>
+          </select>
+          <input type="checkbox" id="to-scale-preset-all" title="Apply to every page of this PDF"> <span style="font-size:10px;">all pages</span>
+        </label>
         <button onclick="takeoffOpenAdd('area')">▱ Area</button>
         <button onclick="takeoffOpenAdd('linear')">／ Linear</button>
         <button onclick="takeoffOpenTruss()">◉ Truss count</button>
@@ -7354,7 +7376,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v186';
+const BB_VERSION = 'v187';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17896,7 +17918,7 @@ if (typeof origSwitchTab === 'function') {
     });
     const dc = $('to-draw-canvas');
     if (dc) dc.style.cursor = (TO.tool === 'pan') ? 'grab'
-      : (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit') ? BLUE_CROSS : 'default';
+      : (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit') ? 'crosshair' : 'default';
   }
 
   function isPolygon(mode) { return mode === 'floor' || mode === 'roof'; }
@@ -18109,15 +18131,21 @@ if (typeof origSwitchTab === 'function') {
     if (TO.mouseBase && (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit')) {
       const mx = TO.mouseBase.x * S, my = TO.mouseBase.y * S;
       ctx.save();
-      ctx.strokeStyle = (TO.tool === 'scale') ? 'rgba(255,210,127,0.85)' : 'rgba(30,123,255,0.75)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([6, 4]);
+      // dark halo first so the dashes read on white paper AND dark linework
+      ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([7, 5]);
+      ctx.beginPath(); ctx.moveTo(mx, 0); ctx.lineTo(mx, dc.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(dc.width, my); ctx.stroke();
+      // blue dashes on top — same blue in every tool (scale used to be pale amber)
+      ctx.strokeStyle = '#1e7bff';
+      ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(mx, 0); ctx.lineTo(mx, dc.height); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(dc.width, my); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.beginPath(); ctx.arc(mx, my, 3, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(mx, my, 5, 0, Math.PI * 2);
       ctx.fillStyle = '#ff3b30'; ctx.fill();
-      ctx.lineWidth = 1; ctx.strokeStyle = '#fff'; ctx.stroke();
+      ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
       ctx.restore();
     }
   }
@@ -18411,6 +18439,24 @@ if (typeof origSwitchTab === 'function') {
     setFoot([['▶ Start', 'takeoffScaleStart()', true], ['Close', 'takeoffCloseDialog()', false]]);
     showModal();
   };
+  // Set the page scale straight from the plan's title-block scale — no clicking
+  // on the sheet at all. base units are PDF points (72 per inch), so
+  // unitsPerFoot = inches-of-paper-per-foot x 72.
+  window.takeoffScalePreset = function (v) {
+    const ipf = parseFloat(v);
+    if (!TO.pdfDoc) { alert('Load a PDF first.'); const s = $('to-scale-preset'); if (s) s.value = ''; return; }
+    if (!(ipf > 0)) return;
+    const upf = ipf * 72;
+    const all = !!($('to-scale-preset-all') || {}).checked;
+    if (all) { for (let pg = 1; pg <= TO.pageCount; pg++) TO.pages[pg] = { unitsPerFoot: upf }; }
+    else { TO.pages[TO.pageNum] = { unitsPerFoot: upf }; }
+    TO.draft = null;
+    redraw(); updateHud(); renderResults();
+    alert('Scale set' + (all ? ' on ALL pages' : ' on page ' + TO.pageNum) + ' — ' + archScale(upf).replace('≈ ', '') +
+          '\n\nThis assumes the PDF is at true sheet size (a 24x36 plan exported as 24x36).\n' +
+          'Sanity-check it: measure a known dimension and confirm the footage matches.');
+  };
+
   window.takeoffScaleStart = function () {
     const ft = parseFloat(($('to-sc-ft') || {}).value) || 0;
     const inch = parseFloat(($('to-sc-in') || {}).value) || 0;
