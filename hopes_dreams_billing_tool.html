@@ -96,7 +96,7 @@
 <body>
 <header>
   <h1 id="hdrName">Hopes and Dreams Speech Therapy</h1>
-  <div class="sub">Billing Code Advisor — Speech &amp; Occupational Therapy · companion to Fusion</div>
+  <div class="sub">Billing Code Advisor — Pediatric Speech &amp; Occupational Therapy · companion to Fusion</div>
 </header>
 <nav id="nav">
   <button data-tab="advisor" class="active">Session Advisor</button>
@@ -302,13 +302,15 @@
 const CODES = [
   // ---- Speech-language pathology ----
   {code:"92521", disc:"ST", eval:true,  timed:false, unit:"per eval",  name:"Evaluation of speech fluency",
-   desc:"Fluency evaluation (stuttering, cluttering). Use when the visit's purpose is assessing fluency."},
+   desc:"Fluency evaluation — school-age stuttering and cluttering. Use when the visit's purpose is assessing fluency."},
   {code:"92522", disc:"ST", eval:true,  timed:false, unit:"per eval",  name:"Evaluation of speech sound production",
    desc:"Articulation/phonology eval WITHOUT language testing. Never bill with 92523 (92523 includes it)."},
   {code:"92523", disc:"ST", eval:true,  timed:false, unit:"per eval",  name:"Eval of speech sound production + language",
    desc:"Combined artic + language comprehension/expression eval — the standard full pediatric speech eval. Pays more than 92522; use it whenever language was formally assessed too."},
   {code:"92524", disc:"ST", eval:true,  timed:false, unit:"per eval",  name:"Behavioral/qualitative analysis of voice & resonance",
-   desc:"Voice or resonance evaluation."},
+   desc:"Pediatric voice or resonance evaluation — vocal nodules, hypernasality/VPI (incl. cleft palate resonance)."},
+  {code:"92630", disc:"ST", eval:false, timed:false, unit:"per session", name:"Auditory rehabilitation — prelingual hearing loss",
+   desc:"Listening & spoken language therapy for a child whose hearing loss came before language developed (hearing aids, cochlear implants). Pediatric-specific — more accurate than 92507 when the session targets auditory skill development. Not all payers recognize it: verify per payer and fall back to 92507 where they don't."},
   {code:"92507", disc:"ST", eval:false, timed:false, unit:"per session", name:"Speech/language treatment, individual",
    desc:"The workhorse ST treatment code — articulation, language, fluency, voice, auditory processing. Untimed: one unit per session regardless of length."},
   {code:"92508", disc:"ST", eval:false, timed:false, unit:"per session", name:"Speech/language treatment, group (2+)",
@@ -316,7 +318,7 @@ const CODES = [
   {code:"92526", disc:"ST", eval:false, timed:false, unit:"per session", name:"Treatment of swallowing / oral function for feeding",
    desc:"Feeding & swallowing therapy. Frequently MISSED: if the session was feeding work, this is the code — not 92507. NCCI pairs it with 92507; billing both same day needs truly separate sessions + modifier 59."},
   {code:"92610", disc:"ST", eval:true,  timed:false, unit:"per eval",  name:"Evaluation of oral & pharyngeal swallowing function",
-   desc:"Clinical (bedside) feeding/swallowing evaluation."},
+   desc:"Clinical feeding/swallowing evaluation — bottle/breast feeding, texture progression, oral-motor feeding assessment."},
   {code:"92605", disc:"ST", eval:true,  timed:false, unit:"first hour", name:"Eval for prescription of non-speech-generating AAC device",
    desc:"Evaluation for low-tech AAC (boards, PECS-style systems)."},
   {code:"92606", disc:"ST", eval:false, timed:false, unit:"per session", name:"Therapeutic service for non-speech-generating AAC device",
@@ -328,7 +330,7 @@ const CODES = [
   {code:"92609", disc:"ST", eval:false, timed:false, unit:"per session", name:"Therapeutic services for use of SGD",
    desc:"Programming, modification, and training on a speech-generating device."},
   {code:"96125", disc:"ST", eval:true,  timed:true,  unit:"per hour",  name:"Standardized cognitive performance testing",
-   desc:"Standardized cognitive testing, per hour (includes interpretation & report time). Requires at least 31 minutes to bill the first unit."},
+   desc:"Standardized cognitive testing, per hour (includes scoring & report time) — school-age kids with TBI, executive function, or language-based learning concerns. Requires at least 31 minutes to bill the first unit."},
   {code:"97129", disc:"BOTH", eval:false, timed:true, unit:"initial 15 min", name:"Therapeutic cognitive function intervention, initial 15 min",
    desc:"Cognitive skills treatment (attention, memory, executive function, problem solving). ST or OT. NCCI pairs it with 92507 — same-day with 92507 by the same clinician generally denies."},
   {code:"97130", disc:"BOTH", eval:false, timed:true, unit:"each addl 15 min", name:"Cognitive function intervention, each additional 15 min",
@@ -343,9 +345,9 @@ const CODES = [
   {code:"97168", disc:"OT", eval:true,  timed:false, unit:"per re-eval", name:"OT re-evaluation",
    desc:"Re-evaluation of an established plan of care when status has changed."},
   {code:"97110", disc:"OT", eval:false, timed:true,  unit:"15 min",   name:"Therapeutic exercise",
-   desc:"Exercises for strength, endurance, ROM, flexibility. Timed — bill in 15-min units under the 8-minute rule."},
+   desc:"Strength, endurance, ROM — core strength, postural endurance, hand strengthening. Timed — bill in 15-min units under the 8-minute rule."},
   {code:"97112", disc:"OT", eval:false, timed:true,  unit:"15 min",   name:"Neuromuscular re-education",
-   desc:"Balance, coordination, posture, proprioception work. Timed."},
+   desc:"Balance, coordination, motor planning, proprioception — pediatric gross/fine motor coordination work. Timed."},
   {code:"97530", disc:"OT", eval:false, timed:true,  unit:"15 min",   name:"Therapeutic activities",
    desc:"Dynamic functional activities (lifting, reaching, play-based functional tasks). Timed. The pediatric OT workhorse. NCCI pairs it with OT evals and with 97533 — see Combo Checker."},
   {code:"97533", disc:"OT", eval:false, timed:true,  unit:"15 min",   name:"Sensory integrative techniques",
@@ -365,7 +367,7 @@ const codeMap = {}; CODES.forEach(c=>codeMap[c.code]=c);
 const BENCHMARK = {
   "92507":85.53,"92508":40,"92521":150,"92522":140,"92523":223,"92524":150,
   "92526":83,"92610":130,"92605":190,"92606":90,"92607":220,"92608":75,
-  "92609":102.60,"96125":110,"97129":40,"97130":37,
+  "92609":102.60,"92630":75,"96125":110,"97129":40,"97130":37,
   "97165":100,"97166":100,"97167":100,"97168":68,
   "97110":31,"97112":35,"97530":39,"97533":37,"97535":36,"97150":25,"97755":40
 };
@@ -376,7 +378,8 @@ const SERVICES = {
   ST: [
     {id:"st_tx",    label:"Individual speech/language treatment", detail:"Artic, language, fluency, voice, AP — the standard 1:1 session", codes:["92507"]},
     {id:"st_group", label:"Group speech treatment (2+ kids)", detail:"Bill 92508 per child — not 92507", codes:["92508"]},
-    {id:"st_feed",  label:"Feeding / swallowing treatment", detail:"Oral-motor feeding work, dysphagia tx", codes:["92526"]},
+    {id:"st_feed",  label:"Feeding / swallowing treatment", detail:"Oral-motor feeding work, picky-eater/texture therapy, dysphagia tx", codes:["92526"]},
+    {id:"st_aural", label:"Aural rehab — child with hearing loss (LSL therapy)", detail:"92630 — hearing aids/cochlear implant listening therapy; verify payer recognizes it", codes:["92630"]},
     {id:"st_cog",   label:"Cognitive intervention (attention, memory, executive function)", detail:"Timed — enter total minutes", codes:["97129"], timed:true},
     {id:"st_aac_tx",label:"AAC device therapy / programming", detail:"Low-tech → 92606 · speech-generating device → 92609", codes:["92606","92609"], pick:true},
     {id:"st_ev_full",label:"EVAL — speech sound + language (full eval)", detail:"The standard full pediatric eval → 92523", codes:["92523"]},
@@ -410,6 +413,7 @@ const COMBOS = [
   {a:"92507", b:"92526", level:"edit",  note:"NCCI edit pair. Payable together only as two genuinely separate, separately documented sessions the same day — modifier 59 on 92526. Many Medicaid plans still bundle; log outcomes per payer."},
   {a:"92507", b:"97129", level:"edit",  note:"NCCI edit pair. Same clinician same day generally denies; distinct sessions + modifier 59 may pay on some payers. If the cognitive work is under an OT plan (GO), the pair is cross-discipline — see ST+OT co-treatment rules."},
   {a:"92507", b:"92508", level:"never", note:"Individual and group speech treatment for the same client on the same day — pick the one that reflects the session."},
+  {a:"92507", b:"92630", level:"never", note:"One session is either speech/language treatment (92507) or auditory rehab (92630) — pick the code matching the session's target. Payers treat same-day both as double-billing one session."},
   {a:"92507", b:"96125", level:"edit",  note:"NCCI edit — testing and treatment same day needs distinct sessions + modifier 59; several payers deny regardless."},
   {a:"92523", b:"92507", level:"caution", note:"Eval + treatment on the same day is allowed by CPT but many payers (esp. Medicaid) pay only the eval on day one. Check your matrix / log."},
   {a:"92610", b:"92526", level:"caution", note:"Swallow eval + swallow treatment same day: allowed when documented as distinct, but several payers bundle. Verify per payer."},
@@ -1069,7 +1073,7 @@ function renderSettings(){
   document.getElementById("setLoc2").value=settings.loc2;
   document.getElementById("hdrName").textContent=settings.name;
   document.querySelector("header .sub").textContent=
-    "Billing Code Advisor — Speech & Occupational Therapy · companion to Fusion"+(settings.state?" · "+settings.state:"");
+    "Billing Code Advisor — Pediatric Speech & Occupational Therapy · companion to Fusion"+(settings.state?" · "+settings.state:"");
 }
 document.getElementById("btnSaveSettings").onclick=()=>{
   const newState=document.getElementById("setState").value;
