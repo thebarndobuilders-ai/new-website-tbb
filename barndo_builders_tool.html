@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v189</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v190</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3295,6 +3295,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <select id="to-lead" onchange="takeoffSelectLead()" style="font-family:var(--font-mono); font-size:12px; min-width:190px;"></select>
         <button onclick="takeoffSaveToLead()">💾 Save takeoff to lead</button>
         <span id="to-lead-status" class="qbs-note" style="margin:0;"></span>
+        <span id="to-live" style="margin-left:auto; font-family:var(--font-mono); font-size:11px; color:var(--copper); background:#241a10; border:1px solid rgba(251,146,60,0.45); border-radius:6px; padding:3px 9px; white-space:nowrap;">tool: — · mouse: — · points: 0</span>
       </div>
 
       <div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;">
@@ -7382,7 +7383,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v189';
+const BB_VERSION = 'v190';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17678,6 +17679,18 @@ if (typeof origSwitchTab === 'function') {
       dc.addEventListener('mouseleave', () => { TO.mouseBase = null; xhHide(); redraw(); });
       dc.addEventListener('mousedown', onDown);
       dc.addEventListener('contextmenu', (e) => e.preventDefault());
+      // Safety net: if ANY element ends up over the sheet (stale overlay, stray
+      // layer), events would never reach the canvas. Forward them from the
+      // container whenever the pointer is geometrically over the canvas.
+      const overCanvas = (e) => {
+        if (e.target === dc) return false;           // canvas handled it already
+        const b = dc.getBoundingClientRect();
+        return e.clientX >= b.left && e.clientX <= b.right && e.clientY >= b.top && e.clientY <= b.bottom;
+      };
+      const wrapEl = $('to-canvas-wrap');
+      wrapEl.addEventListener('mousemove', (e) => { if (overCanvas(e)) onMove(e); });
+      wrapEl.addEventListener('click',     (e) => { if (overCanvas(e)) onClick(e); });
+      wrapEl.addEventListener('mousedown', (e) => { if (overCanvas(e)) onDown(e); });
       const wrap = $('to-canvas-wrap');
       wrap.addEventListener('contextmenu', (e) => e.preventDefault());
       wrap.addEventListener('wheel', onWheel, { passive: false });
@@ -18032,6 +18045,7 @@ if (typeof origSwitchTab === 'function') {
     }
     if (TO.tool === 'scale') {
       if (TO._suppressClick) return;      // a drag-to-scale just completed
+      setTimeout(() => { try { liveStatus(ev); } catch (e) {} }, 0);
       if (!TO.draft || TO.draft.mode !== 'scale') TO.draft = { mode: 'scale', basePts: [] };
       TO.draft.basePts.push(p);
       if (TO.draft.basePts.length === 2) {
@@ -18056,7 +18070,20 @@ if (typeof origSwitchTab === 'function') {
   }
   function onDblClick(ev) { if (TO.tool !== 'pan' && TO.tool !== 'scale') takeoffFinish(); }
   // DOM crosshair — positioned from raw client coords, no canvas involved.
+  function liveStatus(ev) {
+    const el = $('to-live'); if (!el) return;
+    const pts = (TO.draft && TO.draft.basePts) ? TO.draft.basePts.length : 0;
+    const upf = uPerFt();
+    let mouse = '—';
+    if (ev) {
+      const b = toBase(ev);
+      mouse = Math.round(b.x) + ',' + Math.round(b.y);
+      if (upf) mouse += '  (' + (b.x / upf).toFixed(1) + "', " + (b.y / upf).toFixed(1) + "')";
+    }
+    el.textContent = 'tool: ' + TO.tool + ' · mouse: ' + mouse + ' · points: ' + pts + (upf ? ' · SCALE SET' : ' · no scale');
+  }
   function xhUpdate(ev) {
+    liveStatus(ev);
     const stage = $('to-stage'); if (!stage || !TO.pdfDoc) return;
     const r = stage.getBoundingClientRect();
     const x = ev.clientX - r.left, y = ev.clientY - r.top;
