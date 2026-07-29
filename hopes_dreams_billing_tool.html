@@ -104,6 +104,7 @@
   <button data-tab="codes">Code Library</button>
   <button data-tab="payers">Payer Matrix</button>
   <button data-tab="combos">Combo Checker</button>
+  <button data-tab="audit">Self-Audit</button>
   <button data-tab="denials">Denial Log</button>
   <button data-tab="settings">Settings</button>
 </nav>
@@ -229,6 +230,27 @@
     <div class="scrollwrap"><table id="comboTable">
       <thead><tr><th>Pair</th><th>Verdict</th><th>Rule</th></tr></thead><tbody></tbody>
     </table></div>
+  </div>
+</section>
+
+<!-- ═══════════════ SELF-AUDIT ═══════════════ -->
+<section class="tab" id="tab-audit">
+  <div class="card">
+    <h2>Self-Audit — analyze your Fusion billing export</h2>
+    <p class="note"><b>Everything stays in this browser.</b> The file is read locally, analyzed on this screen, and never uploaded or saved. Strip client names before exporting if you can — a client ID or initials is enough (it's only used to group same-child same-day claims).</p>
+    <p class="note" style="margin-top:4px">Export a claims/payments report from Fusion as CSV covering 3–12 months. Needs at least: date, payer, CPT code, paid amount. Client ID, units, billed amount, and location make the audit sharper.</p>
+    <div class="flexrow" style="margin-top:10px">
+      <button class="btn" id="btnAuditFile">📂 Load claims CSV</button>
+      <input type="file" id="auditFile" accept=".csv,.txt" style="display:none">
+      <span class="note" id="auditFileInfo"></span>
+    </div>
+    <div id="auditMap" style="display:none;margin-top:14px">
+      <h3>Match your columns</h3>
+      <p class="note">I've guessed from your headers — fix any that are wrong. Only starred ones are required.</p>
+      <div class="grid g3" id="auditMapGrid"></div>
+      <div style="margin-top:10px"><button class="btn" id="btnRunAudit">Run audit →</button></div>
+    </div>
+    <div id="auditResults"></div>
   </div>
 </section>
 
@@ -928,6 +950,218 @@ document.getElementById("btnCheat").onclick = ()=>{
   <div class="foot">Codes must reflect services actually delivered and documented. NCCI edits &amp; payer rules change quarterly — when this sheet and current payer policy disagree, payer policy wins. Log every approval/denial in the Billing Code Advisor so the matrix learns. Printed ${new Date().toLocaleDateString()}.</div>
   <script>window.print()<\/script></body></html>`);
   w.document.close();
+};
+
+/* ══════════════════ SELF-AUDIT ══════════════════ */
+let auditData = null; // {headers, rows} — in memory only, never persisted
+
+function parseCSV(text){
+  const rows=[]; let row=[], field="", inQ=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(inQ){
+      if(ch==='"'){ if(text[i+1]==='"'){ field+='"'; i++; } else inQ=false; }
+      else field+=ch;
+    } else {
+      if(ch==='"') inQ=true;
+      else if(ch===','){ row.push(field); field=""; }
+      else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&text[i+1]==='\n') i++; row.push(field); field=""; if(row.some(f=>f.trim()!=="")) rows.push(row); row=[]; }
+      else field+=ch;
+    }
+  }
+  if(field!==""||row.length){ row.push(field); if(row.some(f=>f.trim()!=="")) rows.push(row); }
+  return rows;
+}
+const AUDIT_FIELDS=[
+  {key:"date",  label:"Date of service *", kw:["date","dos","service date"]},
+  {key:"payer", label:"Payer *",           kw:["payer","insurance","plan","carrier"]},
+  {key:"code",  label:"CPT code *",        kw:["cpt","code","procedure","proc"]},
+  {key:"paid",  label:"Paid amount *",     kw:["paid","payment","allowed","reimburse"]},
+  {key:"client",label:"Client ID / initials", kw:["client","patient","name","id","mrn"]},
+  {key:"units", label:"Units",             kw:["unit","qty","quantity"]},
+  {key:"billed",label:"Billed amount",     kw:["billed","charge","fee"]},
+  {key:"loc",   label:"Location",          kw:["location","facility","clinic","site","place"]},
+  {key:"mods",  label:"Modifiers",         kw:["modifier","mod"]},
+];
+document.getElementById("btnAuditFile").onclick=()=>document.getElementById("auditFile").click();
+document.getElementById("auditFile").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    const rows=parseCSV(r.result);
+    if(rows.length<2){ alert("That file has no data rows."); return; }
+    auditData={headers:rows[0].map(h=>h.trim()), rows:rows.slice(1)};
+    document.getElementById("auditFileInfo").textContent=`${f.name} — ${auditData.rows.length} rows`;
+    const grid=document.getElementById("auditMapGrid");
+    grid.innerHTML=AUDIT_FIELDS.map(fl=>{
+      const guess=auditData.headers.findIndex(h=>fl.kw.some(k=>h.toLowerCase().includes(k)));
+      return `<div><label class="fld">${fl.label}</label><select data-amap="${fl.key}">
+        <option value="-1">— not in file —</option>
+        ${auditData.headers.map((h,i)=>`<option value="${i}" ${i===guess?"selected":""}>${esc(h)}</option>`).join("")}
+      </select></div>`;
+    }).join("");
+    document.getElementById("auditMap").style.display="";
+    document.getElementById("auditResults").innerHTML="";
+  };
+  r.readAsText(f); e.target.value="";
+});
+
+function money(n){ return "$"+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function normDate(s){ const d=new Date(s); return isNaN(d)?String(s).trim():d.toISOString().slice(0,10); }
+function parseCode(s){
+  const str=String(s||"").toUpperCase();
+  const m=str.match(/\d{5}/); if(!m) return null;
+  const mods=(str.replace(m[0],"").match(/\b(59|XE|XP|XS|XU|GN|GO|GP|95|96|97|KX)\b/g))||[];
+  return {code:m[0], mods};
+}
+
+document.getElementById("btnRunAudit").onclick=()=>{
+  const map={};
+  document.querySelectorAll("[data-amap]").forEach(sel=>map[sel.dataset.amap]=parseInt(sel.value,10));
+  for(const req of ["date","payer","code","paid"]) if(map[req]<0){ alert("Date, Payer, CPT code, and Paid amount are required."); return; }
+  const get=(row,key)=> map[key]>=0 ? String(row[map[key]]??"").trim() : "";
+  // Build normalized lines
+  const lines=[];
+  auditData.rows.forEach(row=>{
+    const pc=parseCode(get(row,"code")); if(!pc||!codeMap[pc.code]) return;
+    const extraMods=(get(row,"mods").toUpperCase().match(/\b(59|XE|XP|XS|XU|GN|GO|GP|95|96|97|KX)\b/g))||[];
+    lines.push({
+      date:normDate(get(row,"date")), payer:get(row,"payer")||"(unknown payer)",
+      code:pc.code, mods:[...new Set([...pc.mods,...extraMods])],
+      client:get(row,"client"), loc:get(row,"loc"),
+      units:Math.max(1,parseFloat(get(row,"units"))||1),
+      paid:parseFloat(get(row,"paid").replace(/[^0-9.-]/g,""))||0,
+      billed:parseFloat(get(row,"billed").replace(/[^0-9.-]/g,""))||0
+    });
+  });
+  if(!lines.length){ document.getElementById("auditResults").innerHTML=`<div class="alert bad">No rows with recognizable CPT codes found — check the CPT column mapping.</div>`; return; }
+  const hasClient=map.client>=0, hasLoc=map.loc>=0, hasUnits=map.units>=0;
+
+  /* ---- 1. Stacked-pair exposure ---- */
+  const groups={};
+  lines.forEach(l=>{ const k=(hasClient?l.client+"|":"")+l.date+"|"+l.payer; (groups[k]=groups[k]||[]).push(l); });
+  const pairAgg={}; // key: a+b|payer → {n, paid, with59, without59, level}
+  Object.values(groups).forEach(g=>{
+    const codes=[...new Set(g.map(l=>l.code))];
+    for(let i=0;i<codes.length;i++) for(let j=i+1;j<codes.length;j++){
+      const cb=comboFor(codes[i],codes[j]);
+      if(!cb||cb.level==="ok") continue;
+      const payer=g[0].payer, key=cb.a+"+"+cb.b+"|"+payer+"|"+cb.level;
+      const involved=g.filter(l=>l.code===cb.a||l.code===cb.b);
+      const any59=involved.some(l=>l.mods.some(m=>["59","XE","XP","XS","XU"].includes(m)));
+      const agg=pairAgg[key]=pairAgg[key]||{a:cb.a,b:cb.b,payer,level:cb.level,n:0,paid:0,with59:0,without59:0};
+      agg.n++; agg.paid+=involved.reduce((s,l)=>s+l.paid,0);
+      any59?agg.with59++:agg.without59++;
+    }
+  });
+  const pairs=Object.values(pairAgg).sort((x,y)=>y.paid-x.paid);
+  const pairRows=pairs.map(p=>`<tr>
+    <td><b>${p.a} + ${p.b}</b></td><td>${esc(p.payer)}</td>
+    <td>${p.level==="never"?'<span class="badge b-no">Never-pair</span>':p.level==="edit"?'<span class="badge b-pa">Needs 59 + distinct</span>':'<span class="badge b-pa">Payer-dependent</span>'}</td>
+    <td>${p.n}</td><td>${p.with59} / ${p.without59}</td><td style="text-align:right"><b>${money(p.paid)}</b></td></tr>`).join("");
+  const pairPaid=pairs.reduce((s,p)=>s+p.paid,0);
+  const neverPairs=pairs.filter(p=>p.level==="never");
+
+  /* ---- 2. Missed money ---- */
+  const missed=[];
+  const c92522=lines.filter(l=>l.code==="92522");
+  if(c92522.length){
+    const avg23=avgRate(lines,"92523"), avg22=avgRate(lines,"92522");
+    const delta=(avg23&&avg22)?(avg23-avg22):null;
+    missed.push({t:`${c92522.length} evals billed 92522 (speech sound only)`,
+      d:`If language was also formally assessed on any of these, they were 92523.${delta?" Your own data shows 92523 pays "+money(delta)+" more per eval.":""} Review the eval reports.`});
+  }
+  let sgdNoAddon=0; Object.values(groups).forEach(g=>{ if(g.some(l=>l.code==="92607")&&!g.some(l=>l.code==="92608")) sgdNoAddon++; });
+  if(sgdNoAddon) missed.push({t:`${sgdNoAddon} SGD evals (92607) with no 92608 add-on`, d:`Any of these that ran past an hour left a 92608 unit (or more) unbilled. AAC evals under an hour are rare.`});
+  let cogNoAddon=0; Object.values(groups).forEach(g=>{ if(g.some(l=>l.code==="97129")&&!g.some(l=>l.code==="97130")) cogNoAddon++; });
+  if(cogNoAddon) missed.push({t:`${cogNoAddon} cognitive sessions (97129) with no 97130 add-on`, d:`97129 alone covers only the first 15 minutes. Sessions that ran 23+ minutes earn 97130 units.`});
+  if(hasUnits){
+    let lump=0; Object.values(groups).forEach(g=>{
+      const ot=g.filter(l=>["97110","97112","97530","97533","97535"].includes(l.code));
+      if(ot.length===1&&ot[0].code==="97530"&&ot[0].units>=3) lump++;
+    });
+    if(lump) missed.push({t:`${lump} OT visits billed as 3+ units of 97530 only`, d:`If parts of those sessions were ADL work (97535), exercise (97110), or sensory integration (97533), splitting minutes to the accurate codes is better documentation — and on some fee schedules pays differently.`});
+  }
+  const missedRows=missed.map(m=>`<div class="alert info" style="margin:6px 0"><b>${esc(m.t)}.</b> ${esc(m.d)}</div>`).join("")||`<div class="alert good">No obvious missed-money patterns found in this export.</div>`;
+
+  /* ---- 3. Rates per payer+code ---- */
+  function avgRate(ls,code,payer){
+    const rel=ls.filter(l=>l.code===code&&(!payer||l.payer===payer)&&l.paid>0);
+    if(!rel.length) return null;
+    return rel.reduce((s,l)=>s+l.paid/l.units,0)/rel.length;
+  }
+  const rateAgg={};
+  lines.forEach(l=>{ if(l.paid<=0) return; const k=l.payer+"|"+l.code;
+    const a=rateAgg[k]=rateAgg[k]||{payer:l.payer,code:l.code,sum:0,units:0,n:0};
+    a.sum+=l.paid; a.units+=l.units; a.n++; });
+  const rates=Object.values(rateAgg).map(a=>({payer:a.payer,code:a.code,rate:a.sum/a.units,n:a.n}))
+    .sort((x,y)=>x.payer.localeCompare(y.payer)||x.code.localeCompare(y.code));
+  const rateRows=rates.map(r=>`<tr><td>${esc(r.payer)}</td><td><b>${r.code}</b> <span class="note">${esc(codeMap[r.code].name)}</span></td><td style="text-align:right">${money(r.rate)}</td><td>${r.n}</td></tr>`).join("");
+  const ratesCSV="Payer,Code,Rate,Status\n"+rates.map(r=>`"${r.payer.replace(/"/g,'""')}",${r.code},${r.rate.toFixed(2)},covered`).join("\n");
+
+  /* ---- 4. Location comparison ---- */
+  let locHTML="";
+  if(hasLoc){
+    const locAgg={};
+    lines.forEach(l=>{ if(l.paid<=0||!l.loc) return; const k=l.payer+"|"+l.code;
+      (locAgg[k]=locAgg[k]||{}); (locAgg[k][l.loc]=locAgg[k][l.loc]||{sum:0,units:0});
+      locAgg[k][l.loc].sum+=l.paid; locAgg[k][l.loc].units+=l.units; });
+    const diffs=[];
+    Object.entries(locAgg).forEach(([k,byLoc])=>{
+      const locs=Object.keys(byLoc); if(locs.length<2) return;
+      const r=locs.map(L=>({L,rate:byLoc[L].sum/byLoc[L].units})).sort((a,b)=>b.rate-a.rate);
+      const gap=(r[0].rate-r[r.length-1].rate)/r[0].rate;
+      if(gap>0.05){ const [payer,code]=k.split("|"); diffs.push({payer,code,hi:r[0],lo:r[r.length-1],gap}); }
+    });
+    locHTML = diffs.length
+      ? `<h3>⚠ Same code, different pay by location</h3>`+diffs.map(d=>`<div class="alert warn"><b>${d.code}</b> from ${esc(d.payer)}: ${esc(d.hi.L)} averages ${money(d.hi.rate)} but ${esc(d.lo.L)} averages ${money(d.lo.rate)} (${Math.round(d.gap*100)}% gap) — check credentialing/contract loading for the lower site.</div>`).join("")
+      : `<h3>Location comparison</h3><div class="alert good">No payer pays your two locations differently by more than 5% on the same code.</div>`;
+  }
+
+  /* ---- Render ---- */
+  const totalPaid=lines.reduce((s,l)=>s+l.paid,0);
+  document.getElementById("auditResults").innerHTML=`
+    <div class="resultbox" style="margin-top:16px">
+      <h3 style="margin-top:0">Audit results</h3>
+      <div class="kpi">
+        <div class="k"><div class="n">${lines.length}</div><div class="l">Claim lines analyzed</div></div>
+        <div class="k"><div class="n">${money(totalPaid)}</div><div class="l">Total paid</div></div>
+        <div class="k"><div class="n" style="color:${pairPaid?"var(--warn)":"var(--good)"}">${money(pairPaid)}</div><div class="l">Paid on flagged same-day pairs</div></div>
+        <div class="k"><div class="n" style="color:${neverPairs.length?"var(--bad)":"var(--good)"}">${neverPairs.length}</div><div class="l">Never-pair combos found</div></div>
+      </div>
+      ${hasClient?"":`<div class="alert warn">No client column mapped — same-day pairs are grouped by date+payer only, which can over-count on busy days. Re-export with a client ID column for exact results.</div>`}
+      <h3>Same-day stacked pairs — your documentation decides if this is revenue or exposure</h3>
+      ${pairs.length?`<div class="scrollwrap"><table><thead><tr><th>Pair</th><th>Payer</th><th>Rule</th><th>Days</th><th>w/ 59 / without</th><th>Paid</th></tr></thead><tbody>${pairRows}</tbody></table></div>
+      <p class="note">“Without 59” pairs that still got paid are the first ones to review — they cleared no edit at all. For every flagged day: pull the notes. Two separate documented sessions = keep with confidence. One session split = fix the process going forward and talk to a healthcare attorney before repaying anything.</p>`
+      :`<div class="alert good">No flagged same-day code pairs found — no stacking exposure in this export.</div>`}
+      <h3>Missed money</h3>
+      ${missedRows}
+      ${locHTML}
+      <h3>Your real rates (from actual payments)</h3>
+      <div class="scrollwrap" style="max-height:340px;overflow-y:auto"><table><thead><tr><th>Payer</th><th>Code</th><th>Avg paid/unit</th><th>Claims</th></tr></thead><tbody>${rateRows}</tbody></table></div>
+      <div class="flexrow" style="margin-top:10px">
+        <button class="btn" id="btnApplyAuditRates">Apply these rates to the Payer Matrix</button>
+        <button class="btn secondary" id="btnDlRatesCSV">⬇ Download rates CSV</button>
+      </div>
+      <p class="note" style="margin-top:8px">Raw claim data is not saved anywhere — only rates you choose to apply go into the matrix.</p>
+    </div>`;
+  document.getElementById("btnApplyAuditRates").onclick=()=>{
+    let applied=0,newPayers=0;
+    rates.forEach(r=>{
+      let payer=payers.find(p=>p.name.toLowerCase()===r.payer.toLowerCase());
+      if(!payer){ payer={id:"p"+Date.now()+"_"+applied, name:r.payer, loc:"BOTH"}; payers.push(payer); newPayers++; }
+      const cur=cell(payer.id,r.code);
+      setCell(payer.id,r.code,{rate:r.rate.toFixed(2), s:cur.s==="unk"?"cov":cur.s});
+      applied++;
+    });
+    save(LS.payers,payers); refreshAll();
+    alert(`${applied} rates applied to the matrix${newPayers?", "+newPayers+" payers added":""}.`);
+  };
+  document.getElementById("btnDlRatesCSV").onclick=()=>{
+    const blob=new Blob([ratesCSV],{type:"text/csv"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download="hopes_dreams_rates.csv"; a.click();
+  };
 };
 
 /* ══════════════════ DENIAL LOG ══════════════════ */
