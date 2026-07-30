@@ -2,7 +2,7 @@
 
 **Purpose of this file:** Carry the full context of our work to a new computer (or a new Claude session). On the new machine, start a fresh Claude session, **upload `barndo_builders_tool_v127.html`**, and **paste this whole file in**. We'll pick up exactly where we left off.
 
-_Last updated: 2026-07-26_
+_Last updated: 2026-07-31 (v198)_
 
 ---
 
@@ -21,12 +21,17 @@ A single, self-contained HTML app — **The Barndo Builders** post-frame / barnd
 
 ## 4. ⚠️ Critical warnings
 
-### 🔒 DO NOT TOUCH — Takeoff viewer (v186: restored to v166 vintage, builder-approved)
-After repeated failed attempts to "improve" the takeoff viewer's input handling (v170–v185), the builder ordered a full reset. **v186 transplanted the ENTIRE takeoff tab (markup + script) byte-for-byte from v166 (commit 5d03318)** — the version the builder confirms gives full mouse control: blue-cross cursor, right/middle-drag pan, plain scroll moves the sheet, Ctrl+scroll zooms, two-click Set scale, pan button present, default tool = scale.
-**MANDATORY FIX ON TOP OF v166 (v189, do not remove):** `renderPage()` must serialize pdf.js renders — cancel the in-flight `RenderTask` before starting a new one, guard with a render token, and `redraw()` in BOTH the `.then()` and the `.catch()`. Without it, multi-page plan sets throw "Cannot use the same canvas during multiple render() operations" on rapid page flips/zooms; the completion handler never runs and the OVERLAY canvas is left blank — the builder sees the sheet but no crosshair, no scale line, no measures. This was the real root cause of the entire v170–v188 "cursor doesn't work" saga, confirmed by the on-screen error banner on the builder's machine.
-Also keep: the DOM crosshair overlay (#to-xh-* divs in #to-stage), press-drag-to-scale, explicit canvas z-index (pdf 1, draw 2), native `crosshair` cursor, and the 📐 title-block scale preset.
-
-**RULES:** Never modify ANYTHING inside the takeoff `<script>` block (banner: "BLUEPRINT TAKEOFF — load a plan PDF") or the `#tab-takeoff` markup. No refactors, no pointer-events, no canvas caps, no cursor changes, and NEVER remove the render serialization above (the render-collision error is NOT cosmetic — it blanks the overlay). If a takeoff change is ever requested, diff against v166 first and get explicit builder sign-off.
+### 🔒 DO NOT TOUCH — Takeoff viewer (LOCKED at v198 — builder confirmed working)
+The takeoff is v166's engine plus a short list of builder-approved fixes. The **root cause of the long "cursor doesn't work" saga (v170–v195)** was startup order: the app opens on the Takeoff tab via `switchTab('takeoff')` which runs BEFORE the takeoff script parses, so its `typeof takeoffInit` check silently failed and no mouse listeners were bound until the user left the tab and returned. **Fixed by self-init at the end of the takeoff IIFE** (setTimeout(0) + window.load + first-mouse-activity self-healing). Never remove those.
+**The locked, builder-approved takeoff behavior (v198):**
+- Opens ready on the Takeoff tab, mouse live immediately (self-init — see above).
+- ONE footage entry: the blue "Line length __ ft" toolbar box. ⟂ Set scale ARMS the drag (no modal). Drag or two clicks → `scaleLockIn()` → green persistent scale line + "SCALE LOCKED" toast → tool auto-steps to PAN so area/linear clicks can't re-lock.
+- **ZERO browser dialogs in the scale flow** (no prompt/alert — Chrome's "prevent additional dialogs" silently kills them; use `toToast()`).
+- 📐 title-block preset dropdown sets scale with no clicking (unitsPerFoot = in/ft × 72); "all pages" checkbox applies to both preset and drag locks.
+- DOM crosshair + band + persistent scale line are page elements (#to-xh-*, #to-sl-*), NOT canvas pixels. Live readout #to-live shows tool/mouse/points.
+- `renderPage()` serializes pdf.js renders (cancel in-flight, render token, redraw in then AND catch) — the render-collision error is NOT cosmetic, it blanks the overlay.
+- Input paths: canvas listeners + wrap forwarder + document-level capture forwarder (dedup via e._toH). Right/middle-drag pans; plain scroll scrolls; Ctrl+scroll zooms.
+**RULES:** No refactors of the takeoff block. Any change needs explicit builder sign-off, and every change must be verified headless with real mouse input AND with dialogs force-dismissed.
 
 ## 5. Everything built/fixed (cumulative, all in v127)
 
