@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v197</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v198</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -7809,7 +7809,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v197';
+const BB_VERSION = 'v198';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -18627,14 +18627,19 @@ if (typeof origSwitchTab === 'function') {
   // flashes an unmissable confirmation, refreshes every readout.
   function scaleLockIn(p1, p2, feet, upf) {
     const line = { p1: { x: p1.x, y: p1.y }, p2: { x: p2.x, y: p2.y }, feet: feet };
-    if (TO.scaleEntry && TO.scaleEntry.applyAll) {
+    const applyAll = (TO.scaleEntry && TO.scaleEntry.applyAll) || !!(($('to-scale-preset-all') || {}).checked);
+    if (applyAll) {
       for (let pg = 1; pg <= TO.pageCount; pg++) TO.pages[pg] = { unitsPerFoot: upf };
       TO.pages[TO.pageNum].scaleLine = line;
     } else {
       TO.pages[TO.pageNum] = { unitsPerFoot: upf, scaleLine: line };
     }
     TO.scaleEntry = null;         // never silently reuse old footage
-    toToast('✓ SCALE LOCKED — ' + feet + ' ft · ' + archScale(upf).replace('≈ ', '') + ' · page ' + TO.pageNum, true);
+    // Step aside so the next clicks can't re-lock the scale — the builder's
+    // area clicks were firing SCALE LOCKED over and over while scale stayed armed.
+    TO.tool = 'pan';
+    try { highlightTool(); } catch (e) {}
+    toToast('✓ SCALE LOCKED — ' + feet + ' ft · ' + archScale(upf).replace('≈ ', '') + (applyAll ? ' · ALL pages' : ' · page ' + TO.pageNum) + '. Now use ▱ Area or ／ Linear to measure.', true);
     setTimeout(() => { try { liveStatus(null); } catch (e) {} }, 0);   // after draft clears
   }
   // Non-blocking toast (green = success, red = needs attention). NO browser
@@ -19124,19 +19129,14 @@ if (typeof origSwitchTab === 'function') {
   }
 
   window.takeoffOpenScale = function () {
-    if (!TO.pdfDoc) { alert('Load a PDF first.'); return; }
-    $('to-modal-title').textContent = 'Set scale — page ' + TO.pageNum;
-    $('to-modal-body').innerHTML =
-      `<div style="color:var(--text-2);">Enter the real length of a known dimension, then click <strong>Start</strong> and click its two endpoints on the plan.</div>
-       <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
-         ${fieldRow('Feet', `<input type="number" id="to-sc-ft" value="40" style="width:72px;">`)}
-         ${fieldRow('Inches', `<input type="number" id="to-sc-in" value="0" style="width:62px;">`)}
-         ${fieldRow('Frac num', `<input type="number" id="to-sc-fn" value="0" style="width:62px;">`)}
-         ${fieldRow('Frac den', `<input type="number" id="to-sc-fd" value="0" style="width:62px;">`)}
-       </div>
-       <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="to-sc-all"> Apply same scale to all pages</label>`;
-    setFoot([['▶ Start', 'takeoffScaleStart()', true], ['Close', 'takeoffCloseDialog()', false]]);
-    showModal();
+    if (!TO.pdfDoc) { toToast('Load a PDF first.', false); return; }
+    TO.scaleEntry = null;              // the blue toolbar box is the ONE length entry
+    TO.tool = 'scale'; TO.draft = null;
+    highlightTool(); redraw();
+    const ft = _cnTO('to-feet');
+    toToast(ft > 0
+      ? 'SCALE ARMED — drag along a known ' + ft + ' ft dimension (blue box sets the length).'
+      : 'SCALE ARMED — type the length in the blue box, then drag along that dimension.', true);
   };
   // Set the page scale straight from the plan's title-block scale — no clicking
   // on the sheet at all. base units are PDF points (72 per inch), so
