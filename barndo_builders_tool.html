@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v195</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v196</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -7806,7 +7806,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v195';
+const BB_VERSION = 'v196';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -19275,5 +19275,14 @@ if (typeof origSwitchTab === 'function') {
       if (act && act.dataset.tab === 'takeoff' && tk && tk.style.display === 'none' && typeof switchTab === 'function') switchTab('takeoff');
     } catch (e) {}
   }, 0);
+  // SELF-HEALING: bound at parse time with no dependencies — the very first
+  // mouse activity anywhere initializes the takeoff tool if anything above
+  // failed to. After init it's a single boolean check per event.
+  ['mousemove', 'mousedown', 'click'].forEach(function (t) {
+    document.addEventListener(t, function () {
+      if (!TO.inited) { try { window.takeoffInit(); } catch (e) {} }
+    }, true);
+  });
+  window.addEventListener('load', function () { try { window.takeoffInit(); } catch (e) {} });
 })();
 </script>
