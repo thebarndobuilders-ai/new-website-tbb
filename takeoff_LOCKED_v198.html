@@ -1,0 +1,1368 @@
+<!-- ============================================================
+ LOCKED SNAPSHOT — Takeoff tab, v198, builder-confirmed working.
+ Two sections: (1) #tab-takeoff markup, (2) the BLUEPRINT TAKEOFF
+ script block. To verify the live file has not drifted, extract
+ the same sections from barndo_builders_tool.html and diff against
+ this file. To restore, transplant these sections verbatim.
+ ============================================================ -->
+<!-- ==== SECTION 1: MARKUP ==== -->
+<div class="qbs-tab-content" id="tab-takeoff" style="display:none">
+    <div class="qbs-card">
+      <h3>Blueprint takeoff <span class="badge">PDF · scale &amp; measure</span></h3>
+      <p class="qbs-sub" style="margin-bottom: 10px;">Load a plan PDF, set the scale off a known dimension, then click to measure linear feet and areas. Double-click (or Finish) to close a measurement. Results push into the quote.</p>
+
+      <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px;">
+        <input type="file" id="to-file" accept="application/pdf" style="display:none" onchange="takeoffLoadFile(event)">
+        <label style="display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--text); background:#12233d; border:1px solid #1e7bff; border-radius:6px; padding:3px 9px;" title="Type the real length of the line you're about to drag — no popups">
+          Line length <input id="to-feet" type="number" value="40" step="0.5" style="width:64px; font-size:13px; font-weight:700; text-align:right;"> ft
+        </label>
+        <button id="to-tool-scale" onclick="takeoffOpenScale()">⟂ Set scale</button>
+        <label style="display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--text-2); background:var(--copper-soft); border:1px solid rgba(251,146,60,0.45); border-radius:6px; padding:3px 8px;" title="Fastest way: read the scale off the plan's title block and pick it here. No clicking on the drawing.">
+          📐 Scale from title block
+          <select id="to-scale-preset" onchange="takeoffScalePreset(this.value)" style="font-family:var(--font-mono); font-size:12px;">
+            <option value="">— pick —</option>
+            <option value="0.0625">1/16" = 1'</option>
+            <option value="0.09375">3/32" = 1'</option>
+            <option value="0.125">1/8" = 1'</option>
+            <option value="0.1875">3/16" = 1'</option>
+            <option value="0.25">1/4" = 1'</option>
+            <option value="0.375">3/8" = 1'</option>
+            <option value="0.5">1/2" = 1'</option>
+            <option value="0.75">3/4" = 1'</option>
+            <option value="1">1" = 1'</option>
+            <option value="1.5">1-1/2" = 1'</option>
+            <option value="3">3" = 1'</option>
+            <option value="0.1">1" = 10' (eng)</option>
+            <option value="0.05">1" = 20' (eng)</option>
+            <option value="0.0333333">1" = 30' (eng)</option>
+            <option value="0.025">1" = 40' (eng)</option>
+          </select>
+          <input type="checkbox" id="to-scale-preset-all" title="Apply to every page of this PDF"> <span style="font-size:10px;">all pages</span>
+        </label>
+        <button onclick="takeoffOpenAdd('area')">▱ Area</button>
+        <button onclick="takeoffOpenAdd('linear')">／ Linear</button>
+        <button onclick="takeoffOpenTruss()">◉ Truss count</button>
+        <button id="to-tool-pan" onclick="takeoffTool('pan')">✋ Pan</button>
+        <button onclick="takeoffFinish()">✓ Finish</button>
+        <button onclick="takeoffUndoPt()">↶ Undo point</button>
+        <button onclick="takeoffClearAll()" title="Clear all measurements and scale">✕ Clear</button>
+        <button onclick="takeoffConvertToQuote()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600;" title="Send the measured dimensions to the Dimensions tab (footprint, wall LF, areas...)">➡ Push to Dimensions</button>
+        <button onclick="takeoffPushLinesToQuote()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;" title="Send the PRICED takeoff lines to the quote's Materials list — only when you want them on the quote">$ Push to Quote</button>
+        <label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-2);" title="Zero the quote before pushing so ONLY measured items drive it — otherwise the push lands on top of whatever building is already entered (including the default one)"><input type="checkbox" id="to-clean-start" checked> Blank quote first — quote only measured items</label>
+        <button onclick="takeoffPushTrusses()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;">◉ Push trusses → truss tool</button>
+      </div>
+
+      <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px; border-top:1px solid var(--hairline); padding-top:8px;">
+        <label style="font-size:11px; color:var(--text-2);">Save under lead</label>
+        <select id="to-lead" onchange="takeoffSelectLead()" style="font-family:var(--font-mono); font-size:12px; min-width:190px;"></select>
+        <button onclick="takeoffSaveToLead()">💾 Save takeoff to lead</button>
+        <span id="to-lead-status" class="qbs-note" style="margin:0;"></span>
+        <span id="to-live" style="margin-left:auto; font-family:var(--font-mono); font-size:11px; color:var(--copper); background:#241a10; border:1px solid rgba(251,146,60,0.45); border-radius:6px; padding:3px 9px; white-space:nowrap;">tool: — · mouse: — · points: 0</span>
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;">
+        <div style="flex:0 0 290px; min-width:240px; max-width:340px;">
+          <div style="font-family:var(--font-headline); font-size:11px; color:var(--copper); text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-bottom:6px;">Pages</div>
+          <div id="to-pages-list" style="max-height:220px; overflow:auto; border:1px solid var(--hairline); border-radius:6px; margin-bottom:12px;"><div class="qbs-note" style="padding:8px;">Load a PDF to list its pages.</div></div>
+          <div style="font-family:var(--font-headline); font-size:11px; color:var(--copper); text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-bottom:6px;">Required measurements</div>
+          <div id="to-required" style="border:1px solid var(--hairline); border-radius:6px; padding:8px; margin-bottom:12px;"><div class="qbs-note">Pick a build tier on the Dimensions tab to see what this quote needs.</div></div>
+          <div style="font-family:var(--font-headline); font-size:11px; color:var(--copper); text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-bottom:6px;">Quote selections</div>
+          <div id="to-cat-totals" style="border:1px solid var(--hairline); border-radius:6px; padding:8px; margin-bottom:12px;"><div class="qbs-note">Pick a standard selection, measure, and the total feeds the quote here.</div></div>
+          <div style="font-family:var(--font-headline); font-size:11px; color:var(--copper); text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-bottom:6px;">Takeoff items</div>
+          <div id="to-results" style="max-height:420px; overflow:auto;"></div>
+        </div>
+        <div style="flex:1 1 460px; min-width:320px;">
+          <div id="to-edit-bar" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px; padding:7px 10px; background:rgba(30,123,255,0.12); border:1px solid #1e7bff; border-radius:6px; font-size:12px;">
+            <span id="to-edit-label" style="font-weight:600; color:#1e7bff;">Editing</span>
+            <span style="color:var(--text-2);">drag a point to move · click a point then Delete · click a line to add a point</span>
+            <span style="flex:1;"></span>
+            <button onclick="takeoffDeletePoint()" style="background:#3a1414;color:#ff9b9b;border-color:#5a1f1f;">🗑 Delete point</button>
+            <button onclick="takeoffEditDone()" style="background:var(--copper);color:var(--bg-deep);border-color:var(--copper);font-weight:600;">✓ Done</button>
+          </div>
+          <div id="to-scale-readout" class="qbs-note" style="margin-bottom:6px;">Scale: not set on this page — use <strong>Set scale</strong>, click two ends of a known dimension, then type its real length.</div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:6px; padding:7px 9px; background:var(--bg-deep); border:1px solid var(--hairline); border-radius:6px;">
+            <button onclick="document.getElementById('to-file').click()">📄 Load PDF</button>
+            <span style="display:inline-flex; gap:3px; align-items:center; border-left:1px solid var(--hairline); padding-left:8px;">
+              <button onclick="takeoffPage(-1)" title="Previous page">‹</button>
+              <span id="to-page-ind" style="font-family:var(--font-mono); font-size:12px; min-width:120px; text-align:center;">— / —</span>
+              <button onclick="takeoffPage(1)" title="Next page">›</button>
+            </span>
+            <span style="display:inline-flex; gap:3px; align-items:center; border-left:1px solid var(--hairline); padding-left:8px;">
+              <button onclick="takeoffZoom(-1)" title="Zoom out (−)">−</button>
+              <button onclick="takeoffZoom(1)" title="Zoom in (+)">＋</button>
+              <button onclick="takeoffZoom(0)" title="Fit page (0)">Fit</button>
+            </span>
+          </div>
+          <div id="to-canvas-wrap" style="position:relative; width:100%; height:600px; overflow:auto; background:#2a2a2a; border:1px solid var(--hairline); border-radius:6px;">
+            <div id="to-stage" style="position:relative;">
+              <canvas id="to-pdf-canvas" style="display:block; position:relative; z-index:1;"></canvas>
+              <canvas id="to-draw-canvas" style="position:absolute; left:0; top:0; z-index:2;"></canvas>
+              <!-- DOM crosshair: plain divs (same layer as buttons/text) so the
+                   cursor guides show even if canvas overlay drawing ever fails -->
+              <div id="to-xh-v" style="display:none; position:absolute; top:0; width:0; border-left:2px dashed #1e7bff; box-shadow:0 0 0 1px rgba(0,0,0,0.45); z-index:6; pointer-events:none;"></div>
+              <div id="to-xh-h" style="display:none; position:absolute; left:0; height:0; border-top:2px dashed #1e7bff; box-shadow:0 0 0 1px rgba(0,0,0,0.45); z-index:6; pointer-events:none;"></div>
+              <div id="to-xh-d" style="display:none; position:absolute; width:11px; height:11px; margin:-6px 0 0 -6px; border-radius:50%; background:#ff3b30; border:2px solid #fff; z-index:7; pointer-events:none;"></div>
+              <div id="to-xh-band" style="display:none; position:absolute; height:0; border-top:4px solid #1e7bff; box-shadow:0 0 0 2px rgba(0,0,0,0.5); transform-origin:0 0; z-index:6; pointer-events:none;"></div>
+              <!-- persistent scale line: stays on the sheet after locking -->
+              <div id="to-sl-line" style="display:none; position:absolute; height:0; border-top:4px solid #3ad67b; box-shadow:0 0 0 2px rgba(0,0,0,0.55); transform-origin:0 0; z-index:5; pointer-events:none;"></div>
+              <div id="to-sl-label" style="display:none; position:absolute; z-index:5; pointer-events:none; background:rgba(0,0,0,0.78); color:#3ad67b; font:bold 12px Arial,sans-serif; padding:2px 9px; border-radius:4px; transform:translate(-50%,-135%); white-space:nowrap;"></div>
+            </div>
+            <div id="to-empty" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#888; font-size:13px;">No PDF loaded — click “Load PDF”.</div>
+          </div>
+          <div class="qbs-note" style="margin-top:4px;">Scroll to pan · <strong>Ctrl/⌘ + scroll</strong> or <strong>+ / −</strong> to zoom (<strong>0</strong> = fit) · right- or middle-drag to pan · left-click to measure.</div>
+        </div>
+      </div>
+
+      <div id="to-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:99999; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-2,#161616); border:1px solid var(--hairline); border-radius:10px; width:460px; max-width:94vw; max-height:90vh; overflow:auto; padding:18px 20px; box-shadow:0 16px 50px rgba(0,0,0,0.6);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div id="to-modal-title" style="font-family:var(--font-headline); font-size:16px; color:var(--copper); font-weight:600;">—</div>
+            <button onclick="takeoffCloseDialog()" style="padding:2px 8px !important;">✕</button>
+          </div>
+          <div id="to-modal-body" style="display:flex; flex-direction:column; gap:10px; font-size:12px;"></div>
+          <div id="to-modal-foot" style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="qbs-card">
+      <h3>Roof geometry <span class="badge">Auto-calculated · Shelby Weeks formulas</span></h3>
+      <p class="qbs-sub" style="margin-bottom: 10px;">Driven by L × W, pitch, and overhangs from the Dimensions tab. Drives roof sheathing, panel, and gable siding takeoff.</p>
+      <div id="roof-geometry-output" class="qbs-grid-4"></div>
+    </div>
+
+    <!-- Roof structure mix card moved to Dimensions tab — right before Truss configuration -->
+    <!-- Electrical meter panel card moved to Subs & Labor tab -->
+  </div>
+
+  
+<!-- ==== SECTION 2: SCRIPT ==== -->
+<script>
+// =============================================================================
+// BLUEPRINT TAKEOFF — load a plan PDF, calibrate scale, measure LF / SF.
+// Original implementation: pixel calibration off a known dimension, polyline
+// length, and shoelace area. Measures stored in scale-independent "base" units
+// (canvas px ÷ render scale) so they stay correct across zoom.
+// =============================================================================
+(function () {
+  const TO = {
+    inited: false,
+    pdfDoc: null, pageNum: 1, pageCount: 0,
+    renderScale: 1.5, vp: null,
+    tool: 'scale', measureAs: 'lf',
+    pages: {},            // pageNum -> { unitsPerFoot }
+    measures: [],         // { page, mode, basePts:[{x,y}], color }
+    draft: null,          // { mode, basePts:[...] }
+    mouseBase: null,
+    pan: null,
+    colorIdx: 0,
+    leadId: null,
+    pdfName: null,
+    pageNames: {},
+    editIndex: null,    // measurement being edited
+    selVertex: null,    // selected vertex within the edited measurement
+    dragVertex: null,   // active vertex drag
+    _suppressClick: false,
+    autoPush: true,
+  };
+  const COLORS = ['#d98a3a', '#4aa3d9', '#6bbf59', '#c95b8e', '#b58be0', '#d9c14a'];
+  // Standard takeoff categories. `mode` drives geometry; `target` is the quote input id it feeds (null = tracked for reference only, no quote field yet).
+  const TAKEOFF_CATS = [
+    { key: 'ext_wall_lf',       label: 'Exterior wall LF',          group: 'linear', mode: 'lf',    unit: 'LF', target: 'ext_wall_lf' },
+    { key: 'int_wall_lf',       label: 'Interior wall LF',          group: 'linear', mode: 'lf',    unit: 'LF', target: 'int_wall_lf' },
+    { key: 'heated_sqft',       label: 'Heated & cooled SF',        group: 'area',   mode: 'floor', unit: 'SF', target: 'living_sqft' },
+    { key: 'shell_sqft',        label: 'Shell-only area SF',        group: 'area',   mode: 'floor', unit: 'SF', target: 'shop_sqft' },
+    { key: 'concrete_sqft',     label: 'Concrete / slab SF',        group: 'area',   mode: 'floor', unit: 'SF', target: 'footprint' },
+    { key: 'garage_sqft',       label: 'Garage area SF',            group: 'area',   mode: 'floor', unit: 'SF', target: 'garage_sqft' },
+    { key: 'timber_porch_sqft', label: 'Timber porch area SF',      group: 'area',   mode: 'floor', unit: 'SF', target: 'porch_sqft' },
+    { key: 'stick_porch_sqft',  label: 'Stick-framed porch area SF',group: 'area',   mode: 'floor', unit: 'SF', target: 'porch_sqft' },
+  ];
+  function catByKey(k) { return TAKEOFF_CATS.find(c => c.key === k) || null; }
+
+  // Guided takeoff: which measured quantities each build tier needs to quote correctly.
+  // Openings are intentionally NOT here — they stay manual on the window/door chart.
+  // 'porch_either' is satisfied by EITHER a timber OR a stick-framed porch measurement.
+  const REQUIRED_BY_TIER = {
+    shell:   ['concrete_sqft', 'ext_wall_lf'],
+    shop:    ['concrete_sqft', 'ext_wall_lf', 'shell_sqft'],
+  };
+  const TIER_LABELS = { shell: 'Shell', shop: 'Shop / Barn' };
+  function curTier() { return (typeof currentTier !== 'undefined' && REQUIRED_BY_TIER[currentTier]) ? currentTier : 'shell'; }
+
+  // Returns {met, missing:[{key,label}], items:[{key,label,ok,val}]} for the current tier.
+  function requiredStatus() {
+    const tier = curTier();
+    const keys = REQUIRED_BY_TIER[tier] || [];
+    const totals = catTotals();
+    const fmt = (cat, q) => cat && cat.unit === 'LF' ? q.toFixed(1) + ' LF' : Math.round(q) + ' SF';
+    const items = keys.map(k => {
+      if (k === 'porch_either') {
+        const q = (totals['timber_porch_sqft'] || 0) + (totals['stick_porch_sqft'] || 0);
+        return { key: k, label: 'Porch area (stick or timber)', ok: q > 0, val: q > 0 ? Math.round(q) + ' SF' : '' };
+      }
+      const cat = catByKey(k);
+      const q = totals[k] || 0;
+      return { key: k, label: cat ? cat.label : k, ok: q > 0, val: q > 0 ? fmt(cat, q) : '' };
+    });
+    const missing = items.filter(i => !i.ok).map(i => ({ key: i.key, label: i.label }));
+    return { tier: tier, met: missing.length === 0, missing: missing, items: items };
+  }
+
+  function renderRequiredPanel() {
+    const el = $('to-required'); if (!el) return;
+    const st = requiredStatus();
+    const done = st.items.filter(i => i.ok).length;
+    const head = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <span style="font-size:12px;font-weight:600;">${TIER_LABELS[st.tier] || st.tier}</span>
+      <span style="font-size:11px;color:${st.met ? 'var(--ok,#5aa24a)' : 'var(--copper)'};font-family:var(--font-mono);">${done}/${st.items.length} measured</span>
+    </div>`;
+    const rows = st.items.map(i => {
+      const mark = i.ok ? '<span style="color:#5aa24a;">✓</span>' : '<span style="color:#d98a3a;">✗</span>';
+      const val = i.ok ? `<span style="font-family:var(--font-mono);font-size:10px;color:var(--text-3);">${i.val}</span>` : '';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:2px 0;font-size:11px;">
+        <span>${mark} ${i.label}</span>${val}</div>`;
+    }).join('');
+    el.innerHTML = head + rows;
+  }
+  window.takeoffRefreshRequired = renderRequiredPanel;
+  // Blue crosshair mouse cursor (with a red center dot) for measuring — always visible on white plans.
+  const BLUE_CROSS = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26'><line x1='13' y1='1' x2='13' y2='10' stroke='%231e7bff' stroke-width='2'/><line x1='13' y1='16' x2='13' y2='25' stroke='%231e7bff' stroke-width='2'/><line x1='1' y1='13' x2='10' y2='13' stroke='%231e7bff' stroke-width='2'/><line x1='16' y1='13' x2='25' y2='13' stroke='%231e7bff' stroke-width='2'/><circle cx='13' cy='13' r='2' fill='%23ff3b30' stroke='white' stroke-width='0.5'/></svg>") 13 13, crosshair`;
+
+  function $(id) { return document.getElementById(id); }
+  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+  function polyLen(p) { let s = 0; for (let i = 1; i < p.length; i++) s += dist(p[i - 1], p[i]); return s; }
+  function polyArea(p) { let a = 0; for (let i = 0; i < p.length; i++) { const q = p[i], r = p[(i + 1) % p.length]; a += q.x * r.y - r.x * q.y; } return Math.abs(a) / 2; }
+  function distToSeg(p, a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y; const L2 = dx * dx + dy * dy;
+    if (L2 === 0) return dist(p, a);
+    let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / L2; t = Math.max(0, Math.min(1, t));
+    return dist(p, { x: a.x + t * dx, y: a.y + t * dy });
+  }
+  function hitVertex(m, p) { const th = 10 / TO.renderScale; for (let i = 0; i < m.basePts.length; i++) if (dist(p, m.basePts[i]) < th) return i; return -1; }
+  function hitSegment(m, p) {
+    if (m.mode === 'count') return -1;
+    const th = 7 / TO.renderScale, pts = m.basePts, n = pts.length;
+    const closed = (m.mode === 'floor' || m.mode === 'roof');
+    const lim = closed ? n : n - 1;
+    for (let i = 0; i < lim; i++) { if (distToSeg(p, pts[i], pts[(i + 1) % n]) < th) return i; }
+    return -1;
+  }
+  function uPerFt() { return (TO.pages[TO.pageNum] || {}).unitsPerFoot || null; }
+  function roofFactor() { const pitch = parseFloat(($('to-pitch') || {}).value) || 0; return Math.sqrt(1 + Math.pow(pitch / 12, 2)); }
+  function wallHt() { return parseFloat(($('to-wall-h') || {}).value) || 0; }
+
+  // ---- init ----
+  window.takeoffInit = function () {
+    if (typeof pdfjsLib === 'undefined') {
+      const ro = $('to-empty'); if (ro) ro.textContent = 'PDF engine failed to load (check your connection).';
+      return;
+    }
+    if (!TO.inited) {
+      try {
+        // Run pdf.js on the MAIN THREAD — no Web Worker spawned. This is reliable
+        // on file:// (blob/CDN workers get blocked there). window.pdfjsWorker was
+        // registered by the embedded worker script above.
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+        if (typeof pdfjsLib.GlobalWorkerOptions.workerPort !== 'undefined') pdfjsLib.GlobalWorkerOptions.workerPort = null;
+      } catch (_) {}
+      const dc = $('to-draw-canvas');
+      dc.addEventListener('click', onClick);
+      dc.addEventListener('dblclick', onDblClick);
+      dc.addEventListener('mousemove', onMove);
+      dc.addEventListener('mouseleave', () => { TO.mouseBase = null; xhHide(); redraw(); });
+      dc.addEventListener('mousedown', onDown);
+      dc.addEventListener('contextmenu', (e) => e.preventDefault());
+      // Safety net: if ANY element ends up over the sheet (stale overlay, stray
+      // layer), events would never reach the canvas. Forward them from the
+      // container whenever the pointer is geometrically over the canvas.
+      const overCanvas = (e) => {
+        if (e.target === dc) return false;           // canvas handled it already
+        const b = dc.getBoundingClientRect();
+        return e.clientX >= b.left && e.clientX <= b.right && e.clientY >= b.top && e.clientY <= b.bottom;
+      };
+      const wrapEl = $('to-canvas-wrap');
+      wrapEl.addEventListener('mousemove', (e) => { if (!e._toH && overCanvas(e)) onMove(e); });
+      wrapEl.addEventListener('click',     (e) => { if (!e._toH && overCanvas(e)) onClick(e); });
+      wrapEl.addEventListener('mousedown', (e) => { if (!e._toH && overCanvas(e)) onDown(e); });
+      // LAST-RESORT input path: DOCUMENT-level capture. Runs before anything
+      // else in the page can see or swallow the event, so no overlay, layer,
+      // or extension can stand between the mouse and the sheet.
+      const docForward = (fn) => (e) => {
+        if (!TO.pdfDoc || e._toH || e.target === dc) return;
+        const tab = $('tab-takeoff'); if (!tab || tab.style.display === 'none') return;
+        const b = dc.getBoundingClientRect();
+        if (e.clientX < b.left || e.clientX > b.right || e.clientY < b.top || e.clientY > b.bottom) return;
+        e._toH = true;
+        fn(e);
+      };
+      document.addEventListener('mousemove', docForward(onMove), true);
+      document.addEventListener('mousedown', docForward(onDown), true);
+      document.addEventListener('click', docForward(onClick), true);
+      const wrap = $('to-canvas-wrap');
+      wrap.addEventListener('contextmenu', (e) => e.preventDefault());
+      wrap.addEventListener('wheel', onWheel, { passive: false });
+      document.addEventListener('keydown', (e) => {
+        if ($('tab-takeoff').style.display === 'none') return;
+        const tag = (e.target && e.target.tagName) || '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        // Keyboard zoom (works with any tool active)
+        if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomAt(1.25); return; }
+        if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomAt(0.8); return; }
+        if (e.key === '0') { e.preventDefault(); takeoffZoom(0); return; }
+        if (TO.tool === 'edit') {
+          if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); takeoffDeletePoint(); return; }
+          if (e.key === 'Escape') { takeoffEditDone(); return; }
+          return;
+        }
+        if (e.key === 'Enter') takeoffFinish();
+        if (e.key === 'Escape') { TO.draft = null; redraw(); }
+      });
+      TO.inited = true;
+      highlightTool();
+    }
+    takeoffRefreshLeads();
+    renderRequiredPanel();
+    takeoffResize();
+  };
+  window.takeoffResize = function () { /* canvas keeps intrinsic size; nothing required */ };
+
+  // ---- save / load under a lead ----
+  window.takeoffRefreshLeads = function () {
+    const sel = $('to-lead'); if (!sel) return;
+    const leads = (typeof leadsState !== 'undefined') ? leadsState : [];
+    let html = '<option value="">— pick a lead —</option>';
+    leads.forEach(l => {
+      const nm = ((l.firstName || '') + ' ' + (l.lastName || '')).trim() || '(unnamed)';
+      html += `<option value="${l.id}">${nm}${l.takeoff ? ' ✓' : ''}</option>`;
+    });
+    sel.innerHTML = html;
+    if (TO.leadId) sel.value = TO.leadId;
+  };
+
+  // Clear/zero the whole takeoff — measurements, scale, page names, draft, edit state.
+  window.takeoffClearAll = function (opts) {
+    window._takeoffQuoteLines = [];
+    opts = opts || {};
+    const hasWork = (TO.measures && TO.measures.length) || (TO.pages && Object.keys(TO.pages).length);
+    if (!opts.silent && hasWork && !confirm('Clear all measurements and the scale on this takeoff? (The loaded plan stays open.)')) return;
+    TO.measures = []; TO.pages = {}; TO.pageNames = {}; TO.draft = null;
+    TO.editIndex = null; TO.selVertex = null; TO.dragVertex = null; TO.colorIdx = 0;
+    TO.tool = 'pan';
+    if (typeof redraw === 'function') redraw();
+    if (typeof renderResults === 'function') renderResults();
+    if (typeof renderPagesList === 'function') renderPagesList();
+    if (typeof renderCatTotals === 'function') renderCatTotals();
+    if (typeof highlightTool === 'function') highlightTool();
+    if (typeof updateHud === 'function') updateHud();
+    if (typeof window.takeoffRefreshRequired === 'function') window.takeoffRefreshRequired();
+  };
+
+  window.takeoffSelectLead = function () {
+    const sel = $('to-lead'); TO.leadId = sel.value || null;
+    const st = $('to-lead-status');
+    const lead = TO.leadId && (typeof leadsState !== 'undefined') && leadsState.find(l => l.id === TO.leadId);
+    if (lead && lead.takeoff) {
+      const t = lead.takeoff;
+      TO.measures = (t.measures || []).map(m => ({ page: m.page, mode: m.mode, color: m.color, name: m.name, cat: m.cat || null, target: m.target || null, type: m.type || '', desc: m.desc || '', price: m.price || 0, widthIn: m.widthIn || 0, alpha: (m.alpha != null ? m.alpha : 0.28), visible: m.visible !== false, basePts: (m.basePts || []).map(p => ({ x: p.x, y: p.y })) }));
+      TO.pages = t.pages || {};
+      TO.pageNames = t.pageNames || {};
+      if (t.pitch != null && $('to-pitch')) $('to-pitch').value = t.pitch;
+      if (t.wallHeight != null && $('to-wall-h')) $('to-wall-h').value = t.wallHeight;
+      TO.colorIdx = TO.measures.length;
+      redraw(); renderResults(); renderPagesList(); renderCatTotals();
+      if (st) st.textContent = `Loaded ${TO.measures.length} measurement(s)` + (t.pdfName ? ` — re-open "${t.pdfName}" to see them on the plan.` : '.');
+    } else if (lead) {
+      // Lead with no saved takeoff → start clean (don't carry the previous lead's work).
+      TO.measures = []; TO.pages = {}; TO.pageNames = {}; TO.draft = null;
+      TO.editIndex = null; TO.selVertex = null; TO.colorIdx = 0;
+      redraw(); renderResults(); renderPagesList(); renderCatTotals();
+      if (typeof window.takeoffRefreshRequired === 'function') window.takeoffRefreshRequired();
+      if (st) st.textContent = 'No saved takeoff for this lead yet — measure, then Save.';
+    } else {
+      TO.measures = []; TO.pages = {}; TO.pageNames = {}; TO.draft = null;
+      TO.editIndex = null; TO.selVertex = null; TO.colorIdx = 0;
+      redraw(); renderResults(); renderPagesList(); renderCatTotals();
+      if (typeof window.takeoffRefreshRequired === 'function') window.takeoffRefreshRequired();
+      if (st) st.textContent = '';
+    }
+  };
+
+  window.takeoffSaveToLead = async function () {
+    if (!TO.leadId) { alert('Pick a lead to save this takeoff under (add one on the Leads tab first if needed).'); return; }
+    const lead = (typeof leadsState !== 'undefined') && leadsState.find(l => l.id === TO.leadId);
+    if (!lead) { alert('Lead not found — reopen the tab to refresh.'); return; }
+    if (!TO.measures.length) { if (!confirm('No measurements yet — save an empty takeoff to this lead anyway?')) return; }
+    lead.takeoff = {
+      measures: TO.measures,
+      pages: TO.pages,
+      pageNames: TO.pageNames,
+      pitch: parseFloat(($('to-pitch') || {}).value) || null,
+      wallHeight: parseFloat(($('to-wall-h') || {}).value) || null,
+      pdfName: TO.pdfName || null,
+      savedAt: new Date().toISOString(),
+    };
+    lead.updatedAt = new Date().toISOString();
+    try {
+      await saveLeadToStorage(lead);
+      if (typeof renderLeadsLog === 'function') renderLeadsLog();
+      const nm = ((lead.firstName || '') + ' ' + (lead.lastName || '')).trim();
+      const st = $('to-lead-status'); if (st) st.textContent = `Saved ${TO.measures.length} measurement(s) to ${nm}.`;
+      takeoffRefreshLeads();
+    } catch (e) { alert('Save failed: ' + e.message); }
+  };
+
+  // ---- load ----
+  window.takeoffLoadFile = function (ev) {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    TO.pdfName = f.name;
+    const rd = new FileReader();
+    rd.onload = function () {
+      const data = new Uint8Array(rd.result);
+      pdfjsLib.getDocument({ data }).promise.then(doc => {
+        TO.pdfDoc = doc; TO.pageCount = doc.numPages; TO.pageNum = 1;
+        TO.pages = {}; TO.measures = []; TO.draft = null; TO.pageNames = {};
+        const e = $('to-empty'); if (e) e.style.display = 'none';
+        renderPage(); renderPagesList();
+        takeoffAutoNamePages(doc);
+      }).catch(err => {
+        const e = $('to-empty'); if (e) { e.style.display = 'flex'; e.textContent = 'Could not open PDF: ' + err.message; }
+      });
+    };
+    rd.readAsArrayBuffer(f);
+  };
+
+  // Pull page names from the PDF itself: page labels first, then bookmark/outline titles.
+  function resolveDestPage(doc, dest) {
+    if (!dest) return Promise.resolve(null);
+    if (typeof dest === 'string') {
+      return doc.getDestination(dest).then(d => {
+        const ref = Array.isArray(d) ? d[0] : null;
+        return ref ? doc.getPageIndex(ref).then(i => i + 1) : null;
+      });
+    }
+    if (Array.isArray(dest)) {
+      const ref = dest[0];
+      return ref ? doc.getPageIndex(ref).then(i => i + 1) : Promise.resolve(null);
+    }
+    return Promise.resolve(null);
+  }
+  function takeoffAutoNamePages(doc) {
+    let p = Promise.resolve();
+    // 1) Page labels (e.g. "A1", "S-2") if the PDF defines custom ones
+    p = p.then(() => doc.getPageLabels()).then(labels => {
+      if (labels && labels.length) {
+        const meaningful = labels.some((lab, idx) => lab && lab !== String(idx + 1));
+        if (meaningful) labels.forEach((lab, idx) => { if (lab) TO.pageNames[idx + 1] = lab; });
+      }
+    }).catch(() => {});
+    // 2) Bookmark/outline titles — usually the real sheet names
+    p = p.then(() => doc.getOutline()).then(outline => {
+      if (!outline || !outline.length) return;
+      const tasks = [];
+      const walk = (items) => items.forEach(it => {
+        tasks.push(resolveDestPage(doc, it.dest).then(pg => { if (pg && it.title) TO.pageNames[pg] = it.title.trim(); }).catch(() => {}));
+        if (it.items && it.items.length) walk(it.items);
+      });
+      walk(outline);
+      return Promise.all(tasks);
+    }).catch(() => {});
+    p.then(() => { renderPagesList(); updateHud(); });
+  }
+
+  function renderPage() {
+    if (!TO.pdfDoc) return;
+    // SERIALIZE pdf.js renders. Page flips and zooms fire renderPage rapidly;
+    // starting a second render on the same canvas throws "Cannot use the same
+    // canvas during multiple render() operations", the promise rejects, the
+    // completion handler never runs, and the OVERLAY canvas is left blank —
+    // which kills the crosshair/scale line on screen. Cancel the in-flight
+    // render first and always repaint the overlay, even on failure.
+    if (TO._renderTask) { try { TO._renderTask.cancel(); } catch (e) {} TO._renderTask = null; }
+    const myToken = (TO._renderToken = (TO._renderToken || 0) + 1);
+    TO.pdfDoc.getPage(TO.pageNum).then(page => {
+      if (myToken !== TO._renderToken) return;         // a newer render superseded this one
+      const vp = page.getViewport({ scale: TO.renderScale });
+      TO.vp = vp;
+      const pc = $('to-pdf-canvas'), dc = $('to-draw-canvas');
+      pc.width = vp.width; pc.height = vp.height;
+      dc.width = vp.width; dc.height = vp.height;
+      $('to-stage').style.width = vp.width + 'px';
+      $('to-stage').style.height = vp.height + 'px';
+      const ctx = pc.getContext('2d');
+      const task = page.render({ canvasContext: ctx, viewport: vp });
+      TO._renderTask = task;
+      task.promise.then(() => {
+        if (TO._renderTask === task) TO._renderTask = null;
+        redraw(); updateHud();
+        if (TO._afterRender) { const f = TO._afterRender; TO._afterRender = null; f(); }
+      }).catch(err => {
+        if (TO._renderTask === task) TO._renderTask = null;
+        // Cancellation is expected when zooming/flipping fast; repaint anyway
+        // so measures, the scale line and the crosshair never disappear.
+        try { redraw(); updateHud(); } catch (e) {}
+      });
+    }).catch(() => { try { redraw(); updateHud(); } catch (e) {} });
+  }
+
+  window.takeoffPage = function (d) {
+    if (!TO.pdfDoc) return;
+    const n = TO.pageNum + d;
+    if (n < 1 || n > TO.pageCount) return;
+    TO.pageNum = n; TO.draft = null; renderPage(); renderPagesList();
+  };
+  window.takeoffGoPage = function (n) {
+    if (!TO.pdfDoc || n < 1 || n > TO.pageCount || n === TO.pageNum) return;
+    TO.pageNum = n; TO.draft = null; renderPage(); renderPagesList();
+  };
+  window.takeoffRenamePage = function (n, name) { TO.pageNames[n] = name; renderPagesList(); updateHud(); };
+  function pageLabel(n) { return (TO.pageNames && TO.pageNames[n]) || ('Page ' + n); }
+  function renderPagesList() {
+    const el = $('to-pages-list'); if (!el) return;
+    if (!TO.pdfDoc) { el.innerHTML = '<div class="qbs-note" style="padding:8px;">Load a PDF to list its pages.</div>'; return; }
+    let html = '';
+    for (let n = 1; n <= TO.pageCount; n++) {
+      const cur = n === TO.pageNum;
+      const cnt = TO.measures.filter(m => m.page === n).length;
+      const scaled = TO.pages[n] && TO.pages[n].unitsPerFoot;
+      html += `<div onclick="takeoffGoPage(${n})" style="display:flex; align-items:center; gap:6px; padding:5px 8px; cursor:pointer; border-bottom:1px solid var(--hairline); ${cur ? 'background:var(--copper-soft, rgba(212,130,58,0.18));' : ''}">
+        <span style="font-family:var(--font-mono); font-size:10px; color:var(--text-3); width:18px; flex:0 0 auto;">${n}</span>
+        <input value="${pageLabel(n).replace(/"/g, '&quot;')}" onclick="event.stopPropagation()" onchange="takeoffRenamePage(${n}, this.value)" title="Rename page" style="flex:1; min-width:0; font-size:12px; background:transparent; border:none; border-bottom:1px dashed transparent; color:var(--text); padding:1px 2px;" onfocus="this.style.borderBottomColor='var(--hairline)'" onblur="this.style.borderBottomColor='transparent'">
+        <span title="${scaled ? 'scale set' : 'no scale yet'}" style="font-size:11px;">${scaled ? '📐' : '·'}</span>
+        <span style="font-family:var(--font-mono); font-size:10px; color:${cnt ? 'var(--copper)' : 'var(--text-3)'}; flex:0 0 auto;">${cnt}</span>
+      </div>`;
+    }
+    el.innerHTML = html;
+  }
+  window.takeoffZoom = function (d) {
+    if (!TO.pdfDoc) return;
+    if (d === 0) {
+      const wrap = $('to-canvas-wrap');
+      TO.pdfDoc.getPage(TO.pageNum).then(page => {
+        const base = page.getViewport({ scale: 1 });
+        TO.renderScale = Math.max(0.2, (wrap.clientWidth - 24) / base.width);
+        renderPage();
+      });
+      return;
+    }
+    zoomAt(d > 0 ? 1.25 : 0.8);
+  };
+
+  // ---- tools ----
+  window.takeoffTool = function (t) {
+    TO.tool = t; TO.draft = null; redraw(); highlightTool();
+  };
+  function highlightTool() {
+    [['scale', 'to-tool-scale'], ['pan', 'to-tool-pan']].forEach(([t, id]) => {
+      const b = $(id); if (!b) return;
+      const on = TO.tool === t;
+      b.style.background = on ? 'var(--copper)' : '';
+      b.style.color = on ? 'var(--bg-deep)' : '';
+    });
+    const dc = $('to-draw-canvas');
+    if (dc) dc.style.cursor = (TO.tool === 'pan') ? 'grab'
+      : (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit') ? 'crosshair' : 'default';
+  }
+
+  function isPolygon(mode) { return mode === 'floor' || mode === 'roof'; }
+
+  // ---- mouse ----
+  function _cnTO(id) { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; }
+  function toBase(ev) {
+    const dc = $('to-draw-canvas'); const r = dc.getBoundingClientRect();
+    const sx = dc.width / r.width, sy = dc.height / r.height;
+    return { x: (ev.clientX - r.left) * sx / TO.renderScale, y: (ev.clientY - r.top) * sy / TO.renderScale };
+  }
+  function onDown(ev) {
+    // SCALE: press-and-DRAG in one motion (the natural gesture). Two separate
+    // clicks still work via onClick. The DOM band follows the pointer live.
+    if (TO.tool === 'scale' && ev.button === 0 && TO.pdfDoc) {
+      ev.preventDefault();
+      const startBase = toBase(ev);
+      const sx = ev.clientX, sy = ev.clientY;
+      let moved = false;
+      const mv = (e) => {
+        if (!moved && Math.hypot(e.clientX - sx, e.clientY - sy) > 6) {
+          moved = true;
+          TO.draft = { mode: 'scale', basePts: [startBase] };   // arms the band
+        }
+        if (moved) { xhUpdate(e); TO.mouseBase = toBase(e); redraw(); }
+      };
+      const up = (e) => {
+        window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up);
+        if (!moved) return;                       // a plain click -> let onClick handle it
+        TO._suppressClick = true; setTimeout(() => { TO._suppressClick = false; }, 80);
+        const endBase = toBase(e);
+        const px = dist(startBase, endBase);
+        let feet = (TO.scaleEntry && TO.scaleEntry.feet) || _cnTO('to-feet');
+        if (!(feet > 0)) { toToast('Type the line length in the blue "Line length" box first, then drag again.', false); }
+        if (feet && feet > 0) {
+          const upf = px / feet;
+          scaleLockIn(startBase, endBase, feet, upf);
+        }
+        TO.draft = null;
+        const band = $('to-xh-band'); if (band) band.style.display = 'none';
+        redraw(); updateHud(); renderResults();
+      };
+      window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+      return;
+    }
+    // Edit mode: left-button on a vertex starts a drag-to-move
+    if (TO.tool === 'edit' && ev.button === 0 && TO.editIndex != null) {
+      const m = TO.measures[TO.editIndex];
+      if (m) {
+        const vi = hitVertex(m, toBase(ev));
+        if (vi >= 0) {
+          ev.preventDefault();
+          TO.dragVertex = vi; TO.selVertex = vi; TO._dragMoved = false; redraw();
+          const mv = (e) => { const bp = toBase(e); m.basePts[vi] = { x: bp.x, y: bp.y }; TO._dragMoved = true; redraw(); renderResults(); };
+          const up = () => {
+            TO.dragVertex = null;
+            if (TO._dragMoved) { TO._suppressClick = true; setTimeout(() => { TO._suppressClick = false; }, 50); }
+            window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up);
+            renderResults(); renderEditBar(); takeoffAutoPush();
+          };
+          window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+          return;
+        }
+      }
+    }
+    const panBtn = (ev.button === 2 || ev.button === 1);   // right OR middle button pans
+    if (!panBtn && TO.tool !== 'pan') return;
+    if (panBtn) ev.preventDefault();
+    const wrap = $('to-canvas-wrap');
+    wrap.style.cursor = 'grabbing';
+    TO.pan = { x: ev.clientX, y: ev.clientY, sl: wrap.scrollLeft, st: wrap.scrollTop };
+    const mv = (e) => { if (!TO.pan) return; wrap.scrollLeft = TO.pan.sl - (e.clientX - TO.pan.x); wrap.scrollTop = TO.pan.st - (e.clientY - TO.pan.y); };
+    const up = () => { TO.pan = null; wrap.style.cursor = ''; window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+  }
+  function onClick(ev) {
+    if (!TO.pdfDoc || TO.tool === 'pan') return;
+    const p = toBase(ev);
+    // Edit mode: click a vertex to select, click a line to insert a point
+    if (TO.tool === 'edit') {
+      if (TO._suppressClick) return;
+      const m = TO.measures[TO.editIndex]; if (!m) return;
+      const vi = hitVertex(m, p);
+      if (vi >= 0) { TO.selVertex = vi; redraw(); renderEditBar(); return; }
+      const seg = hitSegment(m, p);
+      if (seg >= 0) { m.basePts.splice(seg + 1, 0, { x: p.x, y: p.y }); TO.selVertex = seg + 1; redraw(); renderResults(); renderEditBar(); return; }
+      TO.selVertex = null; redraw(); renderEditBar(); return;
+    }
+    if (TO.tool === 'scale') {
+      if (TO._suppressClick) return;      // a drag-to-scale just completed
+      setTimeout(() => { try { liveStatus(ev); } catch (e) {} }, 0);
+      if (!TO.draft || TO.draft.mode !== 'scale') TO.draft = { mode: 'scale', basePts: [] };
+      TO.draft.basePts.push(p);
+      if (TO.draft.basePts.length === 2) {
+        const px = dist(TO.draft.basePts[0], TO.draft.basePts[1]);
+        let feet = (TO.scaleEntry && TO.scaleEntry.feet) || _cnTO('to-feet');
+        if (!(feet > 0)) { toToast('Type the line length in the blue "Line length" box first, then click the two ends again.', false); }
+        if (feet && feet > 0) {
+          const upf = px / feet;
+          scaleLockIn(TO.draft.basePts[0], TO.draft.basePts[1], feet, upf);
+        }
+        TO.draft = null; redraw(); updateHud(); renderResults();
+        return;
+      }
+      redraw(); return;
+    }
+    // measure
+    if (TO.measureAs !== 'count' && !uPerFt()) { alert('Set the scale on this page first (⟂ Set scale).'); return; }
+    if (!TO.draft || TO.draft.mode !== TO.measureAs) TO.draft = { mode: TO.measureAs, basePts: [] };
+    TO.draft.basePts.push(p);
+    redraw();
+  }
+  function onDblClick(ev) { if (TO.tool !== 'pan' && TO.tool !== 'scale') takeoffFinish(); }
+  // DOM crosshair — positioned from raw client coords, no canvas involved.
+  // Persistent green scale line (DOM) — stored in base units per page,
+  // repositioned on every zoom/page change via updateHud.
+  function syncScaleLineDom() {
+    const ln = $('to-sl-line'), lb = $('to-sl-label');
+    if (!ln || !lb) return;
+    const sl = TO.pdfDoc ? (TO.pages[TO.pageNum] || {}).scaleLine : null;
+    if (!sl) { ln.style.display = 'none'; lb.style.display = 'none'; return; }
+    const R = TO.renderScale;
+    const x1 = sl.p1.x * R, y1 = sl.p1.y * R, x2 = sl.p2.x * R, y2 = sl.p2.y * R;
+    const dx = x2 - x1, dy = y2 - y1;
+    ln.style.left = x1 + 'px'; ln.style.top = y1 + 'px';
+    ln.style.width = Math.sqrt(dx * dx + dy * dy) + 'px';
+    ln.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
+    ln.style.display = 'block';
+    lb.style.left = (x1 + x2) / 2 + 'px'; lb.style.top = (y1 + y2) / 2 + 'px';
+    lb.textContent = sl.feet + "' scale line";
+    lb.style.display = 'block';
+  }
+  // One place that LOCKS the scale: stores it, keeps the line visible,
+  // flashes an unmissable confirmation, refreshes every readout.
+  function scaleLockIn(p1, p2, feet, upf) {
+    const line = { p1: { x: p1.x, y: p1.y }, p2: { x: p2.x, y: p2.y }, feet: feet };
+    const applyAll = (TO.scaleEntry && TO.scaleEntry.applyAll) || !!(($('to-scale-preset-all') || {}).checked);
+    if (applyAll) {
+      for (let pg = 1; pg <= TO.pageCount; pg++) TO.pages[pg] = { unitsPerFoot: upf };
+      TO.pages[TO.pageNum].scaleLine = line;
+    } else {
+      TO.pages[TO.pageNum] = { unitsPerFoot: upf, scaleLine: line };
+    }
+    TO.scaleEntry = null;         // never silently reuse old footage
+    // Step aside so the next clicks can't re-lock the scale — the builder's
+    // area clicks were firing SCALE LOCKED over and over while scale stayed armed.
+    TO.tool = 'pan';
+    try { highlightTool(); } catch (e) {}
+    toToast('✓ SCALE LOCKED — ' + feet + ' ft · ' + archScale(upf).replace('≈ ', '') + (applyAll ? ' · ALL pages' : ' · page ' + TO.pageNum) + '. Now use ▱ Area or ／ Linear to measure.', true);
+    setTimeout(() => { try { liveStatus(null); } catch (e) {} }, 0);   // after draft clears
+  }
+  // Non-blocking toast (green = success, red = needs attention). NO browser
+  // dialogs anywhere in the scale flow — prompt/alert can be silently
+  // suppressed by Chrome's "prevent additional dialogs", killing the flow.
+  function toToast(msg, ok) {
+    let toast = $('to-scale-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'to-scale-toast';
+      document.body.appendChild(toast);
+    }
+    toast.style.cssText = 'position:fixed; top:18px; left:50%; transform:translateX(-50%); z-index:2147483000; border-radius:10px; padding:14px 26px; font:bold 17px Arial,sans-serif; box-shadow:0 6px 30px rgba(0,0,0,0.6); display:block;'
+      + (ok ? 'background:#0e2b18; color:#3ad67b; border:2px solid #3ad67b;'
+            : 'background:#3a1414; color:#ff9b9b; border:2px solid #ef4444;');
+    toast.textContent = msg;
+    clearTimeout(TO._toastT);
+    TO._toastT = setTimeout(() => { toast.style.display = 'none'; }, ok ? 3500 : 5000);
+  }
+  function liveStatus(ev) {
+    const el = $('to-live'); if (!el) return;
+    const pts = (TO.draft && TO.draft.basePts) ? TO.draft.basePts.length : 0;
+    const upf = uPerFt();
+    let mouse = '—';
+    if (ev) {
+      const b = toBase(ev);
+      mouse = Math.round(b.x) + ',' + Math.round(b.y);
+      if (upf) mouse += '  (' + (b.x / upf).toFixed(1) + "', " + (b.y / upf).toFixed(1) + "')";
+    }
+    el.textContent = 'tool: ' + TO.tool + ' · mouse: ' + mouse + ' · points: ' + pts + (upf ? ' · SCALE SET' : ' · no scale');
+  }
+  function xhUpdate(ev) {
+    liveStatus(ev);
+    const stage = $('to-stage'); if (!stage || !TO.pdfDoc) return;
+    const r = stage.getBoundingClientRect();
+    const x = ev.clientX - r.left, y = ev.clientY - r.top;
+    const v = $('to-xh-v'), h = $('to-xh-h'), d = $('to-xh-d');
+    if (!v) return;
+    v.style.left = x + 'px'; v.style.height = r.height + 'px'; v.style.display = 'block';
+    h.style.top = y + 'px';  h.style.width  = r.width  + 'px'; h.style.display = 'block';
+    d.style.left = x + 'px'; d.style.top = y + 'px'; d.style.display = 'block';
+    // rubber band from the first scale point to the pointer
+    const band = $('to-xh-band');
+    const p0 = (TO.tool === 'scale' && TO.draft && TO.draft.mode === 'scale' && TO.draft.basePts.length === 1) ? TO.draft.basePts[0] : null;
+    if (band) {
+      if (p0) {
+        const x0 = p0.x * TO.renderScale, y0 = p0.y * TO.renderScale;
+        const dx = x - x0, dy = y - y0;
+        band.style.left = x0 + 'px'; band.style.top = y0 + 'px';
+        band.style.width = Math.sqrt(dx * dx + dy * dy) + 'px';
+        band.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
+        band.style.display = 'block';
+      } else { band.style.display = 'none'; }
+    }
+  }
+  function xhHide() {
+    ['to-xh-v', 'to-xh-h', 'to-xh-d', 'to-xh-band'].forEach(id => { const el = $(id); if (el) el.style.display = 'none'; });
+  }
+  function onMove(ev) {
+    if (!TO.pdfDoc) return;
+    xhUpdate(ev);                      // crosshair follows in EVERY tool
+    if (TO.tool !== 'scale' && TO.tool !== 'measure' && TO.tool !== 'edit') return;
+    TO.mouseBase = toBase(ev); redraw();
+  }
+  function zoomAt(factor, clientX, clientY) {
+    if (!TO.pdfDoc) return;
+    const dc = $('to-draw-canvas'), wrap = $('to-canvas-wrap');
+    const r = dc.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+    const ax = (clientX != null) ? clientX : wr.left + wrap.clientWidth / 2;
+    const ay = (clientY != null) ? clientY : wr.top + wrap.clientHeight / 2;
+    const bx = (ax - r.left) / TO.renderScale, by = (ay - r.top) / TO.renderScale;
+    const ns = Math.max(0.25, Math.min(8, TO.renderScale * factor));
+    if (ns === TO.renderScale) return;
+    const viewX = ax - wr.left, viewY = ay - wr.top;
+    TO.renderScale = ns;
+    TO._afterRender = () => { wrap.scrollLeft = bx * ns - viewX; wrap.scrollTop = by * ns - viewY; };
+    renderPage();
+  }
+  function onWheel(ev) {
+    if (!TO.pdfDoc) return;
+    // Ctrl/Cmd + wheel = zoom (cursor-anchored). Plain wheel = scroll the plan (native).
+    if (ev.ctrlKey || ev.metaKey) {
+      ev.preventDefault();
+      zoomAt(ev.deltaY < 0 ? 1.15 : 0.87, ev.clientX, ev.clientY);
+    }
+    // else: let #to-canvas-wrap scroll natively (overflow:auto) — don't preventDefault
+  }
+
+  window.takeoffUndoPt = function () {
+    if (TO.tool === 'edit' && TO.editIndex != null) {
+      const m = TO.measures[TO.editIndex];
+      const need = isPolygon(m.mode) ? 3 : (m.mode === 'count' ? 1 : 2);
+      if (m && m.basePts.length > need) { m.basePts.pop(); TO.selVertex = null; redraw(); renderResults(); renderEditBar(); }
+      return;
+    }
+    if (TO.draft && TO.draft.basePts.length) { TO.draft.basePts.pop(); redraw(); }
+  };
+
+  // ---- edit committed measurements ----
+  window.takeoffEdit = function (i) {
+    const m = TO.measures[i]; if (!m) return;
+    if (m.page !== TO.pageNum) { TO.pageNum = m.page; renderPage(); renderPagesList(); }
+    TO.tool = 'edit'; TO.editIndex = i; TO.selVertex = null; TO.draft = null;
+    if (m.visible === false) { m.visible = true; }
+    highlightTool(); renderEditBar(); renderResults(); redraw();
+  };
+  window.takeoffEditDone = function () {
+    TO.tool = 'pan'; TO.editIndex = null; TO.selVertex = null; TO.dragVertex = null;
+    highlightTool(); renderEditBar(); renderResults(); redraw();
+  };
+  window.takeoffDeletePoint = function () {
+    if (TO.tool !== 'edit' || TO.editIndex == null || TO.selVertex == null) { alert('Click a point first, then Delete point.'); return; }
+    const m = TO.measures[TO.editIndex]; if (!m) return;
+    const need = isPolygon(m.mode) ? 3 : (m.mode === 'count' ? 1 : 2);
+    if (m.basePts.length <= need) {
+      if (confirm('That would leave too few points. Delete the whole measurement instead?')) { const idx = TO.editIndex; takeoffEditDone(); takeoffDelete(idx); }
+      return;
+    }
+    m.basePts.splice(TO.selVertex, 1); TO.selVertex = null;
+    redraw(); renderResults(); renderEditBar(); takeoffAutoPush();
+  };
+  function renderEditBar() {
+    const bar = $('to-edit-bar'); if (!bar) return;
+    if (TO.tool === 'edit' && TO.editIndex != null && TO.measures[TO.editIndex]) {
+      const m = TO.measures[TO.editIndex];
+      bar.style.display = 'flex';
+      $('to-edit-label').textContent = 'Editing: ' + (m.name || 'measurement') + (TO.selVertex != null ? '  · point ' + (TO.selVertex + 1) + ' selected' : '');
+    } else {
+      bar.style.display = 'none';
+    }
+  }
+  window.takeoffFinish = function () {
+    if (!TO.draft || TO.draft.mode === 'scale') return;
+    const need = isPolygon(TO.draft.mode) ? 3 : (TO.draft.mode === 'count' ? 1 : 2);
+    if (TO.draft.basePts.length < need) return;
+    const p = TO.pending || {};
+    const defName = { lf: 'Linear', wall: 'Wall', floor: 'Area', roof: 'Roof', count: 'Count' }[TO.draft.mode];
+    const n = TO.measures.filter(m => m.mode === TO.draft.mode).length + 1;
+    TO.measures.push({
+      page: TO.pageNum, mode: TO.draft.mode,
+      cat: p.cat || null, target: p.target || null,
+      name: p.name || (defName + ' ' + n),
+      type: p.type || '', desc: p.desc || '',
+      color: p.color || COLORS[TO.colorIdx++ % COLORS.length],
+      price: p.price || 0, widthIn: p.widthIn || 0,
+      alpha: (p.alpha != null ? p.alpha : 0.28),
+      truss: p.truss || null,
+      basePts: TO.draft.basePts.slice(), visible: true,
+    });
+    TO.draft = null; redraw(); renderResults(); renderPagesList(); takeoffAutoPush();
+  };
+
+  // ---- compute ----
+  function valueOf(m) {
+    if (m.mode === 'count') return { count: m.basePts.length };
+    const upf = (TO.pages[m.page] || {}).unitsPerFoot;
+    if (!upf) return null;
+    if (m.mode === 'lf') { const lf = polyLen(m.basePts) / upf; return { lf }; }
+    if (m.mode === 'wall') { const lf = polyLen(m.basePts) / upf; return { lf, sf: lf * wallHt() }; }
+    if (m.mode === 'floor') { const sf = polyArea(m.basePts) / (upf * upf); const lf = polyLen(m.basePts) / upf; return { sf, lf }; }
+    if (m.mode === 'roof') { const plan = polyArea(m.basePts) / (upf * upf); return { sf: plan * roofFactor(), plan }; }
+    return null;
+  }
+
+  // ---- draw ----
+  function redraw() {
+    const dc = $('to-draw-canvas'); if (!dc) return;
+    const ctx = dc.getContext('2d'); ctx.clearRect(0, 0, dc.width, dc.height);
+    const S = TO.renderScale;
+    // committed measures on this page (skip hidden)
+    TO.measures.filter(m => m.page === TO.pageNum && m.visible !== false).forEach(m => drawMeasure(ctx, m, S, m.color, false));
+    // draft (live)
+    if (TO.draft) {
+      const isScale = TO.draft.mode === 'scale';
+      const pts = TO.draft.basePts.slice();
+      const live = (TO.mouseBase && pts.length && TO.draft.mode !== 'count') ? pts.concat([TO.mouseBase]) : pts;
+      drawMeasure(ctx, { mode: TO.draft.mode, basePts: live }, S, isScale ? '#ffd27f' : '#1e7bff', true);
+    }
+    // edit handles
+    if (TO.tool === 'edit' && TO.editIndex != null && TO.measures[TO.editIndex]) {
+      const m = TO.measures[TO.editIndex];
+      m.basePts.forEach((bp, vi) => {
+        const x = bp.x * S, y = bp.y * S;
+        ctx.beginPath(); ctx.arc(x, y, vi === TO.selVertex ? 7 : 5.5, 0, Math.PI * 2);
+        ctx.fillStyle = vi === TO.selVertex ? '#ff3b30' : '#1e7bff';
+        ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+      });
+    }
+    // Crosshair guide lines in scale/measure/edit modes — full-canvas hairlines that
+    // follow the pointer, so you always see exactly where you're clicking even when
+    // the OS hides the custom cursor (common with Windows display scaling).
+    if (TO.mouseBase && (TO.tool === 'scale' || TO.tool === 'measure' || TO.tool === 'edit')) {
+      const mx = TO.mouseBase.x * S, my = TO.mouseBase.y * S;
+      ctx.save();
+      // dark halo first so the dashes read on white paper AND dark linework
+      ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([7, 5]);
+      ctx.beginPath(); ctx.moveTo(mx, 0); ctx.lineTo(mx, dc.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(dc.width, my); ctx.stroke();
+      // blue dashes on top — same blue in every tool (scale used to be pale amber)
+      ctx.strokeStyle = '#1e7bff';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(mx, 0); ctx.lineTo(mx, dc.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(dc.width, my); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(mx, my, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ff3b30'; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+      ctx.restore();
+    }
+  }
+  function drawMeasure(ctx, m, S, color, draft) {
+    const pts = m.basePts.map(p => ({ x: p.x * S, y: p.y * S }));
+    if (pts.length === 0) return;
+
+    if (m.mode === 'count') {
+      // Each point is a counted marker
+      pts.forEach((p, i) => {
+        ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+        ctx.fillStyle = color; ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.font = '700 9px ui-monospace, monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(i + 1), p.x, p.y);
+      });
+      ctx.textAlign = 'start';
+      if (!draft) {
+        const last = pts[pts.length - 1];
+        const txt = pts.length + ' EA';
+        ctx.font = '600 12px ui-monospace, monospace';
+        const w = ctx.measureText(txt).width + 8;
+        ctx.fillStyle = 'rgba(20,20,20,0.85)'; ctx.fillRect(last.x + 10, last.y - 9, w, 18);
+        ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle';
+        ctx.fillText(txt, last.x + 14, last.y);
+      }
+      return;
+    }
+
+    const poly = isPolygon(m.mode);
+    ctx.lineWidth = 2; ctx.strokeStyle = color;
+    const aHex = Math.max(0, Math.min(255, Math.round((m.alpha != null ? m.alpha : 0.2) * 255))).toString(16).padStart(2, '0');
+    ctx.fillStyle = color + aHex;
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    if (poly && pts.length >= 3 && !draft) ctx.closePath();
+    if (poly && pts.length >= 3) { ctx.fill(); }
+    ctx.stroke();
+    ctx.fillStyle = color;
+    pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctx.fill(); });
+    if (!draft) {
+      const v = valueOf({ page: m.page != null ? m.page : TO.pageNum, mode: m.mode, basePts: m.basePts });
+      let txt = '';
+      if (m.mode === 'lf' && v) txt = v.lf.toFixed(1) + ' LF';
+      else if (m.mode === 'wall' && v) txt = v.lf.toFixed(1) + ' LF · ' + Math.round(v.sf) + ' SF';
+      else if (m.mode === 'floor' && v) txt = Math.round(v.sf) + ' SF';
+      else if (m.mode === 'roof' && v) txt = Math.round(v.sf) + ' SF';
+      if (m.name) txt = m.name + (txt ? '  ·  ' + txt : '');
+      if (txt) {
+        const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+        const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+        ctx.font = '600 12px ui-monospace, monospace';
+        const w = ctx.measureText(txt).width + 8;
+        ctx.fillStyle = 'rgba(20,20,20,0.85)'; ctx.fillRect(cx - w / 2, cy - 9, w, 18);
+        ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(txt, cx, cy);
+        ctx.textAlign = 'start';
+      }
+    }
+  }
+
+  // PDF base units are PDF points = 1/72". So units-per-foot ÷ 72 = paper-inches per real foot,
+  // i.e. the architect's scale. Lets the user check calibration against the title block.
+  function archScale(upf) {
+    const ipf = upf / 72;  // inches of paper per foot
+    const std = [
+      [1 / 16, '1/16" = 1\''], [3 / 32, '3/32" = 1\''], [1 / 8, '1/8" = 1\''], [3 / 16, '3/16" = 1\''],
+      [1 / 4, '1/4" = 1\''], [3 / 8, '3/8" = 1\''], [1 / 2, '1/2" = 1\''], [3 / 4, '3/4" = 1\''],
+      [1, '1" = 1\''], [1.5, '1-1/2" = 1\''], [3, '3" = 1\''],
+    ];
+    let best = null, bestErr = 1e9;
+    std.forEach(s => { const e = Math.abs(s[0] - ipf) / s[0]; if (e < bestErr) { bestErr = e; best = s; } });
+    if (best && bestErr < 0.06) return `≈ ${best[1]}`;
+    return `≈ ${ipf.toFixed(3)}" = 1' (non-standard — recheck)`;
+  }
+  function updateHud() {
+    try { syncScaleLineDom(); } catch (e) {}
+    $('to-page-ind').textContent = TO.pdfDoc ? (pageLabel(TO.pageNum) + '  (' + TO.pageNum + '/' + TO.pageCount + ')') : '— / —';
+    const upf = uPerFt();
+    const ro = $('to-scale-readout');
+    if (ro) ro.innerHTML = upf
+      ? `Scale set on page ${TO.pageNum} — drawing scale <strong style="color:var(--copper);">${archScale(upf)}</strong>. Check that against the title block; if it's off, re-set scale off the longest dimensioned line.`
+      : 'Scale: not set on this page — use <strong>Set scale</strong>, click two ends of a known dimension, then type its real length.';
+  }
+
+  // ---- results + push to quote ----
+  window.takeoffPushDim = function (id, val) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = Math.round(val * 100) / 100;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    if (typeof recalc === 'function') recalc();
+  };
+
+  const TYPE_ICON = { lf: '／', wall: '▤', floor: '▱', roof: '◹', count: '◉' };
+  function renderResults() {
+    const el = $('to-results'); if (!el) return;
+    if (!TO.measures.length) { el.innerHTML = '<div class="qbs-note">No items yet. Set the scale, name an item, then measure.</div>'; return; }
+    let tot = { lf: 0, wallSf: 0, floorSf: 0, roofSf: 0, count: 0, cost: 0 };
+    let rows = '';
+    TO.measures.forEach((m, i) => {
+      const v = valueOf(m); if (!v) return;
+      let val = '', push = '', qty = 0;
+      if (m.mode === 'lf') { qty = v.lf; val = v.lf.toFixed(1) + ' LF'; if (m.widthIn) val += ' · ' + (v.lf * m.widthIn / 12).toFixed(0) + ' SF'; tot.lf += v.lf; push = `<button onclick="takeoffPushDim('length', ${v.lf.toFixed(2)})" title="Set building length">→ L</button><button onclick="takeoffPushDim('width', ${v.lf.toFixed(2)})" title="Set building width">→ W</button>`; }
+      else if (m.mode === 'wall') { qty = v.lf; val = v.lf.toFixed(1) + ' LF · ' + Math.round(v.sf) + ' SF'; tot.wallSf += v.sf; }
+      else if (m.mode === 'floor') { qty = v.sf; val = Math.round(v.sf) + ' SF'; tot.floorSf += v.sf; push = `<button onclick="takeoffPushDim('footprint', ${Math.round(v.sf)})" title="Set footprint">→ Footprint</button>`; }
+      else if (m.mode === 'roof') { qty = v.sf; val = Math.round(v.sf) + ' SF'; tot.roofSf += v.sf; }
+      else if (m.mode === 'count') { qty = v.count; val = v.count + ' EA'; tot.count += v.count; }
+      const cost = (m.price || 0) * qty; tot.cost += cost;
+      const costStr = (m.price ? '$' + Math.round(cost).toLocaleString() : '—');
+      const hidden = m.visible === false;
+      const editing = (TO.tool === 'edit' && TO.editIndex === i);
+      rows += `<tr style="${hidden ? 'opacity:0.45;' : ''}${editing ? 'outline:2px solid #1e7bff; background:rgba(30,123,255,0.10);' : ''}">
+        <td style="width:14px;"><span style="display:inline-block;width:11px;height:11px;border-radius:2px;background:${m.color};"></span></td>
+        <td><input value="${(m.name || '').replace(/"/g, '&quot;')}" onchange="takeoffRename(${i}, this.value)" style="font-size:12px; width:100%; min-width:120px;"><div style="font-size:9px; color:var(--text-3);">${m.type || ''}</div></td>
+        <td style="font-family:var(--font-mono); white-space:nowrap;">${val}<div style="font-size:10px; color:var(--copper);">${costStr}</div></td>
+        <td style="text-align:right; white-space:nowrap;">
+          ${push}
+          <button onclick="takeoffEdit(${i})" title="Edit points" ${editing ? 'style="background:#1e7bff;color:#fff;border-color:#1e7bff;"' : ''}>✎</button>
+          <button onclick="takeoffToggleVis(${i})" title="Show/hide on plan">${hidden ? '🚫' : '👁'}</button>
+          <button onclick="takeoffDelete(${i})" style="background:#3a1414;color:#ff9b9b;border-color:#5a1f1f;" title="Delete measurement">✕</button>
+        </td>
+      </tr>`;
+    });
+    el.innerHTML = `
+      <table class="qbs-table" style="width:100%; font-size:12px;">
+        <thead><tr><th></th><th>Item</th><th>Qty / cost</th><th style="text-align:right;">Use / show</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:8px; font-size:11px; font-family:var(--font-mono);">
+        <span>Σ Linear <strong>${tot.lf.toFixed(1)} LF</strong></span>
+        <span>Σ Floor <strong>${Math.round(tot.floorSf)} SF</strong></span>
+        <span style="color:var(--copper);">Σ Takeoff ref. cost <strong>$${Math.round(tot.cost).toLocaleString()}</strong></span>
+        <button onclick="takeoffPushLinesToQuote()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); font-weight:600; font-size:11px;">$ Push priced lines → quote</button>
+      </div>`;
+    renderCatTotals();
+  }
+  window.takeoffDelete = function (i) { TO.measures.splice(i, 1); if (TO.editIndex != null) { TO.tool = 'pan'; TO.editIndex = null; TO.selVertex = null; highlightTool(); renderEditBar(); } redraw(); renderResults(); renderPagesList(); takeoffAutoPush(); };
+  window.takeoffRename = function (i, name) { if (TO.measures[i]) { TO.measures[i].name = name; redraw(); } };
+  window.takeoffToggleVis = function (i) { if (TO.measures[i]) { TO.measures[i].visible = (TO.measures[i].visible === false); redraw(); renderResults(); } };
+
+  // ---- standard categories → quote ----
+  function quantOf(m) {
+    const v = valueOf(m); if (!v) return 0;
+    if (m.mode === 'count') return v.count;
+    if (m.mode === 'lf' || m.mode === 'wall') return v.lf;
+    return v.sf;
+  }
+  function catTotals() {
+    const t = {};
+    TO.measures.forEach(m => { if (!m.cat) return; t[m.cat] = (t[m.cat] || 0) + quantOf(m); });
+    return t;
+  }
+  window.takeoffAutoPush = function () { if (TO.autoPush) takeoffPushAllToQuote(true); else renderCatTotals(); };
+  window.takeoffSetAutoPush = function (on) { TO.autoPush = !!on; if (on) takeoffPushAllToQuote(true); renderCatTotals(); };
+  window.takeoffConvertToQuote = function () {
+    const totals = catTotals();
+    const used = TAKEOFF_CATS.filter(c => c.target && totals[c.key] > 0);
+    if (!used.length) { alert('No measured selections map to a quote field yet.\n\nUse the standard Area / Linear / Count selections (e.g. Exterior wall LF, Heated & cooled SF), measure them, then convert.'); return; }
+    // Soft completeness check against the current build tier (does not hard-block).
+    const st = requiredStatus();
+    if (!st.met) {
+      const list = st.missing.map(m => '  • ' + m.label).join('\n');
+      if (!confirm(st.missing.length + ' required measurement(s) for a ' + (TIER_LABELS[st.tier] || st.tier) + ' quote are still missing:\n\n' + list + '\n\nConvert to quote anyway?')) return;
+    }
+    takeoffPushAllToQuote(true);
+    const lines = used.map(c => {
+      const q = totals[c.key];
+      const val = c.unit === 'LF' ? q.toFixed(1) + ' LF' : c.unit === 'EA' ? Math.round(q) + ' EA' : Math.round(q) + ' SF';
+      return '• ' + c.label + ': ' + val + '  →  ' + c.target;
+    }).join('\n');
+    if (typeof switchTab === 'function') switchTab('inputs');
+    const cleaned = ($('to-clean-start') || {}).checked;
+    alert('Takeoff pushed to Dimensions:\n\n' + lines
+      + (cleaned ? '\n\nThe quote was BLANKED first — only these measured items drive it now.' : '\n\nPushed ON TOP of the existing quote (blank-first was unchecked).')
+      + '\n\nPriced takeoff lines are NOT on the quote — use "$ Push to Quote" when you want them added.');
+  };
+  // Push the PRICED takeoff lines (the bottom-left estimate list) straight into the
+  // quote as line items — same names, quantities, and unit prices.
+  window.takeoffPushLinesToQuote = function (silent) {
+    const out = [];
+    TO.measures.forEach((m, i) => {
+      if (!m.price || m.price <= 0) return;
+      const v = valueOf(m); if (!v) return;
+      let qty = 0, uom = 'EA';
+      if (m.mode === 'lf' || m.mode === 'wall') { qty = v.lf; uom = 'LF'; }
+      else if (m.mode === 'floor' || m.mode === 'roof') { qty = v.sf; uom = 'SF'; }
+      else { qty = v.count; uom = 'ea'; }
+      if (qty <= 0) return;
+      out.push({
+        key: i,
+        label: (m.name || m.type || 'Takeoff item') + ' — takeoff @ $' + m.price + '/' + uom,
+        qty: Math.round(qty * 100) / 100,
+        uom,
+        unitCost: m.price,
+      });
+    });
+    window._takeoffQuoteLines = out;
+    if (typeof recalc === 'function') recalc();
+    if (!silent) {
+      alert(out.length
+        ? out.length + ' priced takeoff line(s) pushed to the quote — see the "Takeoff items" category on the Materials list.'
+        : 'No priced takeoff items yet. Set a "Price per unit" when adding a measurement and it will carry to the quote.');
+    }
+  };
+
+  window.takeoffPushAllToQuote = function (silent) {
+    // Blank-quote-first: zero everything so ONLY the measured items drive the quote.
+    // Without this, the push lands on top of the already-entered (or default 60×40)
+    // building and unmeasured concrete/labor/panels ride along.
+    if (($('to-clean-start') || {}).checked) {
+      if (typeof newQuoteReset === 'function') newQuoteReset();
+      if (typeof trussGroups !== 'undefined') {
+        trussGroups.length = 0;
+        window._trussCleared = true;   // don't auto-reseed a truss row for an unmeasured building
+        if (typeof renderTrussTable === 'function') renderTrussTable();
+      }
+      const se = document.getElementById('shed_enabled');
+      if (se && se.checked) { se.checked = false; if (typeof onShedToggle === 'function') onShedToggle(); }
+      window._takeoffOnlyQuote = true;   // quote ONLY what was measured — no auto slab/labor
+    }
+    const totals = catTotals();
+    const byTarget = {};
+    TAKEOFF_CATS.forEach(c => { if (c.target && totals[c.key] > 0) byTarget[c.target] = (byTarget[c.target] || 0) + totals[c.key]; });
+    // Push footprint/garage/porch before living/shop so the AUTO sync doesn't fight us,
+    // and dispatch a real 'input' event on each so the field flips AUTO→MANUAL and won't be overwritten.
+    const order = { footprint: 0, garage_sqft: 1, porch_sqft: 1, living_sqft: 2, shop_sqft: 2 };
+    const ids = Object.keys(byTarget).sort((a, b) => (order[a] != null ? order[a] : 3) - (order[b] != null ? order[b] : 3));
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.value = Math.round(byTarget[id] * 100) / 100;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+    if (typeof recalc === 'function') recalc();
+    renderCatTotals();
+    if (!silent && !ids.length) alert('No measured selections with a quote field yet.');
+  };
+  function renderCatTotals() {
+    const el = $('to-cat-totals'); if (!el) return;
+    const totals = catTotals();
+    const used = TAKEOFF_CATS.filter(c => totals[c.key] > 0);
+    const cb = `<label style="display:flex;align-items:center;gap:6px;font-size:11px;"><input type="checkbox" ${TO.autoPush ? 'checked' : ''} onchange="takeoffSetAutoPush(this.checked)"> Auto-push to quote</label>`;
+    if (!used.length) { el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span class="qbs-note">Pick a standard selection, measure, and the total feeds the quote here.</span>${cb}</div>`; renderRequiredPanel(); return; }
+    let rows = used.map(c => {
+      const q = totals[c.key];
+      const val = (c.unit === 'EA') ? Math.round(q) + ' EA' : (c.unit === 'LF') ? q.toFixed(1) + ' LF' : Math.round(q) + ' SF';
+      const tgt = c.target ? `→ <span style="color:var(--copper);">${c.target}</span>` : `<span style="color:var(--text-3);">reference</span>`;
+      return `<tr><td style="font-size:11px;">${c.label}</td><td style="font-family:var(--font-mono);white-space:nowrap;">${val}</td><td style="font-size:10px;text-align:right;">${tgt}</td></tr>`;
+    }).join('');
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">${cb}<button onclick="takeoffPushAllToQuote()" style="font-size:11px;background:var(--copper);color:var(--bg-deep);border-color:var(--copper);font-weight:600;">Push to Dimensions ↗</button></div>
+      <table class="qbs-table" style="width:100%;font-size:12px;"><tbody>${rows}</tbody></table>`;
+    renderRequiredPanel();
+  }
+
+  // ---- dialogs (Set scale / Add area / Add linear / Add count) ----
+  const COLOR_OPTS = [
+    ['Red', '#d64545'], ['Orange', '#d98a3a'], ['Yellow', '#d9bf3a'], ['Green', '#5aa24a'],
+    ['Teal', '#2fa39a'], ['Blue', '#3a7bd6'], ['Purple', '#9a5bd0'], ['Pink', '#c95b8e'],
+    ['Gray', '#9aa0a6'], ['Black', '#2b2b2b'],
+  ];
+  const TYPE_OPTS = {
+    area: ['Floor / slab', 'Living area', 'Garage', 'Porch', 'Concrete', 'Insulation', 'Roof', 'Other'],
+    linear: ['Exterior wall', 'Interior wall', 'Footing', 'Fence', 'Trim', 'Gutter', 'Other'],
+    count: ['Doors', 'Windows', 'Posts', 'Outlets', 'Light fixtures', 'Other'],
+  };
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function fieldRow(label, inner) { return `<label style="display:flex;flex-direction:column;gap:3px;">${label}${inner}</label>`; }
+  function showModal() { const m = $('to-modal'); if (m) m.style.display = 'flex'; }
+  window.takeoffCloseDialog = function () { const m = $('to-modal'); if (m) m.style.display = 'none'; };
+  function setFoot(buttons) {
+    $('to-modal-foot').innerHTML = buttons.map(b =>
+      `<button onclick="${b[1]}" ${b[2] ? 'style="background:var(--copper);color:var(--bg-deep);border-color:var(--copper);font-weight:600;"' : ''}>${b[0]}</button>`
+    ).join('');
+  }
+
+  window.takeoffOpenScale = function () {
+    if (!TO.pdfDoc) { toToast('Load a PDF first.', false); return; }
+    TO.scaleEntry = null;              // the blue toolbar box is the ONE length entry
+    TO.tool = 'scale'; TO.draft = null;
+    highlightTool(); redraw();
+    const ft = _cnTO('to-feet');
+    toToast(ft > 0
+      ? 'SCALE ARMED — drag along a known ' + ft + ' ft dimension (blue box sets the length).'
+      : 'SCALE ARMED — type the length in the blue box, then drag along that dimension.', true);
+  };
+  // Set the page scale straight from the plan's title-block scale — no clicking
+  // on the sheet at all. base units are PDF points (72 per inch), so
+  // unitsPerFoot = inches-of-paper-per-foot x 72.
+  window.takeoffScalePreset = function (v) {
+    const ipf = parseFloat(v);
+    if (!TO.pdfDoc) { alert('Load a PDF first.'); const s = $('to-scale-preset'); if (s) s.value = ''; return; }
+    if (!(ipf > 0)) return;
+    const upf = ipf * 72;
+    const all = !!($('to-scale-preset-all') || {}).checked;
+    if (all) { for (let pg = 1; pg <= TO.pageCount; pg++) TO.pages[pg] = { unitsPerFoot: upf }; }
+    else { TO.pages[TO.pageNum] = { unitsPerFoot: upf }; }
+    TO.draft = null;
+    redraw(); updateHud(); renderResults();
+    toToast('✓ SCALE SET from title block' + (all ? ' on ALL pages' : ' on page ' + TO.pageNum) + ' — ' + archScale(upf).replace('≈ ', '') + ' (assumes true sheet size — check one known dimension)', true);
+  };
+
+  window.takeoffScaleStart = function () {
+    const ft = parseFloat(($('to-sc-ft') || {}).value) || 0;
+    const inch = parseFloat(($('to-sc-in') || {}).value) || 0;
+    const fn = parseFloat(($('to-sc-fn') || {}).value) || 0;
+    const fd = parseFloat(($('to-sc-fd') || {}).value) || 0;
+    const feet = ft + inch / 12 + (fd > 0 ? (fn / fd) / 12 : 0);
+    if (!(feet > 0)) { alert('Enter a length greater than zero.'); return; }
+    TO.scaleEntry = { feet, applyAll: !!($('to-sc-all') || {}).checked };
+    TO.tool = 'scale'; TO.draft = null; highlightTool();
+    takeoffCloseDialog();
+  };
+
+  window.takeoffOpenAdd = function (kind) {
+    if (!TO.pdfDoc) { alert('Load a PDF first.'); return; }
+    TO._addKind = kind;
+    $('to-modal-title').textContent = { area: 'Add area', linear: 'Add linear', count: 'Add count' }[kind];
+    const cats = TAKEOFF_CATS.filter(c => c.group === kind);
+    const catSel = `<select id="to-add-cat">` + cats.map((c, i) => `<option value="${c.key}" ${i === 0 ? 'selected' : ''}>${c.label}${c.target ? '  → quote' : '  (reference)'}</option>`).join('') + `</select>`;
+    const colorSel = `<select id="to-add-color"><option value="">Auto color</option>` + COLOR_OPTS.map(c => `<option value="${c[1]}">${c[0]}</option>`).join('') + `</select>`;
+    let extra = '';
+    if (kind === 'area') extra = fieldRow('Transparency (0–10)', `<input type="range" id="to-add-alpha" min="0" max="10" value="4">`);
+    const unit = kind === 'area' ? 'SF' : kind === 'linear' ? 'LF' : 'EA';
+    $('to-modal-body').innerHTML =
+      fieldRow('Selection *', catSel)
+      + `<div class="qbs-note">Measured total feeds the matching quote field automatically. Measure as many runs as you want into the same selection — they add up.</div>`
+      + fieldRow('Label (optional)', `<input type="text" id="to-add-name" placeholder="defaults to the selection name">`)
+      + extra
+      + fieldRow('Color', colorSel)
+      + fieldRow(`Price per ${unit} (optional · takeoff reference only)`, `<input type="number" id="to-add-price" step="0.01" value="0" placeholder="0.00">`);
+    setFoot([['▶ Start measuring', 'takeoffAddStart()', true], ['Close', 'takeoffCloseDialog()', false]]);
+    showModal();
+  };
+  window.takeoffAddStart = function () {
+    const cat = catByKey(($('to-add-cat') || {}).value);
+    if (!cat) { alert('Pick a selection.'); return; }
+    const mode = cat.mode;
+    if (mode !== 'count' && !uPerFt()) { alert('Set the scale on this page first (⟂ Set scale).'); takeoffCloseDialog(); return; }
+    const customName = (($('to-add-name') || {}).value || '').trim();
+    const alpha = (($('to-add-alpha') || {}) .value != null && $('to-add-alpha')) ? (parseFloat($('to-add-alpha').value) || 4) / 16 : 0.28;
+    const idx = TAKEOFF_CATS.indexOf(cat);
+    TO.pending = {
+      cat: cat.key, target: cat.target, name: customName || cat.label, type: cat.unit, desc: '',
+      color: ($('to-add-color') || {}).value || COLORS[idx % COLORS.length],
+      price: parseFloat(($('to-add-price') || {}).value) || 0, widthIn: 0, alpha, mode,
+    };
+    TO.tool = 'measure'; TO.measureAs = mode; TO.draft = null; highlightTool();
+    takeoffCloseDialog();
+  };
+
+  // ---- TRUSS COUNT → pushes line items into the Truss configuration tool ----
+  window.takeoffOpenTruss = function () {
+    if (!TO.pdfDoc) { alert('Load a PDF first.'); return; }
+    const styles = (typeof TRUSS_TYPES !== 'undefined') ? TRUSS_TYPES : [
+      { key: 'common', label: 'Common gable' }, { key: 'mono', label: 'Mono-slope (lean-to)' },
+      { key: 'attic', label: 'Attic' }, { key: 'scissor', label: 'Scissor (vaulted)' }, { key: 'stick', label: 'Stick frame' },
+    ];
+    const mainSpan = (parseFloat((document.getElementById('width') || {}).value) || 0) || 30;
+    const mainPitch = (parseFloat((document.getElementById('pitch') || {}).value) || 0) || 4;
+    $('to-modal-title').textContent = 'Truss count';
+    const styleSel = `<select id="to-truss-style">` + styles.map((s, i) => `<option value="${s.key}" ${i === 0 ? 'selected' : ''}>${s.label}</option>`).join('') + `</select>`;
+    const colorSel = `<select id="to-truss-color"><option value="">Auto color</option>` + COLOR_OPTS.map(c => `<option value="${c[1]}">${c[0]}</option>`).join('') + `</select>`;
+    $('to-modal-body').innerHTML =
+      fieldRow('Truss style *', styleSel)
+      + fieldRow('Truss width / span (ft) *', `<input type="number" id="to-truss-span" step="0.5" value="${mainSpan}">`)
+      + fieldRow('Pitch (X/12) *', `<input type="number" id="to-truss-pitch" step="0.5" value="${mainPitch}">`)
+      + `<div class="qbs-note">Click each truss on the plan to count it, then ✓ Finish. Click <strong>Push trusses → truss tool</strong> to send the counts to the Truss configuration table as line items.</div>`
+      + fieldRow('Label (optional)', `<input type="text" id="to-truss-label" placeholder="e.g. Main, Porch, Lean-to">`)
+      + fieldRow('Marker color', colorSel);
+    setFoot([['▶ Start counting', 'takeoffTrussStart()', true], ['Close', 'takeoffCloseDialog()', false]]);
+    showModal();
+  };
+  window.takeoffTrussStart = function () {
+    const style = ($('to-truss-style') || {}).value || 'common';
+    const span = parseFloat(($('to-truss-span') || {}).value) || 0;
+    const pitch = parseFloat(($('to-truss-pitch') || {}).value) || 0;
+    const label = (($('to-truss-label') || {}).value || '').trim();
+    if (span <= 0) { alert('Enter the truss width / span.'); return; }
+    const styleLabel = ((typeof TRUSS_TYPES !== 'undefined' ? TRUSS_TYPES : []).find(s => s.key === style) || {}).label || style;
+    TO.pending = {
+      cat: 'truss', target: null,
+      name: (label ? label + ' · ' : '') + styleLabel + ' ' + span + 'ft ' + pitch + '/12',
+      type: 'EA', desc: '', color: ($('to-truss-color') || {}).value || '#3a7bd6',
+      price: 0, widthIn: 0, alpha: 0.28, mode: 'count',
+      truss: { span: span, style: style, pitch: pitch, label: label },
+    };
+    TO.tool = 'measure'; TO.measureAs = 'count'; TO.draft = null; highlightTool();
+    takeoffCloseDialog();
+  };
+  window.takeoffPushTrusses = function () {
+    if (typeof addTrussGroup !== 'function') { alert('Truss tool not available.'); return; }
+    const groups = TO.measures.filter(m => m.truss && m.mode === 'count' && !m._pushedTruss);
+    if (!groups.length) {
+      const any = TO.measures.some(m => m.truss);
+      alert(any ? 'These truss counts were already pushed. Add new truss counts to push more.'
+                : 'No truss counts yet.\n\nUse ◉ Truss count, pick width/style/pitch, click each truss on the plan, then Finish.');
+      return;
+    }
+    const lines = [];
+    groups.forEach(m => {
+      const qty = m.basePts.length;
+      if (qty <= 0) return;
+      addTrussGroup({
+        qty: qty, type: m.truss.style, span: m.truss.span, pitch: m.truss.pitch,
+        eaveOH: 16, spacing: 48, label: m.truss.label || '', autoQty: false,
+      });
+      m._pushedTruss = true;
+      const sl = ((typeof TRUSS_TYPES !== 'undefined' ? TRUSS_TYPES : []).find(s => s.key === m.truss.style) || {}).label || m.truss.style;
+      lines.push('• ' + qty + ' × ' + sl + ' ' + m.truss.span + 'ft @ ' + m.truss.pitch + '/12' + (m.truss.label ? ' (' + m.truss.label + ')' : ''));
+    });
+    if (typeof switchTab === 'function') switchTab('inputs');
+    setTimeout(() => {
+      const t = document.getElementById('truss-tbody');
+      if (t) t.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 120);
+    alert('Pushed to the Truss configuration tool:\n\n' + lines.join('\n') + '\n\nEach is a new row (manual qty) on the Dimensions tab.');
+  };
+  // STARTUP BIND (the builder's discovery): the app opens on the Takeoff tab,
+  // but the startup switchTab('takeoff') runs BEFORE this script exists, so
+  // its takeoffInit type-check silently failed — tab visible, mouse dead,
+  // until the user left the tab and came back. Bind here at startup, and if
+  // the strip marks Takeoff active while its content is still hidden, finish
+  // the job switchTab started.
+  setTimeout(function () {
+    try { window.takeoffInit(); } catch (e) {}
+    try {
+      const act = document.querySelector('.qbs-tab.active');
+      const tk = document.getElementById('tab-takeoff');
+      if (act && act.dataset.tab === 'takeoff' && tk && tk.style.display === 'none' && typeof switchTab === 'function') switchTab('takeoff');
+    } catch (e) {}
+  }, 0);
+  // SELF-HEALING: bound at parse time with no dependencies — the very first
+  // mouse activity anywhere initializes the takeoff tool if anything above
+  // failed to. After init it's a single boolean check per event.
+  ['mousemove', 'mousedown', 'click'].forEach(function (t) {
+    document.addEventListener(t, function () {
+      if (!TO.inited) { try { window.takeoffInit(); } catch (e) {} }
+    }, true);
+  });
+  window.addEventListener('load', function () { try { window.takeoffInit(); } catch (e) {} });
+})();
+</script>
