@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v196</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v197</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3255,6 +3255,9 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
 
       <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px;">
         <input type="file" id="to-file" accept="application/pdf" style="display:none" onchange="takeoffLoadFile(event)">
+        <label style="display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--text); background:#12233d; border:1px solid #1e7bff; border-radius:6px; padding:3px 9px;" title="Type the real length of the line you're about to drag — no popups">
+          Line length <input id="to-feet" type="number" value="40" step="0.5" style="width:64px; font-size:13px; font-weight:700; text-align:right;"> ft
+        </label>
         <button id="to-tool-scale" onclick="takeoffOpenScale()">⟂ Set scale</button>
         <label style="display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--text-2); background:var(--copper-soft); border:1px solid rgba(251,146,60,0.45); border-radius:6px; padding:3px 8px;" title="Fastest way: read the scale off the plan's title block and pick it here. No clicking on the drawing.">
           📐 Scale from title block
@@ -7806,7 +7809,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v196';
+const BB_VERSION = 'v197';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -18493,6 +18496,7 @@ if (typeof origSwitchTab === 'function') {
   function isPolygon(mode) { return mode === 'floor' || mode === 'roof'; }
 
   // ---- mouse ----
+  function _cnTO(id) { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; }
   function toBase(ev) {
     const dc = $('to-draw-canvas'); const r = dc.getBoundingClientRect();
     const sx = dc.width / r.width, sy = dc.height / r.height;
@@ -18519,8 +18523,8 @@ if (typeof origSwitchTab === 'function') {
         TO._suppressClick = true; setTimeout(() => { TO._suppressClick = false; }, 80);
         const endBase = toBase(e);
         const px = dist(startBase, endBase);
-        let feet = (TO.scaleEntry && TO.scaleEntry.feet) || 0;
-        if (!feet) { const s = prompt('Real length of this line, in feet (decimal ok):', '40'); feet = parseFloat(s); }
+        let feet = (TO.scaleEntry && TO.scaleEntry.feet) || _cnTO('to-feet');
+        if (!(feet > 0)) { toToast('Type the line length in the blue "Line length" box first, then drag again.', false); }
         if (feet && feet > 0) {
           const upf = px / feet;
           scaleLockIn(startBase, endBase, feet, upf);
@@ -18582,8 +18586,8 @@ if (typeof origSwitchTab === 'function') {
       TO.draft.basePts.push(p);
       if (TO.draft.basePts.length === 2) {
         const px = dist(TO.draft.basePts[0], TO.draft.basePts[1]);
-        let feet = (TO.scaleEntry && TO.scaleEntry.feet) || 0;
-        if (!feet) { const s = prompt('Real length of this line, in feet (decimal ok):', '40'); feet = parseFloat(s); }
+        let feet = (TO.scaleEntry && TO.scaleEntry.feet) || _cnTO('to-feet');
+        if (!(feet > 0)) { toToast('Type the line length in the blue "Line length" box first, then click the two ends again.', false); }
         if (feet && feet > 0) {
           const upf = px / feet;
           scaleLockIn(TO.draft.basePts[0], TO.draft.basePts[1], feet, upf);
@@ -18630,18 +18634,25 @@ if (typeof origSwitchTab === 'function') {
       TO.pages[TO.pageNum] = { unitsPerFoot: upf, scaleLine: line };
     }
     TO.scaleEntry = null;         // never silently reuse old footage
+    toToast('✓ SCALE LOCKED — ' + feet + ' ft · ' + archScale(upf).replace('≈ ', '') + ' · page ' + TO.pageNum, true);
+    setTimeout(() => { try { liveStatus(null); } catch (e) {} }, 0);   // after draft clears
+  }
+  // Non-blocking toast (green = success, red = needs attention). NO browser
+  // dialogs anywhere in the scale flow — prompt/alert can be silently
+  // suppressed by Chrome's "prevent additional dialogs", killing the flow.
+  function toToast(msg, ok) {
     let toast = $('to-scale-toast');
     if (!toast) {
       toast = document.createElement('div');
       toast.id = 'to-scale-toast';
-      toast.style.cssText = 'position:fixed; top:18px; left:50%; transform:translateX(-50%); z-index:2147483000; background:#0e2b18; color:#3ad67b; border:2px solid #3ad67b; border-radius:10px; padding:14px 26px; font:bold 17px Arial,sans-serif; box-shadow:0 6px 30px rgba(0,0,0,0.6); display:none;';
       document.body.appendChild(toast);
     }
-    toast.textContent = '✓ SCALE LOCKED — ' + feet + ' ft · ' + archScale(upf).replace('≈ ', '') + ' · page ' + TO.pageNum;
-    toast.style.display = 'block';
+    toast.style.cssText = 'position:fixed; top:18px; left:50%; transform:translateX(-50%); z-index:2147483000; border-radius:10px; padding:14px 26px; font:bold 17px Arial,sans-serif; box-shadow:0 6px 30px rgba(0,0,0,0.6); display:block;'
+      + (ok ? 'background:#0e2b18; color:#3ad67b; border:2px solid #3ad67b;'
+            : 'background:#3a1414; color:#ff9b9b; border:2px solid #ef4444;');
+    toast.textContent = msg;
     clearTimeout(TO._toastT);
-    TO._toastT = setTimeout(() => { toast.style.display = 'none'; }, 3500);
-    setTimeout(() => { try { liveStatus(null); } catch (e) {} }, 0);   // after draft clears
+    TO._toastT = setTimeout(() => { toast.style.display = 'none'; }, ok ? 3500 : 5000);
   }
   function liveStatus(ev) {
     const el = $('to-live'); if (!el) return;
@@ -19140,9 +19151,7 @@ if (typeof origSwitchTab === 'function') {
     else { TO.pages[TO.pageNum] = { unitsPerFoot: upf }; }
     TO.draft = null;
     redraw(); updateHud(); renderResults();
-    alert('Scale set' + (all ? ' on ALL pages' : ' on page ' + TO.pageNum) + ' — ' + archScale(upf).replace('≈ ', '') +
-          '\n\nThis assumes the PDF is at true sheet size (a 24x36 plan exported as 24x36).\n' +
-          'Sanity-check it: measure a known dimension and confirm the footage matches.');
+    toToast('✓ SCALE SET from title block' + (all ? ' on ALL pages' : ' on page ' + TO.pageNum) + ' — ' + archScale(upf).replace('≈ ', '') + ' (assumes true sheet size — check one known dimension)', true);
   };
 
   window.takeoffScaleStart = function () {
