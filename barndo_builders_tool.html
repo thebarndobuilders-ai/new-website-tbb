@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v201</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v202</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -7895,7 +7895,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v201';
+const BB_VERSION = 'v202';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -18365,14 +18365,9 @@ if (typeof origSwitchTab === 'function') {
   };
 
   // Clear/zero the whole takeoff — measurements, scale, page names, draft, edit state.
-  window.takeoffClearAll = function (opts) {
-    window._takeoffQuoteLines = [];
-    opts = opts || {};
-    const hasWork = (TO.measures && TO.measures.length) || (TO.pages && Object.keys(TO.pages).length);
-    if (!opts.silent && hasWork && !confirm('Clear all measurements and the scale on this takeoff? (The loaded plan stays open.)')) return;
-    TO.measures = []; TO.pages = {}; TO.pageNames = {}; TO.draft = null;
-    TO.editIndex = null; TO.selVertex = null; TO.dragVertex = null; TO.colorIdx = 0;
-    TO.tool = 'pan';
+  // Shared refresh after any clear
+  function _clearRefresh() {
+    TO.draft = null; TO.editIndex = null; TO.selVertex = null; TO.dragVertex = null;
     if (typeof redraw === 'function') redraw();
     if (typeof renderResults === 'function') renderResults();
     if (typeof renderPagesList === 'function') renderPagesList();
@@ -18380,6 +18375,48 @@ if (typeof origSwitchTab === 'function') {
     if (typeof highlightTool === 'function') highlightTool();
     if (typeof updateHud === 'function') updateHud();
     if (typeof window.takeoffRefreshRequired === 'function') window.takeoffRefreshRequired();
+    if (typeof takeoffAutoPush === 'function') takeoffAutoPush();
+  }
+  // ✕ Clear now ASKS what to clear — this page only, or everything.
+  // (The builder lost a full set of measurements clearing one truss count.)
+  window.takeoffClearAll = function (opts) {
+    opts = opts || {};
+    if (opts.silent) {   // programmatic full reset (new quote / load) — old behavior
+      window._takeoffQuoteLines = [];
+      TO.measures = []; TO.pages = {}; TO.pageNames = {}; TO.tool = 'pan'; TO.colorIdx = 0;
+      _clearRefresh(); return;
+    }
+    const hasWork = (TO.measures && TO.measures.length) || (TO.pages && Object.keys(TO.pages).length);
+    if (!hasWork) { toToast('Nothing to clear.', false); return; }
+    const onPage = TO.measures.filter(m => m.page === TO.pageNum).length;
+    $('to-modal-title').textContent = 'Clear takeoff — choose what';
+    $('to-modal-body').innerHTML =
+      `<div style="font-size:13px; line-height:1.7;">`
+      + `<b>${pageLabel(TO.pageNum)}</b> has <b>${onPage}</b> measurement(s).<br>`
+      + `All pages together: <b>${TO.measures.length}</b> measurement(s).<br>`
+      + `<span class="qbs-note">"This page" keeps the page scale and every other page untouched. "Everything" also wipes all scales. Clearing cannot be undone.</span></div>`;
+    setFoot([
+      ['🧹 Clear THIS page only (' + onPage + ')', 'takeoffClearPage()', true],
+      ['💥 Clear EVERYTHING', 'takeoffClearEverything()', false],
+      ['Cancel', 'takeoffCloseDialog()', false],
+    ]);
+    showModal();
+  };
+  window.takeoffClearPage = function () {
+    const pg = TO.pageNum;
+    const before = TO.measures.length;
+    TO.measures = TO.measures.filter(m => m.page !== pg);
+    const removed = before - TO.measures.length;
+    takeoffCloseDialog();
+    _clearRefresh();
+    toToast('🧹 Cleared ' + removed + ' measurement(s) on ' + pageLabel(pg) + ' — other pages and the scale untouched.', true);
+  };
+  window.takeoffClearEverything = function () {
+    window._takeoffQuoteLines = [];
+    TO.measures = []; TO.pages = {}; TO.pageNames = {}; TO.tool = 'pan'; TO.colorIdx = 0;
+    takeoffCloseDialog();
+    _clearRefresh();
+    toToast('💥 Cleared ALL measurements and scales on every page. The plan stays open.', true);
   };
 
   window.takeoffSelectLead = function () {
