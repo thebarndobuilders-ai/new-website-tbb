@@ -1,6 +1,6 @@
 <!-- ============================================================
- LOCKED SNAPSHOT — Takeoff tab, v199, builder-confirmed working.
- (v198 + builder-ordered floor framing count tool + floor area cat.)
+ LOCKED SNAPSHOT — Takeoff tab, v200, builder-confirmed working.
+ (v199 + builder-ordered undo upgrade: works on committed measures.)
  Two sections: (1) #tab-takeoff markup, (2) the BLUEPRINT TAKEOFF
  script block. Verify by re-extracting and diffing; restore verbatim.
  ============================================================ -->
@@ -808,7 +808,31 @@
       if (m && m.basePts.length > need) { m.basePts.pop(); TO.selVertex = null; redraw(); renderResults(); renderEditBar(); }
       return;
     }
-    if (TO.draft && TO.draft.basePts.length) { TO.draft.basePts.pop(); redraw(); }
+    if (TO.draft && TO.draft.basePts.length) {
+      TO.draft.basePts.pop();
+      redraw();
+      if (!TO.draft.basePts.length) TO.draft = null;
+      return;
+    }
+    // Nothing in progress: undo works BACKWARDS through committed measurements —
+    // remove the last point of the most recent one; when it drops below its
+    // minimum (or is a count marker), remove the whole measurement.
+    const m = TO.measures[TO.measures.length - 1];
+    if (!m) { toToast('Nothing to undo.', false); return; }
+    if (m.page !== TO.pageNum) { TO.pageNum = m.page; renderPage(); renderPagesList(); }
+    const min = isPolygon(m.mode) ? 3 : (m.mode === 'count' ? 1 : 2);
+    if (m.mode === 'count') {
+      m.basePts.pop();
+      if (!m.basePts.length) { TO.measures.pop(); toToast('↶ Removed the last count marker (group deleted — it was the last one).', true); }
+      else toToast('↶ Removed the last count marker — ' + m.basePts.length + ' left in "' + (m.name || 'count') + '".', true);
+    } else if (m.basePts.length > min) {
+      m.basePts.pop();
+      toToast('↶ Removed the last point from "' + (m.name || m.mode) + '".', true);
+    } else {
+      TO.measures.pop();
+      toToast('↶ Removed measurement "' + (m.name || m.mode) + '".', true);
+    }
+    redraw(); renderResults(); renderPagesList(); takeoffAutoPush();
   };
 
   // ---- edit committed measurements ----

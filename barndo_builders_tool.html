@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v199</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v200</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -7895,7 +7895,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v199';
+const BB_VERSION = 'v200';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -18831,7 +18831,31 @@ if (typeof origSwitchTab === 'function') {
       if (m && m.basePts.length > need) { m.basePts.pop(); TO.selVertex = null; redraw(); renderResults(); renderEditBar(); }
       return;
     }
-    if (TO.draft && TO.draft.basePts.length) { TO.draft.basePts.pop(); redraw(); }
+    if (TO.draft && TO.draft.basePts.length) {
+      TO.draft.basePts.pop();
+      redraw();
+      if (!TO.draft.basePts.length) TO.draft = null;
+      return;
+    }
+    // Nothing in progress: undo works BACKWARDS through committed measurements —
+    // remove the last point of the most recent one; when it drops below its
+    // minimum (or is a count marker), remove the whole measurement.
+    const m = TO.measures[TO.measures.length - 1];
+    if (!m) { toToast('Nothing to undo.', false); return; }
+    if (m.page !== TO.pageNum) { TO.pageNum = m.page; renderPage(); renderPagesList(); }
+    const min = isPolygon(m.mode) ? 3 : (m.mode === 'count' ? 1 : 2);
+    if (m.mode === 'count') {
+      m.basePts.pop();
+      if (!m.basePts.length) { TO.measures.pop(); toToast('↶ Removed the last count marker (group deleted — it was the last one).', true); }
+      else toToast('↶ Removed the last count marker — ' + m.basePts.length + ' left in "' + (m.name || 'count') + '".', true);
+    } else if (m.basePts.length > min) {
+      m.basePts.pop();
+      toToast('↶ Removed the last point from "' + (m.name || m.mode) + '".', true);
+    } else {
+      TO.measures.pop();
+      toToast('↶ Removed measurement "' + (m.name || m.mode) + '".', true);
+    }
+    redraw(); renderResults(); renderPagesList(); takeoffAutoPush();
   };
 
   // ---- edit committed measurements ----
