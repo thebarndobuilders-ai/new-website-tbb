@@ -1,6 +1,7 @@
 <!-- ============================================================
- LOCKED SNAPSHOT — Takeoff tab, v200, builder-confirmed working.
- (v199 + builder-ordered undo upgrade: works on committed measures.)
+ LOCKED SNAPSHOT — Takeoff tab, v201, builder-confirmed working.
+ (v200 + scale gates converted to guidance toasts; counts never
+ require a page scale.)
  Two sections: (1) #tab-takeoff markup, (2) the BLUEPRINT TAKEOFF
  script block. Verify by re-extracting and diffing; restore verbatim.
  ============================================================ -->
@@ -671,7 +672,10 @@
       redraw(); return;
     }
     // measure
-    if (TO.measureAs !== 'count' && !uPerFt()) { alert('Set the scale on this page first (⟂ Set scale).'); return; }
+    if (TO.measureAs !== 'count' && !uPerFt()) {
+      toToast('This page has NO SCALE — a footage selection (' + (TO.pending && TO.pending.name ? TO.pending.name : 'LF/SF') + ') is armed. COUNTS don\'t need a scale: use ◉ Truss count or ▤ Floor count. For footage, type the length in the blue box and drag a known dimension first.', false);
+      return;
+    }
     if (!TO.draft || TO.draft.mode !== TO.measureAs) TO.draft = { mode: TO.measureAs, basePts: [] };
     TO.draft.basePts.push(p);
     redraw();
@@ -1288,7 +1292,7 @@
     const cat = catByKey(($('to-add-cat') || {}).value);
     if (!cat) { alert('Pick a selection.'); return; }
     const mode = cat.mode;
-    if (mode !== 'count' && !uPerFt()) { alert('Set the scale on this page first (⟂ Set scale).'); takeoffCloseDialog(); return; }
+    if (mode !== 'count' && !uPerFt()) { toToast('This page has no scale yet — footage selections need one (counts don\'t). Type the length in the blue box and drag a known dimension, or pick the scale from the 📐 title-block dropdown.', false); takeoffCloseDialog(); return; }
     const customName = (($('to-add-name') || {}).value || '').trim();
     const alpha = (($('to-add-alpha') || {}) .value != null && $('to-add-alpha')) ? (parseFloat($('to-add-alpha').value) || 4) / 16 : 0.28;
     const idx = TAKEOFF_CATS.indexOf(cat);

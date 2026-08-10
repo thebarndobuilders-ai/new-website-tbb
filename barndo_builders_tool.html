@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v200</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v201</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -7895,7 +7895,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v200';
+const BB_VERSION = 'v201';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -18694,7 +18694,10 @@ if (typeof origSwitchTab === 'function') {
       redraw(); return;
     }
     // measure
-    if (TO.measureAs !== 'count' && !uPerFt()) { alert('Set the scale on this page first (⟂ Set scale).'); return; }
+    if (TO.measureAs !== 'count' && !uPerFt()) {
+      toToast('This page has NO SCALE — a footage selection (' + (TO.pending && TO.pending.name ? TO.pending.name : 'LF/SF') + ') is armed. COUNTS don\'t need a scale: use ◉ Truss count or ▤ Floor count. For footage, type the length in the blue box and drag a known dimension first.', false);
+      return;
+    }
     if (!TO.draft || TO.draft.mode !== TO.measureAs) TO.draft = { mode: TO.measureAs, basePts: [] };
     TO.draft.basePts.push(p);
     redraw();
@@ -19311,7 +19314,7 @@ if (typeof origSwitchTab === 'function') {
     const cat = catByKey(($('to-add-cat') || {}).value);
     if (!cat) { alert('Pick a selection.'); return; }
     const mode = cat.mode;
-    if (mode !== 'count' && !uPerFt()) { alert('Set the scale on this page first (⟂ Set scale).'); takeoffCloseDialog(); return; }
+    if (mode !== 'count' && !uPerFt()) { toToast('This page has no scale yet — footage selections need one (counts don\'t). Type the length in the blue box and drag a known dimension, or pick the scale from the 📐 title-block dropdown.', false); takeoffCloseDialog(); return; }
     const customName = (($('to-add-name') || {}).value || '').trim();
     const alpha = (($('to-add-alpha') || {}) .value != null && $('to-add-alpha')) ? (parseFloat($('to-add-alpha').value) || 4) / 16 : 0.28;
     const idx = TAKEOFF_CATS.indexOf(cat);
