@@ -3,14 +3,14 @@
 ## 🔒 TAKEOFF TAB IS LOCKED — DO NOT MODIFY
 The takeoff tab in `barndo_builders_tool.html` (the `#tab-takeoff` markup block and the
 `<script>` block whose banner reads "BLUEPRINT TAKEOFF — load a plan PDF") is **frozen at
-the v198 state the builder confirmed working** after a long, painful debugging saga.
+the v199 state the builder confirmed working** after a long, painful debugging saga.
 
 - **Never** edit, refactor, "improve", or reformat anything inside those two sections —
   not cursors, not event handling, not canvas sizing, not the scale flow — unless the
   builder explicitly asks for a takeoff change **in their own words in the current
   session**, and even then read `BARNDO_TOOL_HANDOFF.md` § "DO NOT TOUCH" first.
 - The frozen reference copy lives at `takeoff_LOCKED_v198.html`
-  (sha256 `894d052dac0707c21a0fa735a4d92f91858f2acc8a1dacce8b2fc77bd705b9e7`).
+  (sha256 `893b46d6825994dcbe8eff41d0eb758ef2eb45106e99c5e16f82a3cda5a9a6a1`).
 - **Verify before shipping any change to the tool:** re-extract the two sections from
   `barndo_builders_tool.html` and diff against the snapshot. If a change was NOT
   builder-ordered and the diff is non-empty, restore the sections verbatim from the

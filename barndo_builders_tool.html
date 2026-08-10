@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v198</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v199</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2366,6 +2366,38 @@
       </table>
       <div id="truss-summary" style="margin-top: 14px; padding: 12px; background: var(--surface-2); border-radius: 6px; font-family: var(--font-mono); font-size: 11px; color: var(--text-2);">
         Add a truss group above to see calculated totals.
+      </div>
+    </div>
+
+    <div class="qbs-card">
+      <h3>Floor system <span class="badge">2nd floor · mezzanine · crawlspace — framing + subfloor</span></h3>
+      <p class="qbs-sub" style="margin-bottom: 14px;">Pick the framing type and enter (or push from the takeoff) the floor area. Drives member count, rim board, subfloor sheathing, glue, and screws on the Materials list. Counts marked AUTO figure from area ÷ span at the chosen spacing — type a number to override.</p>
+      <div class="qbs-grid-3">
+        <div class="qbs-field"><label>Floor framing type</label>
+          <select id="floor_system" onchange="recalc()">
+            <option value="none" selected>None — no framed floor</option>
+            <option value="floor_truss">Floor trusses</option>
+            <option value="stick">Stick-framed joists</option>
+            <option value="ijoist">I-joists</option>
+          </select>
+        </div>
+        <div class="qbs-field"><label>Floor area (sqft)</label><input type="number" id="floor_area_sqft" value="0" step="10" oninput="recalc()" /><div class="qbs-note">Push from takeoff ("Floor area SF") or type it.</div></div>
+        <div class="qbs-field"><label>Joist / truss span (ft)</label><input type="number" id="floor_span" value="14" step="0.5" oninput="recalc()" /></div>
+        <div class="qbs-field"><label>Spacing (in OC)</label>
+          <select id="floor_spacing" onchange="recalc()"><option value="12">12"</option><option value="16" selected>16"</option><option value="19.2">19.2"</option><option value="24">24"</option></select>
+        </div>
+        <div class="qbs-field"><label>Stick lumber size</label>
+          <select id="floor_lumber" onchange="recalc()"><option value="2x10" selected>2×10</option><option value="2x12">2×12</option></select>
+          <div class="qbs-note">Used when type = stick-framed.</div>
+        </div>
+        <div class="qbs-field"><label>Member count (0 = AUTO)</label><input type="number" id="floor_member_count" value="0" step="1" oninput="recalc()" /><div class="qbs-note">Push from takeoff "◉ Floor count" or leave 0 to auto-figure.</div></div>
+        <div class="qbs-field"><label>Rim board LF (0 = AUTO)</label><input type="number" id="floor_rim_lf" value="0" step="1" oninput="recalc()" /><div class="qbs-note">AUTO = rectangle perimeter from area ÷ span.</div></div>
+        <div class="qbs-field"><label>Subfloor sheathing</label>
+          <select id="subfloor_product" onchange="recalc()">
+            <option value="osb_tg" selected>3/4" T&amp;G OSB</option>
+            <option value="advantech">3/4" AdvanTech T&amp;G</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -3284,6 +3316,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <button onclick="takeoffOpenAdd('area')">▱ Area</button>
         <button onclick="takeoffOpenAdd('linear')">／ Linear</button>
         <button onclick="takeoffOpenTruss()">◉ Truss count</button>
+        <button onclick="takeoffOpenFloor()">▤ Floor count</button>
         <button id="to-tool-pan" onclick="takeoffTool('pan')">✋ Pan</button>
         <button onclick="takeoffFinish()">✓ Finish</button>
         <button onclick="takeoffUndoPt()">↶ Undo point</button>
@@ -3292,6 +3325,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <button onclick="takeoffPushLinesToQuote()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;" title="Send the PRICED takeoff lines to the quote's Materials list — only when you want them on the quote">$ Push to Quote</button>
         <label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-2);" title="Zero the quote before pushing so ONLY measured items drive it — otherwise the push lands on top of whatever building is already entered (including the default one)"><input type="checkbox" id="to-clean-start" checked> Blank quote first — quote only measured items</label>
         <button onclick="takeoffPushTrusses()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;">◉ Push trusses → truss tool</button>
+        <button onclick="takeoffPushFloors()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;">▤ Push floors → floor tool</button>
       </div>
 
       <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px; border-top:1px solid var(--hairline); padding-top:8px;">
@@ -5435,6 +5469,58 @@ const MATERIALS = [
   //   - Man door jambs always 4×6 PT
   // Each post-size line adds wall posts ONLY when that size matches postSize selection.
   // 4×6 line always includes man door jambs; 6×6 line always includes garage door jambs.
+  // ---------------- FLOOR SYSTEM (2nd floor / mezzanine / crawlspace) ----------------
+  // Helpers: floor length ≈ area ÷ span (rectangle model). Member count AUTO =
+  // length × 12 ÷ spacing + 1; rim AUTO = rectangle perimeter. Overrides win.
+  { id: "floor_members", label: "Floor framing members", cat: "Floor system", uom: "ea", packSize: null,
+    priceCost: 25, priceSell: 33,
+    formula: i => {
+      if (i.floorSystem === 'none' || i.floorArea <= 0 || i.floorSpan <= 0) return 0;
+      if (i.floorMemberCount > 0) return Math.ceil(i.floorMemberCount);
+      const runLen = i.floorArea / i.floorSpan;
+      return Math.ceil(runLen * 12 / i.floorSpacing) + 1;
+    },
+    labelFn: i => {
+      const stock = Math.max(2, Math.ceil(i.floorSpan / 2) * 2);
+      if (i.floorSystem === 'floor_truss') return `Floor trusses — ${i.floorSpan}' span @ ${i.floorSpacing}\" OC (priced per quote)`;
+      if (i.floorSystem === 'ijoist') return `I-joists — ${i.floorSpan}' span @ ${i.floorSpacing}\" OC (${stock}' stock)`;
+      return `Floor joists ${i.floorLumber} × ${stock}' @ ${i.floorSpacing}\" OC`;
+    },
+    customUnitPrice: i => {
+      const base = getPrice('floor_members').cost || 25;
+      if (i.floorSystem === 'floor_truss') return base * 6;   // per-truss placeholder — set real quote on Pricing master
+      if (i.floorSystem === 'ijoist') return base * 2.4;      // ~$60 default at $25 base
+      const stock = Math.max(2, Math.ceil(i.floorSpan / 2) * 2);
+      const perFt = (i.floorLumber === '2x12' ? 2.10 : 1.65);
+      return stock * perFt;
+    }},
+  { id: "floor_rim", label: "Rim / band board", cat: "Floor system", uom: "ea", packSize: null,
+    priceCost: 28, priceSell: 38,
+    formula: i => {
+      if (i.floorSystem === 'none' || i.floorArea <= 0 || i.floorSpan <= 0) return 0;
+      const rimLF = i.floorRimLF > 0 ? i.floorRimLF : 2 * (i.floorArea / i.floorSpan) + 2 * i.floorSpan;
+      return Math.ceil(rimLF / 16);
+    },
+    labelFn: i => {
+      const rimLF = Math.ceil(i.floorRimLF > 0 ? i.floorRimLF : 2 * (i.floorArea / i.floorSpan) + 2 * i.floorSpan);
+      const kind = i.floorSystem === 'ijoist' ? '1-1/4\" LVL rim' : (i.floorSystem === 'floor_truss' ? 'Rim / ribbon board' : i.floorLumber + ' rim');
+      return `${kind} — ${rimLF} LF (16' pcs)`;
+    }},
+  { id: "subfloor_sheets", label: "Subfloor sheathing 4×8 T&G", cat: "Floor system", uom: "sheets", packSize: null,
+    priceCost: 42, priceSell: 55,
+    formula: i => (i.floorSystem === 'none' || i.floorArea <= 0) ? 0 : Math.ceil(i.floorArea / 32 * 1.07),
+    labelFn: i => (i.subfloorProduct === 'advantech' ? '3/4\" AdvanTech T&G 4×8' : '3/4\" T&G OSB 4×8') + ' (+7% waste)',
+    customUnitPrice: i => {
+      const base = getPrice('subfloor_sheets').cost || 42;
+      return i.subfloorProduct === 'advantech' ? base * 1.38 : base;
+    }},
+  { id: "subfloor_adhesive", label: "Subfloor adhesive (28 oz, 1 per 2 sheets)", cat: "Floor system", uom: "tubes", packSize: null,
+    priceCost: 7, priceSell: 10,
+    formula: i => (i.floorSystem === 'none' || i.floorArea <= 0) ? 0 : Math.ceil(Math.ceil(i.floorArea / 32 * 1.07) / 2) },
+  { id: "subfloor_screws", label: "Subfloor screws (1 box per 500 sqft)", cat: "Floor system", uom: "boxes", packSize: null,
+    priceCost: 35, priceSell: 46,
+    formula: i => (i.floorSystem === 'none' || i.floorArea <= 0) ? 0 : Math.ceil(i.floorArea / 500) },
+
   { id: "post_4x6_pt", label: "4×6 PT post [cut to wall ht + 4'] (eave walls when 4×6 + man door jambs)", cat: "Post-frame wall", uom: "ea", packSize: null,
     priceCost: 25.79, priceSell: 33, priceRetail: 42,
     formula: i => {
@@ -7809,7 +7895,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v198';
+const BB_VERSION = 'v199';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -11295,7 +11381,16 @@ function getInputs() {
     insulPerSf: num('insul_per_sf') || 2.20,
     drywallHangPerSf: num('drywall_hang_per_sf') || 0.65,
     drywallFinishPerSf: num('drywall_finish_per_sf') || 1.50,
-    laborFraming: num('labor_framing'), laborRoofing: num('labor_roofing'), laborSiding: num('labor_siding')
+    laborFraming: num('labor_framing'), laborRoofing: num('labor_roofing'), laborSiding: num('labor_siding'),
+    // Floor system (2nd floor / mezzanine / crawlspace)
+    floorSystem: txt('floor_system') || 'none',
+    floorArea: num('floor_area_sqft'),
+    floorSpan: num('floor_span'),
+    floorSpacing: num('floor_spacing') || 16,
+    floorLumber: txt('floor_lumber') || '2x10',
+    floorMemberCount: num('floor_member_count'),
+    floorRimLF: num('floor_rim_lf'),
+    subfloorProduct: txt('subfloor_product') || 'osb_tg'
   };
 }
 
@@ -13822,7 +13917,7 @@ function buildCutList(i, mats) {
 // =============================================================
 const ORDER_PKGS = [
   { name: 'Concrete / foundation package', phase: 'Pad & grade → Concrete slab', cats: ['Foundation', 'Moisture barrier'] },
-  { name: 'Framing package', phase: 'Framing → Trusses set', cats: ['Post-frame wall', 'Wall framing', 'Roof structure', 'Wall sheathing', 'Fasteners & connectors', 'Hardware'] },
+  { name: 'Framing package', phase: 'Framing → Trusses set', cats: ['Post-frame wall', 'Wall framing', 'Roof structure', 'Wall sheathing', 'Fasteners & connectors', 'Hardware', 'Floor system'] },
   { name: 'Metal package', phase: 'Roof metal → Wall metal & trim → Gutters', cats: ['Roof skin', 'Siding skin', 'Metal wall trim', 'Soffit & fascia', 'Gutters'] },
   { name: 'Doors & windows package', phase: 'Doors & windows', cats: ['Openings', 'Doors — garage', 'Doors — exterior', 'Windows'] },
   { name: 'Side shed package', phase: 'Framing (shed)', cats: ['Side shed'] },
@@ -18105,6 +18200,7 @@ if (typeof origSwitchTab === 'function') {
     { key: 'garage_sqft',       label: 'Garage area SF',            group: 'area',   mode: 'floor', unit: 'SF', target: 'garage_sqft' },
     { key: 'timber_porch_sqft', label: 'Timber porch area SF',      group: 'area',   mode: 'floor', unit: 'SF', target: 'porch_sqft' },
     { key: 'stick_porch_sqft',  label: 'Stick-framed porch area SF',group: 'area',   mode: 'floor', unit: 'SF', target: 'porch_sqft' },
+    { key: 'floor_area_sqft',   label: 'Floor area SF (2nd floor / crawlspace subfloor)', group: 'area', mode: 'floor', unit: 'SF', target: 'floor_area_sqft' },
   ];
   function catByKey(k) { return TAKEOFF_CATS.find(c => c.key === k) || null; }
 
@@ -18787,6 +18883,7 @@ if (typeof origSwitchTab === 'function') {
       price: p.price || 0, widthIn: p.widthIn || 0,
       alpha: (p.alpha != null ? p.alpha : 0.28),
       truss: p.truss || null,
+      floor: p.floor || null,
       basePts: TO.draft.basePts.slice(), visible: true,
     });
     TO.draft = null; redraw(); renderResults(); renderPagesList(); takeoffAutoPush();
@@ -19204,6 +19301,64 @@ if (typeof origSwitchTab === 'function') {
   };
 
   // ---- TRUSS COUNT → pushes line items into the Truss configuration tool ----
+  window.takeoffOpenFloor = function () {
+    if (!TO.pdfDoc) { toToast('Load a PDF first.', false); return; }
+    const mainSpan = (parseFloat((document.getElementById('floor_span') || {}).value) || 0) || 14;
+    $('to-modal-title').textContent = 'Floor framing count';
+    const typeSel = `<select id="to-floor-type">
+      <option value="floor_truss" selected>Floor trusses</option>
+      <option value="stick">Stick-framed joists</option>
+      <option value="ijoist">I-joists</option></select>`;
+    const colorSel = `<select id="to-floor-color"><option value="">Auto color</option>` + COLOR_OPTS.map(c => `<option value="${c[1]}">${c[0]}</option>`).join('') + `</select>`;
+    $('to-modal-body').innerHTML =
+      fieldRow('Framing type *', typeSel)
+      + fieldRow('Span (ft) *', `<input type="number" id="to-floor-span" step="0.5" value="${mainSpan}">`)
+      + fieldRow('Spacing (in OC)', `<select id="to-floor-spacing"><option value="12">12"</option><option value="16" selected>16"</option><option value="19.2">19.2"</option><option value="24">24"</option></select>`)
+      + fieldRow('Stick lumber (if stick-framed)', `<select id="to-floor-lumber"><option value="2x10" selected>2×10</option><option value="2x12">2×12</option></select>`)
+      + `<div class="qbs-note">Click each joist / truss on the plan to count it, then ✓ Finish. "▤ Push floors → floor tool" sends the count, span, spacing and type to the Floor system card on Dimensions. Measure the "Floor area SF" selection too — it drives the subfloor sheathing, rim board, glue and screws.</div>`
+      + fieldRow('Label (optional)', `<input type="text" id="to-floor-label" placeholder="e.g. Mezzanine, 2nd floor, Crawlspace">`)
+      + fieldRow('Marker color', colorSel);
+    setFoot([['▶ Start counting', 'takeoffFloorStart()', true], ['Close', 'takeoffCloseDialog()', false]]);
+    showModal();
+  };
+  window.takeoffFloorStart = function () {
+    const type = ($('to-floor-type') || {}).value || 'floor_truss';
+    const span = parseFloat(($('to-floor-span') || {}).value) || 0;
+    const spacing = parseFloat(($('to-floor-spacing') || {}).value) || 16;
+    const lumber = ($('to-floor-lumber') || {}).value || '2x10';
+    const label = (($('to-floor-label') || {}).value || '').trim();
+    if (span <= 0) { toToast('Enter the floor span.', false); return; }
+    const typeLabel = { floor_truss: 'Floor truss', stick: 'Stick joist ' + lumber, ijoist: 'I-joist' }[type] || type;
+    TO.pending = {
+      cat: 'floor_frame', target: null,
+      name: (label ? label + ' · ' : '') + typeLabel + ' ' + span + "ft @ " + spacing + '\"',
+      type: 'EA', desc: '', color: ($('to-floor-color') || {}).value || '#8e6cd6',
+      price: 0, widthIn: 0, alpha: 0.28, mode: 'count',
+      floor: { type: type, span: span, spacing: spacing, lumber: lumber, label: label },
+    };
+    TO.tool = 'measure'; TO.measureAs = 'count'; TO.draft = null; highlightTool();
+    takeoffCloseDialog();
+  };
+  window.takeoffPushFloors = function () {
+    const groups = TO.measures.filter(m => m.floor && m.mode === 'count' && !m._pushedFloor);
+    if (!groups.length) {
+      const any = TO.measures.some(m => m.floor);
+      toToast(any ? 'These floor counts were already pushed — add new counts to push more.'
+                  : 'No floor counts yet. Use ▤ Floor count, pick type/span/spacing, click each member, then Finish.', false);
+      return;
+    }
+    const set = (id, v) => { const el = document.getElementById(id); if (el) { el.value = v; el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); } };
+    let total = 0; const first = groups[0].floor;
+    groups.forEach(m => { total += m.basePts.length; m._pushedFloor = true; });
+    const prev = parseFloat((document.getElementById('floor_member_count') || {}).value) || 0;
+    set('floor_system', first.type);
+    set('floor_span', first.span);
+    set('floor_spacing', String(first.spacing));
+    set('floor_lumber', first.lumber);
+    set('floor_member_count', prev + total);
+    if (typeof recalc === 'function') recalc();
+    toToast('✓ ' + total + ' floor member(s) pushed to the Floor system card (' + ({ floor_truss: 'Floor trusses', stick: 'Stick joists', ijoist: 'I-joists' }[first.type] || first.type) + ', ' + first.span + "ft @ " + first.spacing + '\"). Measure "Floor area SF" for the subfloor materials.', true);
+  };
   window.takeoffOpenTruss = function () {
     if (!TO.pdfDoc) { alert('Load a PDF first.'); return; }
     const styles = (typeof TRUSS_TYPES !== 'undefined') ? TRUSS_TYPES : [

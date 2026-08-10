@@ -1,9 +1,8 @@
 <!-- ============================================================
- LOCKED SNAPSHOT — Takeoff tab, v198, builder-confirmed working.
+ LOCKED SNAPSHOT — Takeoff tab, v199, builder-confirmed working.
+ (v198 + builder-ordered floor framing count tool + floor area cat.)
  Two sections: (1) #tab-takeoff markup, (2) the BLUEPRINT TAKEOFF
- script block. To verify the live file has not drifted, extract
- the same sections from barndo_builders_tool.html and diff against
- this file. To restore, transplant these sections verbatim.
+ script block. Verify by re-extracting and diffing; restore verbatim.
  ============================================================ -->
 <!-- ==== SECTION 1: MARKUP ==== -->
 <div class="qbs-tab-content" id="tab-takeoff" style="display:none">
@@ -42,6 +41,7 @@
         <button onclick="takeoffOpenAdd('area')">▱ Area</button>
         <button onclick="takeoffOpenAdd('linear')">／ Linear</button>
         <button onclick="takeoffOpenTruss()">◉ Truss count</button>
+        <button onclick="takeoffOpenFloor()">▤ Floor count</button>
         <button id="to-tool-pan" onclick="takeoffTool('pan')">✋ Pan</button>
         <button onclick="takeoffFinish()">✓ Finish</button>
         <button onclick="takeoffUndoPt()">↶ Undo point</button>
@@ -50,6 +50,7 @@
         <button onclick="takeoffPushLinesToQuote()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;" title="Send the PRICED takeoff lines to the quote's Materials list — only when you want them on the quote">$ Push to Quote</button>
         <label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-2);" title="Zero the quote before pushing so ONLY measured items drive it — otherwise the push lands on top of whatever building is already entered (including the default one)"><input type="checkbox" id="to-clean-start" checked> Blank quote first — quote only measured items</label>
         <button onclick="takeoffPushTrusses()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;">◉ Push trusses → truss tool</button>
+        <button onclick="takeoffPushFloors()" style="background:var(--copper-soft); color:var(--copper); border-color:rgba(251,146,60,0.4); font-weight:600;">▤ Push floors → floor tool</button>
       </div>
 
       <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:8px; border-top:1px solid var(--hairline); padding-top:8px;">
@@ -176,6 +177,7 @@
     { key: 'garage_sqft',       label: 'Garage area SF',            group: 'area',   mode: 'floor', unit: 'SF', target: 'garage_sqft' },
     { key: 'timber_porch_sqft', label: 'Timber porch area SF',      group: 'area',   mode: 'floor', unit: 'SF', target: 'porch_sqft' },
     { key: 'stick_porch_sqft',  label: 'Stick-framed porch area SF',group: 'area',   mode: 'floor', unit: 'SF', target: 'porch_sqft' },
+    { key: 'floor_area_sqft',   label: 'Floor area SF (2nd floor / crawlspace subfloor)', group: 'area', mode: 'floor', unit: 'SF', target: 'floor_area_sqft' },
   ];
   function catByKey(k) { return TAKEOFF_CATS.find(c => c.key === k) || null; }
 
@@ -858,6 +860,7 @@
       price: p.price || 0, widthIn: p.widthIn || 0,
       alpha: (p.alpha != null ? p.alpha : 0.28),
       truss: p.truss || null,
+      floor: p.floor || null,
       basePts: TO.draft.basePts.slice(), visible: true,
     });
     TO.draft = null; redraw(); renderResults(); renderPagesList(); takeoffAutoPush();
@@ -1275,6 +1278,64 @@
   };
 
   // ---- TRUSS COUNT → pushes line items into the Truss configuration tool ----
+  window.takeoffOpenFloor = function () {
+    if (!TO.pdfDoc) { toToast('Load a PDF first.', false); return; }
+    const mainSpan = (parseFloat((document.getElementById('floor_span') || {}).value) || 0) || 14;
+    $('to-modal-title').textContent = 'Floor framing count';
+    const typeSel = `<select id="to-floor-type">
+      <option value="floor_truss" selected>Floor trusses</option>
+      <option value="stick">Stick-framed joists</option>
+      <option value="ijoist">I-joists</option></select>`;
+    const colorSel = `<select id="to-floor-color"><option value="">Auto color</option>` + COLOR_OPTS.map(c => `<option value="${c[1]}">${c[0]}</option>`).join('') + `</select>`;
+    $('to-modal-body').innerHTML =
+      fieldRow('Framing type *', typeSel)
+      + fieldRow('Span (ft) *', `<input type="number" id="to-floor-span" step="0.5" value="${mainSpan}">`)
+      + fieldRow('Spacing (in OC)', `<select id="to-floor-spacing"><option value="12">12"</option><option value="16" selected>16"</option><option value="19.2">19.2"</option><option value="24">24"</option></select>`)
+      + fieldRow('Stick lumber (if stick-framed)', `<select id="to-floor-lumber"><option value="2x10" selected>2×10</option><option value="2x12">2×12</option></select>`)
+      + `<div class="qbs-note">Click each joist / truss on the plan to count it, then ✓ Finish. "▤ Push floors → floor tool" sends the count, span, spacing and type to the Floor system card on Dimensions. Measure the "Floor area SF" selection too — it drives the subfloor sheathing, rim board, glue and screws.</div>`
+      + fieldRow('Label (optional)', `<input type="text" id="to-floor-label" placeholder="e.g. Mezzanine, 2nd floor, Crawlspace">`)
+      + fieldRow('Marker color', colorSel);
+    setFoot([['▶ Start counting', 'takeoffFloorStart()', true], ['Close', 'takeoffCloseDialog()', false]]);
+    showModal();
+  };
+  window.takeoffFloorStart = function () {
+    const type = ($('to-floor-type') || {}).value || 'floor_truss';
+    const span = parseFloat(($('to-floor-span') || {}).value) || 0;
+    const spacing = parseFloat(($('to-floor-spacing') || {}).value) || 16;
+    const lumber = ($('to-floor-lumber') || {}).value || '2x10';
+    const label = (($('to-floor-label') || {}).value || '').trim();
+    if (span <= 0) { toToast('Enter the floor span.', false); return; }
+    const typeLabel = { floor_truss: 'Floor truss', stick: 'Stick joist ' + lumber, ijoist: 'I-joist' }[type] || type;
+    TO.pending = {
+      cat: 'floor_frame', target: null,
+      name: (label ? label + ' · ' : '') + typeLabel + ' ' + span + "ft @ " + spacing + '\"',
+      type: 'EA', desc: '', color: ($('to-floor-color') || {}).value || '#8e6cd6',
+      price: 0, widthIn: 0, alpha: 0.28, mode: 'count',
+      floor: { type: type, span: span, spacing: spacing, lumber: lumber, label: label },
+    };
+    TO.tool = 'measure'; TO.measureAs = 'count'; TO.draft = null; highlightTool();
+    takeoffCloseDialog();
+  };
+  window.takeoffPushFloors = function () {
+    const groups = TO.measures.filter(m => m.floor && m.mode === 'count' && !m._pushedFloor);
+    if (!groups.length) {
+      const any = TO.measures.some(m => m.floor);
+      toToast(any ? 'These floor counts were already pushed — add new counts to push more.'
+                  : 'No floor counts yet. Use ▤ Floor count, pick type/span/spacing, click each member, then Finish.', false);
+      return;
+    }
+    const set = (id, v) => { const el = document.getElementById(id); if (el) { el.value = v; el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); } };
+    let total = 0; const first = groups[0].floor;
+    groups.forEach(m => { total += m.basePts.length; m._pushedFloor = true; });
+    const prev = parseFloat((document.getElementById('floor_member_count') || {}).value) || 0;
+    set('floor_system', first.type);
+    set('floor_span', first.span);
+    set('floor_spacing', String(first.spacing));
+    set('floor_lumber', first.lumber);
+    set('floor_member_count', prev + total);
+    if (typeof recalc === 'function') recalc();
+    toToast('✓ ' + total + ' floor member(s) pushed to the Floor system card (' + ({ floor_truss: 'Floor trusses', stick: 'Stick joists', ijoist: 'I-joists' }[first.type] || first.type) + ', ' + first.span + "ft @ " + first.spacing + '\"). Measure "Floor area SF" for the subfloor materials.', true);
+  };
   window.takeoffOpenTruss = function () {
     if (!TO.pdfDoc) { alert('Load a PDF first.'); return; }
     const styles = (typeof TRUSS_TYPES !== 'undefined') ? TRUSS_TYPES : [
