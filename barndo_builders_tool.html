@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v204</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v205</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2225,14 +2225,15 @@
   <div class="qbs-tabs">
     <div class="qbs-tab" data-tab="leads" onclick="switchTab('leads')">Leads</div>
     <div class="qbs-tab active" data-tab="takeoff" onclick="switchTab('takeoff')">1. Takeoff</div>
-    <div class="qbs-tab" data-tab="workspace" onclick="switchTab('workspace')" style="color:var(--copper); font-weight:700;">⚡ Builder</div>
+    <div class="qbs-tab" data-tab="workspace" onclick="switchTab('workspace')" style="color:var(--copper); font-weight:700;">⚡ 3D Buildout</div>
     <div class="qbs-tab" data-tab="inputs" onclick="switchTab('inputs')">2. Dimensions</div>
     <div class="qbs-tab" data-tab="foundation" onclick="switchTab('foundation')">3. Foundation</div>
     <div class="qbs-tab" data-tab="materials" onclick="switchTab('materials')">4. Materials</div>
     <div class="qbs-tab" data-tab="subs" onclick="switchTab('subs')">5. Subs &amp; labor</div>
     <div class="qbs-tab" data-tab="quote" onclick="switchTab('quote')">6. Quote</div>
     <div class="qbs-tab" data-tab="proposal" onclick="switchTab('proposal')">7. Proposal</div>
-    <div class="qbs-tab" data-tab="audit3d" onclick="switchTab('audit3d')" style="border-left: 1px dashed var(--hairline); margin-left: 4px; padding-left: 12px;">3D audit</div>
+    <!-- 3D audit strip button removed (v205): the ⚡ 3D Buildout workspace is the 3D view now.
+         #tab-audit3d stays in the DOM as the hidden home the workspace adopts the viewport from. -->
     <div class="qbs-tab" data-tab="counter" onclick="switchTab('counter')" style="border-left: 1px dashed var(--hairline); margin-left: 4px; padding-left: 12px;">Counter ticket</div>
     <div class="qbs-tab" data-tab="schedule" onclick="switchTab('schedule')">Schedule</div>
     <div class="qbs-tab" data-tab="flitch" onclick="switchTab('flitch')">Pricing master</div>
@@ -7923,7 +7924,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v204';
+const BB_VERSION = 'v205';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
