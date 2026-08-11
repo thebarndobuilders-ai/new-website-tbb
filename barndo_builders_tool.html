@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v203</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v204</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -4300,7 +4300,15 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
        so state, math and listeners are shared 1:1 with the classic tabs. -->
   <div class="qbs-tab-content" id="tab-workspace" style="display:none">
     <div id="ws-totals" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;"></div>
-    <div style="display:grid; grid-template-columns:370px 1fr 400px; gap:12px; align-items:start;">
+    <style>
+      /* Compact fit for the adopted Openings card inside the narrow Builder rail */
+      #ws-left .openings-section { overflow-x: auto; }
+      #ws-left .openings-table th, #ws-left .openings-table td { padding: 4px 3px; font-size: 11px; }
+      #ws-left .openings-table input, #ws-left .openings-table select { font-size: 11px; padding: 3px 4px; }
+      #ws-left #bulk-import-panel textarea { min-height: 100px; }
+      #ws-left .openings-table tbody:empty::after { white-space: nowrap; }
+    </style>
+    <div style="display:grid; grid-template-columns:420px 1fr 400px; gap:12px; align-items:start;">
       <div id="ws-left" style="max-height:calc(100vh - 230px); overflow-y:auto; display:flex; flex-direction:column; gap:12px;"></div>
       <div id="ws-center" style="min-height:600px; position:sticky; top:8px;">
         <div class="qbs-note" style="padding:20px;">3D viewport loads here…</div>
@@ -7915,7 +7923,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v203';
+const BB_VERSION = 'v204';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -8577,6 +8585,7 @@ function wsEnter() {
   _wsAdoptNode(document.querySelector('.qbs-tier-btn') ? document.querySelector('.qbs-tier-btn').closest('.qbs-card') : null, left);
   _wsAdoptNode(cardOf('width'), left);
   _wsAdoptNode(cardOf('siding_product'), left);
+  _wsAdoptNode(cardOf('windows-tbody'), left);   // Openings: windows / ext doors / int doors / garage doors
   _wsAdoptNode(cardOf('floor_system'), left);
   // quick-nav to everything not in the rail
   const nav = document.createElement('div');
