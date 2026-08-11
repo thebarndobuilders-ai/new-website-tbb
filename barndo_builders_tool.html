@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v205</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v206</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2441,7 +2441,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           <button onclick="addOpeningRow('window')" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add window</button>
         </div>
         <table class="openings-table" id="windows-table">
-          <thead><tr><th>Qty</th><th>Width (ft)</th><th>Height (ft)</th><th>Label</th><th>Header LF</th><th></th></tr></thead>
+          <thead><tr><th>Qty</th><th>Width (ft)</th><th>Height (ft)</th><th>Location</th><th>Label</th><th>Header LF</th><th></th></tr></thead>
           <tbody id="windows-tbody"></tbody>
         </table>
       </div>
@@ -2453,7 +2453,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           <button onclick="addOpeningRow('extdoor')" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add ext door</button>
         </div>
         <table class="openings-table" id="extdoors-table">
-          <thead><tr><th>Qty</th><th>Size · Style</th><th>Cost $</th><th>Sell $</th><th>Label</th><th>Header LF</th><th></th></tr></thead>
+          <thead><tr><th>Qty</th><th>Size · Style</th><th>Cost $</th><th>Sell $</th><th>Location</th><th>Label</th><th>Header LF</th><th></th></tr></thead>
           <tbody id="extdoors-tbody"></tbody>
         </table>
       </div>
@@ -2477,7 +2477,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           <button onclick="addOpeningRow('garage')" style="padding: 6px 14px !important; font-size: 12px !important;">+ Add garage door</button>
         </div>
         <table class="openings-table" id="garage-table">
-          <thead><tr><th>Qty</th><th>Size · Style</th><th>Cost $</th><th>Sell $</th><th>Label</th><th>Header LF</th><th></th></tr></thead>
+          <thead><tr><th>Qty</th><th>Size · Style</th><th>Cost $</th><th>Sell $</th><th>Location</th><th>Label</th><th>Header LF</th><th></th></tr></thead>
           <tbody id="garage-tbody"></tbody>
         </table>
       </div>
@@ -7924,7 +7924,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v205';
+const BB_VERSION = 'v206';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -10568,6 +10568,10 @@ function updateOpeningRow(type, idx, field, value) {
     return;
   } else if (field === 'doorType') {
     row.doorType = value;
+  } else if (field === 'wall') {
+    // Location dropdown: '' = Auto (re-distribute), else pin to that wall.
+    if (!value) { row.wall = null; row.pos = null; }
+    else { row.wall = value; if (row.pos == null) row.pos = 0.5; }
   } else {
     row[field] = parseFloat(value) || 0;
   }
@@ -10583,6 +10587,14 @@ function updateOpeningRow(type, idx, field, value) {
     }
   }
   recalc();
+}
+
+// Wall-location selector for exterior openings. Internal wall keys map to the
+// builder's names: front/back = the two eave sides, right/left = the gable ends.
+const WALL_LOCS = [['', 'Auto'], ['front', 'Left eave'], ['back', 'Right eave'], ['right', 'Front gable'], ['left', 'Back gable']];
+function wallLocCell(type, idx, row) {
+  const opts = WALL_LOCS.map(([v, l]) => `<option value="${v}" ${(row.wall || '') === v ? 'selected' : ''}>${l}</option>`).join('');
+  return `<td><select onchange="updateOpeningRow('${type}', ${idx}, 'wall', this.value)" title="Which wall this opening goes on">${opts}</select></td>`;
 }
 
 function renderOpeningsTable(type) {
@@ -10626,6 +10638,7 @@ function renderOpeningsTable(type) {
         <td><select onchange="updateOpeningRow('${type}', ${idx}, 'catalogKey', this.value)">${catOptions}</select></td>
         <td><input type="number" min="0" step="0.10" value="${(row.costPerDoor || 0).toFixed(2)}" oninput="updateOpeningRow('${type}', ${idx}, 'costPerDoor', this.value)" style="width: 80px"></td>
         <td><input type="number" min="0" step="0.10" value="${(row.sellPerDoor || 0).toFixed(2)}" oninput="updateOpeningRow('${type}', ${idx}, 'sellPerDoor', this.value)" style="width: 80px"></td>
+        ${wallLocCell(type, idx, row)}
         <td><input type="text" placeholder="${labelPlaceholder}" value="${row.label || ''}" oninput="updateOpeningRow('${type}', ${idx}, 'label', this.value)" style="width: 80px"></td>
         <td><input type="number" min="0" step="0.5" class="opening-header-input ${hdrClass}" value="${hdrValue}" oninput="updateOpeningRow('${type}', ${idx}, 'headerOverride', this.value)" style="width: 60px"></td>
         <td><button class="opening-remove-btn" onclick="removeOpeningRow('${type}', ${idx})">×</button></td>
@@ -10636,6 +10649,7 @@ function renderOpeningsTable(type) {
         <td><input type="number" min="0" value="${row.qty}" oninput="updateOpeningRow('${type}', ${idx}, 'qty', this.value)"></td>
         <td><input type="number" min="0" step="0.5" value="${row.w}" oninput="updateOpeningRow('${type}', ${idx}, 'w', this.value)"></td>
         <td><input type="number" min="0" step="0.5" value="${row.h}" oninput="updateOpeningRow('${type}', ${idx}, 'h', this.value)"></td>
+        ${wallLocCell(type, idx, row)}
         <td><input type="text" placeholder="${labelPlaceholder}" value="${row.label || ''}" oninput="updateOpeningRow('${type}', ${idx}, 'label', this.value)"></td>
         <td><input type="number" min="0" step="0.5" class="opening-header-input ${hdrClass}" value="${hdrValue}" oninput="updateOpeningRow('${type}', ${idx}, 'headerOverride', this.value)"></td>
         <td><button class="opening-remove-btn" onclick="removeOpeningRow('${type}', ${idx})">×</button></td>
