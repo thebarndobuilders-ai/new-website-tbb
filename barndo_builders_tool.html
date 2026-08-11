@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v202</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v203</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2225,6 +2225,7 @@
   <div class="qbs-tabs">
     <div class="qbs-tab" data-tab="leads" onclick="switchTab('leads')">Leads</div>
     <div class="qbs-tab active" data-tab="takeoff" onclick="switchTab('takeoff')">1. Takeoff</div>
+    <div class="qbs-tab" data-tab="workspace" onclick="switchTab('workspace')" style="color:var(--copper); font-weight:700;">⚡ Builder</div>
     <div class="qbs-tab" data-tab="inputs" onclick="switchTab('inputs')">2. Dimensions</div>
     <div class="qbs-tab" data-tab="foundation" onclick="switchTab('foundation')">3. Foundation</div>
     <div class="qbs-tab" data-tab="materials" onclick="switchTab('materials')">4. Materials</div>
@@ -4291,6 +4292,25 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
       </div>
       <div id="ws_results" style="margin-top:12px;"></div>
       <div class="qbs-note" style="margin-top:8px;">Wall area = perimeter × height + gable triangles (W² × pitch ÷ 48 each) − openings. 1 square = 100&nbsp;ft². Panel LF shown for 36" coverage (÷3) and 12" board &amp; batten (÷1).</div>
+    </div>
+  </div>
+
+  <!-- BUILDER WORKSPACE — one-page mode. It ADOPTS the live cards from the
+       Dimensions tab and the 3D viewport (same DOM nodes, moved temporarily),
+       so state, math and listeners are shared 1:1 with the classic tabs. -->
+  <div class="qbs-tab-content" id="tab-workspace" style="display:none">
+    <div id="ws-totals" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;"></div>
+    <div style="display:grid; grid-template-columns:370px 1fr 400px; gap:12px; align-items:start;">
+      <div id="ws-left" style="max-height:calc(100vh - 230px); overflow-y:auto; display:flex; flex-direction:column; gap:12px;"></div>
+      <div id="ws-center" style="min-height:600px; position:sticky; top:8px;">
+        <div class="qbs-note" style="padding:20px;">3D viewport loads here…</div>
+      </div>
+      <div id="ws-right" style="max-height:calc(100vh - 230px); overflow-y:auto;">
+        <div class="qbs-card" style="margin:0;">
+          <h3 style="display:flex; justify-content:space-between; align-items:center;">Material list <span id="ws-mats-total" style="color:var(--copper); font-family:var(--font-mono);"></span></h3>
+          <div id="ws-mats"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -7895,7 +7915,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v202';
+const BB_VERSION = 'v203';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -8532,6 +8552,118 @@ function renderSchedule() {
 schedLoad();
 
 // =============================================================
+// BUILDER WORKSPACE — single-page mode built by ADOPTING live DOM nodes
+// (cards + 3D viewport) into a 3-pane layout. Nothing is duplicated:
+// the same inputs and canvases are moved in on entry and moved back on
+// exit, so both modes stay perfectly in sync.
+// =============================================================
+let _wsAdopted = false;
+const _wsHomes = [];   // [{node, placeholder}]
+function _wsAdoptNode(node, slot) {
+  if (!node) return;
+  const ph = document.createComment('ws-home');
+  node.parentNode.insertBefore(ph, node);
+  _wsHomes.push({ node, ph });
+  slot.appendChild(node);
+}
+function wsEnter() {
+  if (_wsAdopted) { wsRenderLive(); return; }
+  const left = document.getElementById('ws-left');
+  const center = document.getElementById('ws-center');
+  if (!left || !center) return;
+  center.innerHTML = '';
+  const cardOf = id => { const el = document.getElementById(id); return el ? el.closest('.qbs-card') : null; };
+  // left rail: tier, dimensions, products/colors, floor system
+  _wsAdoptNode(document.querySelector('.qbs-tier-btn') ? document.querySelector('.qbs-tier-btn').closest('.qbs-card') : null, left);
+  _wsAdoptNode(cardOf('width'), left);
+  _wsAdoptNode(cardOf('siding_product'), left);
+  _wsAdoptNode(cardOf('floor_system'), left);
+  // quick-nav to everything not in the rail
+  const nav = document.createElement('div');
+  nav.className = 'qbs-card';
+  nav.innerHTML = '<h3>More</h3><div style="display:flex; flex-wrap:wrap; gap:6px;">'
+    + [['inputs', 'Full Dimensions'], ['takeoff', 'Takeoff'], ['materials', 'Materials'], ['subs', 'Subs & labor'], ['quote', 'Quote'], ['proposal', 'Proposal']]
+      .map(([t, l]) => `<button onclick="switchTab('${t}')" style="font-size:11px;">${l}</button>`).join('') + '</div>';
+  nav.id = 'ws-nav-card';
+  left.appendChild(nav);
+  // center: the live 3D viewport (canvas wrap's parent panel)
+  const wrap3d = document.getElementById('audit3d-canvas-wrap');
+  if (wrap3d) _wsAdoptNode(wrap3d.parentElement, center);
+  _wsAdopted = true;
+  try { if (typeof window.bb3dCmd === 'function') window.bb3dCmd('regenerate'); } catch (e) {}
+  try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+  try { recalc(); } catch (e) { wsRenderLive(); }
+}
+function wsLeave() {
+  if (!_wsAdopted) return;
+  const nav = document.getElementById('ws-nav-card'); if (nav) nav.remove();
+  while (_wsHomes.length) {
+    const { node, ph } = _wsHomes.pop();
+    if (ph.parentNode) { ph.parentNode.insertBefore(node, ph); ph.remove(); }
+  }
+  _wsAdopted = false;
+  try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+}
+function wsRenderLive() {
+  const tab = document.getElementById('tab-workspace');
+  if (!tab || tab.style.display === 'none') return;
+  const c = window._lastCalc;
+  const money = v => '$' + Math.round(v || 0).toLocaleString('en-US');
+  const tile = (label, val, big) => `
+    <div style="flex:1; min-width:120px; background:${big ? 'var(--copper-soft)' : 'var(--surface-2)'}; border:1px solid ${big ? 'var(--copper)' : 'var(--hairline)'}; border-radius:8px; padding:8px 14px;">
+      <div style="font-family:var(--font-mono); font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.06em;">${label}</div>
+      <div style="font-family:var(--font-mono); font-size:${big ? 24 : 17}px; font-weight:700; ${big ? 'color:var(--copper);' : ''} margin-top:2px;">${val}</div>
+    </div>`;
+  const tot = document.getElementById('ws-totals');
+  if (tot) {
+    if (!c) { tot.innerHTML = '<div class="qbs-note">Enter dimensions to see live pricing.</div>'; }
+    else {
+      tot.innerHTML =
+        tile('Materials cost', money(c.matCostTotal))
+        + tile('Materials sell', money(c.matSellTotal))
+        + tile('Subs & labor', money(c.subSellTotal + c.laborSell))
+        + tile('O+P+C', money(c.overhead + c.profit + c.contingency))
+        + tile('$ / sqft', c.sqftCost ? '$' + c.sqftCost.toFixed(2) : '—')
+        + tile('TOTAL CLIENT QUOTE', money(c.grand), true);
+    }
+  }
+  const box = document.getElementById('ws-mats');
+  if (box) {
+    if (!c || !c.mats || !c.mats.length) { box.innerHTML = '<div class="qbs-note">No material lines yet.</div>'; }
+    else {
+      const byCat = {};
+      c.mats.forEach(m => { (byCat[m.cat] = byCat[m.cat] || []).push(m); });
+      box.innerHTML = Object.keys(byCat).map(cat => {
+        const rows = byCat[cat];
+        const sub = rows.reduce((s, m) => s + (m.sell || 0), 0);
+        return `<div style="margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--copper); border-bottom:1px solid var(--hairline); padding-bottom:2px; margin-bottom:4px;">
+            <span>${cat}</span><span style="font-family:var(--font-mono);">${money(sub)}</span></div>
+          ${rows.map(m => `<div style="display:flex; justify-content:space-between; gap:8px; font-size:11px; padding:2px 0; color:var(--text-2);">
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${m.label}</span>
+            <span style="font-family:var(--font-mono); white-space:nowrap;">×${(+m.qty).toLocaleString()} · ${money(m.sell)}</span></div>`).join('')}
+        </div>`;
+      }).join('');
+      const t = document.getElementById('ws-mats-total');
+      if (t) t.textContent = money(c.matSellTotal);
+    }
+  }
+  // keep the center 3D shell tracking the inputs (debounced — recalc fires per keystroke)
+  if (_wsAdopted) {
+    clearTimeout(window._ws3dT);
+    window._ws3dT = setTimeout(() => {
+      try { if (typeof window.bb3dCmd === 'function') window.bb3dCmd('regenerate'); } catch (e) {}
+    }, 500);
+  }
+}
+// live refresh: piggyback on every recalc
+if (typeof recalc === 'function' && !window._wsPatched) {
+  window._wsPatched = true;
+  const _origRecalc = recalc;
+  recalc = function () { _origRecalc.apply(this, arguments); try { wsRenderLive(); } catch (e) {} };
+}
+
+// =============================================================
 // VENDORS — supplier list with categories, status pipeline, CSV.
 // Stored under bb_vendors_v1 (rides in the full backup). Seeded once
 // with real regional suppliers (~300 mi of Selmer, TN) — VERIFY each
@@ -8750,6 +8882,7 @@ function _drawProposalHTML() {
 }
 
 function switchTab(name) {
+  window._userTabbed = true;
   document.querySelectorAll('.qbs-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.qbs-tab-content').forEach(c => c.style.display = 'none');
   document.getElementById('tab-' + name).style.display = 'block';
@@ -8763,6 +8896,7 @@ function switchTab(name) {
   if (name === 'schedule') { try { renderSchedule(); } catch (e) {} }
   if (name === 'quote') { try { renderDrawSchedule(); renderChangeOrders(); } catch (e) {} }
   if (name === 'vendors') { try { renderVendors(); } catch (e) {} }
+  if (name === 'workspace') { try { wsEnter(); } catch (e) {} } else { try { wsLeave(); } catch (e) {} }
   if (name === 'calcs') { ['grCalc','gsCalc','shCalc','swCalc','stCalc','csCalc','phCalc','rfCalc','gpCalc','dwCalc','bfCalc','cbCalc','cfCalc','rsCalc','wsCalc'].forEach(f => { try { window[f] ? window[f]() : eval(f + '()'); } catch (e) {} }); }
   if (name === 'takeoff' && typeof takeoffInit === 'function') takeoffInit();
   if (name === 'subs') {
@@ -14186,7 +14320,9 @@ function exportPDF() {
   if (typeof loadSettings === 'function') loadSettings();
   recalc();
   // Open on the Takeoff tab — it's now the front of the workflow.
-  if (typeof switchTab === 'function') switchTab('takeoff');
+  // Skip if the user (or anything) already navigated: this init runs late, and
+  // yanking someone off the tab they just clicked loses their place.
+  if (typeof switchTab === 'function' && !window._userTabbed) switchTab('takeoff');
   // Load leads in background after first render
   if (typeof loadLeadsFromStorage === 'function') {
     loadLeadsFromStorage();
