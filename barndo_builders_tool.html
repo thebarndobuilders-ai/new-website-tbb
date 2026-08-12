@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v206</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v207</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2499,7 +2499,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           <select id="wall_system" onchange="updateWallSystemUI(); recalc()">
             <option value="auto">Auto — follow construction</option>
             <option value="sheathed">Sheathed (7/16" Zip + skin)</option>
-            <option value="purlin">Lath / girt only — 2×6 lathing, no sheathing (metal)</option>
+            <option value="purlin">Lath / girt only — no sheathing (metal) · member below</option>
           </select>
         </div>
         <div class="qbs-field">
@@ -2827,11 +2827,31 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           <div class="qbs-field">
             <label>Roof framing</label>
             <select id="shed_roof_framing" onchange="onShedRoofFramingChange(); recalc()">
-              <option value="stick">Stick rafters (auto 2×8 / 2×10)</option>
+              <option value="stick">Stick rafters (lumber)</option>
+              <option value="cypress">Cypress timber frame</option>
               <option value="steel">Steel trusses (mono-slope)</option>
             </select>
           </div>
-          <div class="qbs-field"><label>Rafter/truss spacing (in)</label><input type="number" id="shed_rafter_spacing" value="16" oninput="recalc()" /><div class="qbs-note">16" stick · 48" steel</div></div>
+          <div class="qbs-field" id="shed-rafter-size-field">
+            <label>Rafter size</label>
+            <select id="shed_rafter_size" onchange="recalc()">
+              <option value="auto">Auto (2×8 ≤12' · 2×10 &gt;12')</option>
+              <option value="2x6">2×6</option>
+              <option value="2x8">2×8</option>
+              <option value="2x10">2×10</option>
+              <option value="2x12">2×12</option>
+            </select>
+          </div>
+          <div class="qbs-field" id="shed-timber-size-field" style="display:none;">
+            <label>Cypress timber size</label>
+            <select id="shed_timber_size" onchange="recalc()">
+              <option value="4x6">4×6</option>
+              <option value="6x6">6×6</option>
+              <option value="6x8">6×8</option>
+              <option value="8x8">8×8</option>
+            </select>
+          </div>
+          <div class="qbs-field"><label>Rafter/truss spacing (in)</label><input type="number" id="shed_rafter_spacing" value="16" oninput="recalc()" /><div class="qbs-note">16" stick · 48" steel · 24–48" cypress</div></div>
           <div class="qbs-field">
             <label>Wainscot on shed</label>
             <select id="shed_wainscot" onchange="recalc()">
@@ -2854,6 +2874,67 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
               <option value="front">Front (long wall)</option>
               <option value="left">Left (gable end)</option>
               <option value="right">Right (gable end)</option>
+            </select>
+          </div>
+        </div>
+        <div style="font-family: var(--font-headline); font-size: 14px; color: var(--copper); margin: 14px 0 6px;">Posts · rafter carrier · ledger band</div>
+        <div class="qbs-grid-4">
+          <div class="qbs-field">
+            <label>Post material</label>
+            <select id="shed_post_material" onchange="recalc()">
+              <option value="pt">Pressure-treated</option>
+              <option value="cypress">Cypress</option>
+            </select>
+          </div>
+          <div class="qbs-field">
+            <label>Post size</label>
+            <select id="shed_post_size" onchange="recalc()">
+              <option value="4x4">4×4</option>
+              <option value="4x6">4×6</option>
+              <option value="6x6" selected>6×6</option>
+              <option value="6x8">6×8</option>
+              <option value="8x8">8×8</option>
+            </select>
+          </div>
+          <div class="qbs-field"><label>Post spacing (ft)</label><input type="number" id="shed_post_spacing" value="8" step="0.5" oninput="recalc()" /><div class="qbs-note">Outboard wall posts</div></div>
+          <div class="qbs-field">
+            <label>Rafter carrier material</label>
+            <select id="shed_carrier_material" onchange="recalc()">
+              <option value="lumber">Traditional lumber (SYP)</option>
+              <option value="pt">Pressure-treated</option>
+              <option value="cypress">Cypress</option>
+            </select>
+            <div class="qbs-note">Beam on the posts the rafters bear on</div>
+          </div>
+          <div class="qbs-field">
+            <label>Carrier size</label>
+            <select id="shed_carrier_size" onchange="recalc()">
+              <option value="dbl2x8">Double 2×8</option>
+              <option value="dbl2x10" selected>Double 2×10</option>
+              <option value="dbl2x12">Double 2×12</option>
+              <option value="4x6">4×6 timber</option>
+              <option value="6x6">6×6 timber</option>
+              <option value="6x8">6×8 timber</option>
+              <option value="8x8">8×8 timber</option>
+            </select>
+          </div>
+          <div class="qbs-field">
+            <label>Ledger band material</label>
+            <select id="shed_ledger_material" onchange="recalc()">
+              <option value="lumber">Traditional lumber (SYP)</option>
+              <option value="pt" selected>Pressure-treated</option>
+              <option value="cypress">Cypress</option>
+            </select>
+            <div class="qbs-note">Band on the main wall the rafters tie to</div>
+          </div>
+          <div class="qbs-field">
+            <label>Ledger size</label>
+            <select id="shed_ledger_size" onchange="recalc()">
+              <option value="2x8">2×8</option>
+              <option value="2x10" selected>2×10</option>
+              <option value="2x12">2×12</option>
+              <option value="4x6">4×6 timber</option>
+              <option value="6x8">6×8 timber</option>
             </select>
           </div>
         </div>
@@ -5306,6 +5387,27 @@ function postPlateCount(i, size) {
 //   id, label, cat, uom, packSize (null if each), priceCost, priceSell, formula(i)
 // Formula takes inputs object, returns qty NEEDED (before pack rounding)
 
+// Per-LF COST for lean-to / side shed members, by material family and section size.
+// lumber = untreated SYP framing · pt = pressure-treated · cypress = rough cypress timber.
+// Cypress derived from the Cypress timber porch catalog (8×8 ≈ $19/LF, 4×6 ≈ $6.50/LF).
+// Adjust on Pricing master via the line's price override once real supplier numbers land.
+const SHED_LF_COST = {
+  lumber:  { '2x6': 1.25, '2x8': 1.65, '2x10': 2.45, '2x12': 3.30 },
+  pt:      { '2x6': 1.55, '2x8': 2.10, '2x10': 3.00, '2x12': 4.00,
+             '4x4': 1.05, '4x6': 2.60, '6x6': 3.90, '6x8': 5.60, '8x8': 8.60 },
+  cypress: { '4x4': 3.30, '4x6': 6.50, '6x6': 9.80, '6x8': 13.00, '8x8': 19.00 },
+};
+function shedMemberCostLF(mat, dim) {
+  const fam = SHED_LF_COST[mat] || SHED_LF_COST.pt;
+  return fam[dim] || SHED_LF_COST.pt[dim] || SHED_LF_COST.lumber[dim] || 2.45;
+}
+function shedSizeLabel(sz) {
+  return String(sz).indexOf('dbl') === 0
+    ? 'double ' + sz.slice(3).replace('x', '×')
+    : String(sz).replace('x', '×');
+}
+function shedMatLabel(mat) { return mat === 'cypress' ? 'cypress' : (mat === 'pt' ? 'PT' : 'SYP'); }
+
 const MATERIALS = [
   // ---------------- BLOCK FOUNDATION (CMU) ----------------
   // Stem wall + piers. Both feed into the same SKU lines when block size matches.
@@ -5646,8 +5748,10 @@ const MATERIALS = [
     }},
   { id: "wall_lath_eave_pieces", label: "Wall lathing — eave walls, SYP 2×6 [cut to truss spacing] (pieces)", cat: "Post-frame wall", uom: "pieces", packSize: null,
     priceCost: 7.06, priceSell: 9.50, priceRetail: 12,
+    labelFn: i => `Wall lathing — eave walls, SYP ${i.lathSize === '1x4' ? '1×4' : '2×6'} [cut to truss spacing] (pieces)`,
     // Eave girts span post-to-post = truss/eave-post spacing; priced by that length.
-    customUnitPrice: i => 0.706 * i.eaveBaySpacingFt,
+    // 2×6 SYP ≈ $0.706/LF · 1×4 SYP lath/strapping ≈ $0.30/LF.
+    customUnitPrice: i => (i.lathSize === '1x4' ? 0.30 : 0.706) * i.eaveBaySpacingFt,
     formula: i => {
       if (i.constructionType !== 'post' || i.wallSystem !== 'purlin') return 0;
       const rows = Math.max(0, Math.ceil(i.H / i.girtSpacing) - 1);   // upper rows (PT band is the bottom row)
@@ -5655,10 +5759,11 @@ const MATERIALS = [
     }},
   { id: "wall_lath_gable_pieces", label: "Wall lathing — gable walls, SYP 2×6 [cut to 10'] (pieces)", cat: "Post-frame wall", uom: "pieces", packSize: null,
     priceCost: 7.06, priceSell: 9.50, priceRetail: 12,
+    labelFn: i => `Wall lathing — gable walls, SYP ${i.lathSize === '1x4' ? '1×4' : '2×6'} [cut to 10'] (pieces)`,
     // Gable girts span the 10' OC gable posts. Includes the TRIANGLE rows above eave
     // height — rows keep climbing at girt spacing, each row shorter as the roof closes in,
     // so the gable metal always has lathing to fasten to.
-    customUnitPrice: i => 0.706 * i.gableBaySpacingFt,
+    customUnitPrice: i => (i.lathSize === '1x4' ? 0.30 : 0.706) * i.gableBaySpacingFt,
     formula: i => {
       if (i.constructionType !== 'post' || i.wallSystem !== 'purlin') return 0;
       const rows = Math.max(0, Math.ceil(i.H / i.girtSpacing) - 1);
@@ -5721,8 +5826,18 @@ const MATERIALS = [
 
   // ---------------- SIDE SHED ----------------
   // All shed materials only generate when shedActive (checkbox on + length > 0)
-  { id: "shed_post_6x6_pt", label: "Side shed: 6×6 PT post (outboard wall)", cat: "Side shed", uom: "ea", packSize: null,
+  { id: "shed_post_6x6_pt", label: "Side shed: outboard post", cat: "Side shed", uom: "ea", packSize: null,
     priceCost: 61.97, priceSell: 78, priceRetail: 95,
+    labelFn: i => {
+      const s = i.shed || {};
+      return `Side shed: ${shedSizeLabel(s.postSize || '6x6')} ${s.postMaterial === 'cypress' ? 'cypress' : 'PT'} post (outboard wall @ ${s.postSpacingFt || 8}' OC)`;
+    },
+    customUnitPrice: i => {
+      const s = i.shed || {};
+      // stock length = wall height + 4' embed, rounded up to even stock
+      const stockLen = Math.max(8, Math.ceil(((s.H || 10) + 4) / 2) * 2);
+      return shedMemberCostLF(s.postMaterial === 'cypress' ? 'cypress' : 'pt', s.postSize || '6x6') * stockLen;
+    },
     formula: i => i.shedActive ? i.shed.postCount : 0 },
   { id: "shed_sakrete_80lb", label: "Side shed: 80 lb Sakrete", cat: "Side shed", uom: "bag", packSize: null,
     priceCost: 6.21, priceSell: 7.50, priceRetail: 9,
@@ -5736,19 +5851,56 @@ const MATERIALS = [
   { id: "shed_purlin_2x4", label: "Side shed: 2×4×20 SYP roof purlin", cat: "Side shed", uom: "ea (20')", packSize: null,
     priceCost: 8.51, priceSell: 11, priceRetail: 14,
     formula: i => i.shedActive ? Math.ceil(i.shed.lathLF * 1.05 / 20) : 0 },
-  // Rafters — only when stick framing, size auto-picked from span
-  { id: "shed_rafter_2x8", label: "Side shed: 2×8 SYP rafter (span ≤12')", cat: "Side shed", uom: "LF", packSize: null,
+  // Rafters — stick: builder-selected lumber size · cypress: timber size (both cut to top chord)
+  { id: "shed_rafter_2x8", label: "Side shed: stick rafter (SYP)", cat: "Side shed", uom: "LF", packSize: null,
     priceCost: 1.65, priceSell: 2.10, priceRetail: 2.80,
+    labelFn: i => {
+      const s = i.shed || {};
+      return `Side shed: ${shedSizeLabel(s.rafterSize || '2x8')} SYP stick rafter @ ${s.spacing_in || 16}" OC (cut to top chord)`;
+    },
+    customUnitPrice: i => shedMemberCostLF('lumber', (i.shed || {}).rafterSize || '2x8'),
     formula: i => {
-      if (!i.shedActive || i.shed.framing !== 'stick' || i.shed.rafterSize !== '2x8') return 0;
+      if (!i.shedActive || i.shed.framing !== 'stick') return 0;
       return Math.ceil(i.shed.rafterCount * i.shed.rafterCutLength * 1.05);
     }},
-  { id: "shed_rafter_2x10", label: "Side shed: 2×10 SYP rafter (span >12')", cat: "Side shed", uom: "LF", packSize: null,
+  { id: "shed_rafter_cypress", label: "Side shed: cypress timber rafter", cat: "Side shed", uom: "LF", packSize: null,
+    priceCost: 6.50, priceSell: 8.20, priceRetail: 10.20,
+    labelFn: i => {
+      const s = i.shed || {};
+      return `Side shed: ${shedSizeLabel(s.rafterSize || '4x6')} cypress timber rafter @ ${s.spacing_in || 48}" OC (cut to top chord)`;
+    },
+    customUnitPrice: i => shedMemberCostLF('cypress', (i.shed || {}).rafterSize || '4x6'),
+    formula: i => {
+      if (!i.shedActive || i.shed.framing !== 'cypress') return 0;
+      return Math.ceil(i.shed.rafterCount * i.shed.rafterCutLength * 1.05);
+    }},
+  // Rafter carrier — beam across the outboard posts the rafters bear on
+  { id: "shed_carrier", label: "Side shed: rafter carrier (on posts)", cat: "Side shed", uom: "LF", packSize: null,
     priceCost: 2.45, priceSell: 3.10, priceRetail: 4.10,
+    labelFn: i => {
+      const s = i.shed || {};
+      return `Side shed: rafter carrier — ${shedSizeLabel(s.carrierSize || 'dbl2x10')} ${shedMatLabel(s.carrierMaterial || 'lumber')} (on posts)`;
+    },
+    customUnitPrice: i => {
+      const s = i.shed || {};
+      const sz = s.carrierSize || 'dbl2x10';
+      const dim = String(sz).indexOf('dbl') === 0 ? sz.slice(3) : sz;
+      return shedMemberCostLF(s.carrierMaterial || 'lumber', dim);
+    },
     formula: i => {
-      if (!i.shedActive || i.shed.framing !== 'stick' || i.shed.rafterSize !== '2x10') return 0;
-      return Math.ceil(i.shed.rafterCount * i.shed.rafterCutLength * 1.05);
+      if (!i.shedActive) return 0;
+      const plies = String(i.shed.carrierSize || 'dbl2x10').indexOf('dbl') === 0 ? 2 : 1;
+      return Math.ceil(i.shed.L * plies * 1.05);
     }},
+  // Ledger band bolted to the main building wall — what the rafter high ends tie to
+  { id: "shed_ledger", label: "Side shed: ledger band at building", cat: "Side shed", uom: "LF", packSize: null,
+    priceCost: 3.00, priceSell: 3.80, priceRetail: 4.80,
+    labelFn: i => {
+      const s = i.shed || {};
+      return `Side shed: ledger band — ${shedSizeLabel(s.ledgerSize || '2x10')} ${shedMatLabel(s.ledgerMaterial || 'pt')} (rafter tie-in at main wall)`;
+    },
+    customUnitPrice: i => shedMemberCostLF((i.shed || {}).ledgerMaterial || 'pt', (i.shed || {}).ledgerSize || '2x10'),
+    formula: i => i.shedActive ? Math.ceil(i.shed.L * 1.05) : 0 },
   // Steel mono-slope trusses — only when steel framing
   { id: "shed_steel_truss", label: "Side shed: steel mono-slope truss", cat: "Side shed", uom: "ea", packSize: null,
     priceCost: 145, priceSell: 195, priceRetail: 250,
@@ -7384,11 +7536,13 @@ function onShedRoofFramingChange() {
   const sel = document.getElementById('shed_roof_framing');
   const spacingEl = document.getElementById('shed_rafter_spacing');
   if (!sel || !spacingEl) return;
-  if (sel.value === 'steel') {
-    spacingEl.value = 48;
-  } else {
-    spacingEl.value = 16;
-  }
+  if (sel.value === 'steel') spacingEl.value = 48;
+  else if (sel.value === 'cypress') spacingEl.value = 48;
+  else spacingEl.value = 16;
+  const rf = document.getElementById('shed-rafter-size-field');
+  const tf = document.getElementById('shed-timber-size-field');
+  if (rf) rf.style.display = sel.value === 'stick' ? '' : 'none';
+  if (tf) tf.style.display = sel.value === 'cypress' ? '' : 'none';
 }
 
 // =============================================================================
@@ -7924,7 +8078,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v206';
+const BB_VERSION = 'v207';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -11260,11 +11414,15 @@ function getInputs() {
     const shedPanelLF = shedPanelPieces * sTopChord;
     // Rafter/truss count
     const shedRafterCount = Math.ceil(sL / sSpacing_ft) + 1;
-    // Rafter lumber size (stick only)
+    // Rafter member size — stick: builder-selected (or auto by span); cypress: timber size
     let shedRafterSize = null, shedRafterCutLength = 0;
     if (sFraming === 'stick') {
-      shedRafterSize = sW <= 12 ? '2x8' : '2x10';
+      const selSize = (document.getElementById('shed_rafter_size') || {}).value || 'auto';
+      shedRafterSize = selSize === 'auto' ? (sW <= 12 ? '2x8' : '2x10') : selSize;
       shedRafterCutLength = sTopChord; // each rafter cut to top chord length
+    } else if (sFraming === 'cypress') {
+      shedRafterSize = (document.getElementById('shed_timber_size') || {}).value || '4x6';
+      shedRafterCutLength = sTopChord;
     }
     // Mono-slope steel truss count
     let shedSteelTrussCount = 0;
@@ -11272,14 +11430,11 @@ function getInputs() {
     // Lath/purlin LF on shed roof (post-frame style — for steel truss sheds with lath; stick rafter sheds may or may not need)
     const purlinRowsPerSlope = Math.ceil(sTopChord / 2); // 2 ft OC default
     const shedLathLF = purlinRowsPerSlope * sL;
-    // Outboard posts for post-frame shed walls (if post-frame is selected as main construction)
-    // Use main building's post spacing
-    const mainPostSpacing = num('post_spacing') || 10;
-    const shedPostCount = (currentConstruction === 'post')
-      ? Math.ceil(sL / mainPostSpacing) + 2  // outboard wall posts + 2 ends; +2 covers corners on outboard wall
-      : 0;
-    // Sakrete (post-frame only)
-    const shedSakreteBags = (currentConstruction === 'post') ? Math.ceil(shedPostCount * (num('bags_per_post') || 2)) : 0;
+    // Outboard posts ALWAYS carry the lean-to (any main construction) — builder-selected
+    // material, size and spacing (v207).
+    const shedPostSpacingFt = num('shed_post_spacing') || 8;
+    const shedPostCount = Math.ceil(sL / shedPostSpacingFt) + 1;
+    const shedSakreteBags = Math.ceil(shedPostCount * (num('bags_per_post') || 2));
     // Wall girts on outboard + end walls (only on post-frame shed)
     let shedGirtLF_SYP = 0, shedPTBandLF = 0;
     if (currentConstruction === 'post') {
@@ -11307,6 +11462,13 @@ function getInputs() {
       sakreteBags: shedSakreteBags,
       girtLF_SYP: shedGirtLF_SYP,
       ptBandLF: shedPTBandLF,
+      postMaterial: (document.getElementById('shed_post_material') || {}).value || 'pt',
+      postSize: (document.getElementById('shed_post_size') || {}).value || '6x6',
+      postSpacingFt: shedPostSpacingFt,
+      carrierMaterial: (document.getElementById('shed_carrier_material') || {}).value || 'lumber',
+      carrierSize: (document.getElementById('shed_carrier_size') || {}).value || 'dbl2x10',
+      ledgerMaterial: (document.getElementById('shed_ledger_material') || {}).value || 'pt',
+      ledgerSize: (document.getElementById('shed_ledger_size') || {}).value || '2x10',
     };
   }
   
@@ -12711,8 +12873,10 @@ function recalc() {
         : 'Enable the side shed to calculate totals.';
     } else {
       const s = i.shed;
-      const framingDesc = s.framing === 'stick' 
+      const framingDesc = s.framing === 'stick'
         ? `Stick rafters · ${s.rafterCount} × ${s.rafterSize} cut to ${s.rafterCutLength.toFixed(2)}'`
+        : s.framing === 'cypress'
+        ? `Cypress timber · ${s.rafterCount} × ${s.rafterSize} cut to ${s.rafterCutLength.toFixed(2)}' · carrier ${s.carrierSize}`
         : `Steel trusses · ${s.steelTrussCount} mono-slope @ ${s.spacing_in}" OC`;
       let html = '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px;">';
       html += `<div><div style="color: var(--text-3); font-size: 10px;">SHED ROOF AREA</div><div style="color: var(--copper); font-size: 14px;">${Math.round(s.roofArea)} sf</div></div>`;
@@ -12721,8 +12885,9 @@ function recalc() {
       html += `<div><div style="color: var(--text-3); font-size: 10px;">PANEL PIECES</div><div style="color: var(--copper); font-size: 14px;">${s.panelPieces}</div></div>`;
       html += '</div>';
       html += `<div style="font-size: 11px; color: var(--text-2);">${framingDesc}</div>`;
+      html += `<div style="font-size: 11px; color: var(--text-2); margin-top: 4px;">${s.postCount} × ${shedSizeLabel(s.postSize)} ${s.postMaterial === 'cypress' ? 'cypress' : 'PT'} posts @ ${s.postSpacingFt}' OC · ${s.sakreteBags} Sakrete bags · carrier ${shedSizeLabel(s.carrierSize)} ${shedMatLabel(s.carrierMaterial)} · ledger ${shedSizeLabel(s.ledgerSize)} ${shedMatLabel(s.ledgerMaterial)}</div>`;
       if (i.constructionType === 'post') {
-        html += `<div style="font-size: 11px; color: var(--text-2); margin-top: 4px;">Post-frame: ${s.postCount} × 6×6 PT posts · ${s.sakreteBags} Sakrete bags · ${Math.round(s.girtLF_SYP)} LF 2×6 girts · ${Math.round(s.ptBandLF)} LF PT band</div>`;
+        html += `<div style="font-size: 11px; color: var(--text-2); margin-top: 4px;">Post-frame walls: ${Math.round(s.girtLF_SYP)} LF 2×6 girts · ${Math.round(s.ptBandLF)} LF PT band</div>`;
       }
       shedSummaryEl.innerHTML = html;
     }
@@ -16664,14 +16829,25 @@ function buildSideShed(dims, wallBase) {
   slab.position.set(0, 0.25, sW / 2);
   addM(slab);
 
-  // Outboard 6×6 posts at ~8' OC
-  const postN = Math.max(2, Math.ceil(sL / 8) + 1);
+  // Outboard posts — builder-selected material, size and spacing
+  const CYPRESS_HEX = 0xd8b56e, PT_HEX = 0x8b6f47, SYP_HEX = 0xbe9352;
+  const sizeDims = { '4x4': [0.33, 0.33], '4x6': [0.33, 0.5], '6x6': [0.46, 0.46], '6x8': [0.46, 0.62], '8x8': [0.67, 0.67],
+                     '2x6': [0.13, 0.5], '2x8': [0.13, 0.62], '2x10': [0.13, 0.79], '2x12': [0.13, 0.96] };
+  const selVal = (id, dflt) => { const el = document.getElementById(id); return (el && el.value) || dflt; };
+  const matHex = m => m === 'cypress' ? CYPRESS_HEX : (m === 'pt' ? PT_HEX : SYP_HEX);
+  const pMat = selVal('shed_post_material', 'pt');
+  const pSize = selVal('shed_post_size', '6x6');
+  const pSpFt = n('shed_post_spacing') || 8;
+  const pDims = sizeDims[pSize] || sizeDims['6x6'];
+  const postN = Math.max(2, Math.ceil(sL / pSpFt) + 1);
   for (let p = 0; p < postN; p++) {
     const px = -sL / 2 + (sL / (postN - 1)) * p;
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.46, sH, 0.46),
-      new THREE.MeshStandardMaterial({ color: 0x8b6f47, roughness: 0.9 }));
-    post.position.set(px, wallBase + sH / 2, sW - 0.23);
-    addM(post);
+    const post = new THREE.Mesh(new THREE.BoxGeometry(pDims[0], sH, pDims[1]),
+      new THREE.MeshStandardMaterial({ color: matHex(pMat), roughness: 0.9 }));
+    post.position.set(px, wallBase + sH / 2, sW - pDims[1] / 2);
+    post.userData = { categoryKey: 'side_shed', label: `Shed post — ${pSize.replace('x','×')} ${pMat === 'cypress' ? 'cypress' : 'PT'}` };
+    post.castShadow = post.receiveShadow = true;
+    grp.add(post); allMeshes.push(post);
   }
 
   // Shed FRAMING — rafters, outboard header, girt rows. isFraming → frame view only.
@@ -16681,22 +16857,51 @@ function buildSideShed(dims, wallBase) {
     const sp = Math.max(0.5, spIn / 12);
     const rl = slopeLen;
     const nR = Math.ceil(sL / sp);
+    // Rafter cross-section + color follow the framing choice (stick lumber vs cypress timber)
+    const framing = selVal('shed_roof_framing', 'stick');
+    let rDims = [0.13, 0.62], rHex = 0xd2ad79, rLabel = 'Shed rafter';
+    if (framing === 'cypress') {
+      const t = selVal('shed_timber_size', '4x6');
+      rDims = sizeDims[t] || sizeDims['4x6'];
+      rHex = CYPRESS_HEX;
+      rLabel = `Shed cypress timber rafter — ${t.replace('x','×')}`;
+    } else if (framing === 'stick') {
+      const rs = selVal('shed_rafter_size', 'auto');
+      const eff = rs === 'auto' ? (sW <= 12 ? '2x8' : '2x10') : rs;
+      rDims = sizeDims[eff] || sizeDims['2x8'];
+      rLabel = `Shed stick rafter — ${eff.replace('x','×')}`;
+    }
     for (let r2 = 0; r2 <= nR; r2++) {
       const rx = -sL / 2 + Math.min(sL, r2 * sp);
-      const raf = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.62, rl), lumberM(0xd2ad79));
+      const raf = new THREE.Mesh(new THREE.BoxGeometry(rDims[0], rDims[1], rl), lumberM(rHex));
       raf.rotation.x = angle;
       raf.position.set(rx,
         wallBase + hHigh - 0.25 - Math.sin(angle) * (rl / 2),
         Math.cos(angle) * (rl / 2) - 0.1);
       raf.castShadow = raf.receiveShadow = true;
-      raf.userData = { categoryKey: 'side_shed', label: 'Shed rafter', isFraming: true };
+      raf.userData = { categoryKey: 'side_shed', label: rLabel, isFraming: true };
       grp.add(raf); allMeshes.push(raf);
     }
-    const hdr2 = new THREE.Mesh(new THREE.BoxGeometry(sL, 0.62, 0.26), lumberM(0xbe9352));
-    hdr2.position.set(0, wallBase + sH - 0.31, sW - 0.2);
+    // Rafter carrier on the posts — size/material follow the selections
+    const cMat = selVal('shed_carrier_material', 'lumber');
+    const cSize = selVal('shed_carrier_size', 'dbl2x10');
+    const cDim = cSize.indexOf('dbl') === 0 ? cSize.slice(3) : cSize;
+    const cDims = sizeDims[cDim] || sizeDims['2x10'];
+    const cThick = cSize.indexOf('dbl') === 0 ? cDims[0] * 2 : cDims[0];
+    const hdr2 = new THREE.Mesh(new THREE.BoxGeometry(sL, cDims[1], Math.max(0.26, cThick)), lumberM(matHex(cMat)));
+    hdr2.position.set(0, wallBase + sH - cDims[1] / 2, sW - 0.2);
     hdr2.castShadow = hdr2.receiveShadow = true;
-    hdr2.userData = { categoryKey: 'side_shed', label: 'Shed outboard header (2-ply)', isFraming: true };
+    hdr2.userData = { categoryKey: 'side_shed', label: `Shed rafter carrier — ${cSize.indexOf('dbl') === 0 ? 'double ' + cDim.replace('x','×') : cDim.replace('x','×')} ${cMat === 'cypress' ? 'cypress' : (cMat === 'pt' ? 'PT' : 'SYP')}`, isFraming: true };
     grp.add(hdr2); allMeshes.push(hdr2);
+    // Ledger band on the main wall — the rafter tie-in
+    const lMat = selVal('shed_ledger_material', 'pt');
+    const lSize = selVal('shed_ledger_size', '2x10');
+    const lDims = sizeDims[lSize] || sizeDims['2x10'];
+    const ledger = new THREE.Mesh(new THREE.BoxGeometry(sL, lDims[1], Math.max(0.14, lDims[0])), lumberM(matHex(lMat)));
+    ledger.position.set(0, wallBase + hHigh - 0.3 - lDims[1] / 2, 0.1);
+    ledger.castShadow = ledger.receiveShadow = true;
+    ledger.userData = { categoryKey: 'side_shed', label: `Shed ledger band — ${lSize.replace('x','×')} ${lMat === 'cypress' ? 'cypress' : (lMat === 'pt' ? 'PT' : 'SYP')}`, isFraming: true };
+    grp.add(ledger); allMeshes.push(ledger);
     for (let gy = wallBase + 2; gy < wallBase + sH - 0.7; gy += 2) {
       const g3 = new THREE.Mesh(new THREE.BoxGeometry(sL, 0.42, 0.13), lumberM(0xcdaa76));
       g3.position.set(0, gy, sW + 0.03);
