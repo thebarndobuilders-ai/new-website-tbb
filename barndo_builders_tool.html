@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v211</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v212</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2640,23 +2640,47 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
       <h3>Porches / timber porches <span class="badge">Open structure · posts + roof, no walls · any build</span></h3>
       <p class="qbs-sub" style="margin-bottom: 16px;">Enter porch dimensions and where it attaches — sqft, post count and beam count auto-figure (manual entries below override). <strong style="color: var(--copper);">Cypress timber frame</strong> adds 8×8 decorative posts, 4×6 beams, T&amp;G ceiling, and decorative post bases — Rainey-style build.</p>
 
-      <div class="qbs-grid-4" style="margin-bottom: 16px;">
-        <div class="qbs-field"><label>Porch depth (ft)</label><input type="number" id="porch_width" value="0" step="0.5" oninput="recalc()" /><div class="qbs-note">Out from the main wall</div></div>
-        <div class="qbs-field"><label>Porch length (ft)</label><input type="number" id="porch_length" value="0" step="0.5" oninput="recalc()" /><div class="qbs-note">Along the main wall</div></div>
+      <div style="font-family: var(--font-headline); font-size: 13px; color: var(--copper); margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 0.06em;">Porch placement — enable any side</div>
+      <div class="qbs-grid-4" style="margin-bottom: 12px;">
         <div class="qbs-field">
-          <label>Attached side</label>
-          <select id="porch_attached_side" onchange="recalc()">
-            <option value="front">Front (long wall)</option>
-            <option value="back">Back (long wall)</option>
-            <option value="left">Left (gable end)</option>
-            <option value="right">Right (gable end)</option>
-          </select>
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="porch_front_on" onchange="recalc()" style="width:15px;height:15px;"> Front (long wall)</label>
+          <div style="display:flex; gap:6px; margin-top:4px;">
+            <input type="number" id="porch_front_depth" value="8" step="0.5" oninput="recalc()" title="Depth out from the wall (ft)" />
+            <input type="number" id="porch_front_len" value="0" step="0.5" oninput="recalc()" title="Length along the wall (ft) — 0 = full wall" />
+          </div>
+          <div class="qbs-note">Depth · length (0 = full wall)</div>
         </div>
+        <div class="qbs-field">
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="porch_back_on" onchange="recalc()" style="width:15px;height:15px;"> Back (long wall)</label>
+          <div style="display:flex; gap:6px; margin-top:4px;">
+            <input type="number" id="porch_back_depth" value="8" step="0.5" oninput="recalc()" title="Depth out from the wall (ft)" />
+            <input type="number" id="porch_back_len" value="0" step="0.5" oninput="recalc()" title="Length along the wall (ft) — 0 = full wall" />
+          </div>
+          <div class="qbs-note">Depth · length (0 = full wall)</div>
+        </div>
+        <div class="qbs-field">
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="porch_left_on" onchange="recalc()" style="width:15px;height:15px;"> Left (gable end)</label>
+          <div style="display:flex; gap:6px; margin-top:4px;">
+            <input type="number" id="porch_left_depth" value="8" step="0.5" oninput="recalc()" title="Depth out from the wall (ft)" />
+            <input type="number" id="porch_left_len" value="0" step="0.5" oninput="recalc()" title="Length along the wall (ft) — 0 = full wall" />
+          </div>
+          <div class="qbs-note">Depth · length (0 = full wall)</div>
+        </div>
+        <div class="qbs-field">
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="porch_right_on" onchange="recalc()" style="width:15px;height:15px;"> Right (gable end)</label>
+          <div style="display:flex; gap:6px; margin-top:4px;">
+            <input type="number" id="porch_right_depth" value="8" step="0.5" oninput="recalc()" title="Depth out from the wall (ft)" />
+            <input type="number" id="porch_right_len" value="0" step="0.5" oninput="recalc()" title="Length along the wall (ft) — 0 = full wall" />
+          </div>
+          <div class="qbs-note">Depth · length (0 = full wall)</div>
+        </div>
+      </div>
+      <div class="qbs-grid-3" style="margin-bottom: 12px;">
         <div class="qbs-field"><label>Post spacing (ft)</label><input type="number" id="porch_post_spacing" value="10" step="0.5" oninput="recalc()" /></div>
         <div class="qbs-field"><label>Roof pitch (X/12)</label><input type="number" id="porch_pitch" value="3" step="0.5" oninput="recalc()" /></div>
         <div class="qbs-field"><label>Post height (ft)</label><input type="number" id="porch_post_height" value="9" step="0.5" oninput="recalc()" /><div class="qbs-note">Height at the outboard posts</div></div>
       </div>
-      <div class="qbs-note" style="margin-bottom: 16px;">Porch sqft auto-fills from depth × length (falls back to the Porch area field on Building geometry). Porches are open — posts and roof only, no walls. Need an enclosed addition? Use the Side shed / lean-to card.</div>
+      <div class="qbs-note" style="margin-bottom: 16px;"><strong style="color: var(--copper);">Wrap-around:</strong> enable two touching sides at full-wall length and the roofs tie together with a <strong>hip</strong> at the shared corner — hip framing auto-counts and the corner posts merge. Porch sqft auto-figures from all enabled sides (falls back to the Porch area field on Building geometry). Porches are open — posts and roof, no walls; for an enclosed addition use the Side shed / lean-to card.</div>
 
       <div style="margin-bottom: 20px;">
         <label style="display: block; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px;">Construction style</label>
@@ -5977,16 +6001,15 @@ const MATERIALS = [
   // pricing through the Cypress timber porch catalog lines.
   { id: "porch_post_pt", label: "Porch: 6×6 PT post", cat: "Porch framing", uom: "ea", packSize: null,
     priceCost: 61.97, priceSell: 78, priceRetail: 95,
-    labelFn: i => `Porch: 6×6 PT post @ ${(i.porchDims || {}).postSpacingFt || 10}' OC`,
+    labelFn: i => `Porch: 6×6 PT post @ ${(i.porchDims || {}).postSpacingFt || 10}' OC (all porch sides)`,
     customUnitPrice: i => {
       const d = i.porchDims || {};
       const stockLen = Math.max(8, Math.ceil(((d.postH || 9) + 4) / 2) * 2);
       return shedMemberCostLF('pt', '6x6') * stockLen;
     },
     formula: i => {
-      const d = i.porchDims || {};
-      if (i.porchConstruction !== 'stick' || !(d.W > 0 && d.L > 0)) return 0;
-      return Math.ceil(d.L / (d.postSpacingFt || 10)) + 1;
+      if (i.porchConstruction !== 'stick' || !i.porchAgg || !i.porchAgg.count) return 0;
+      return i.porchAgg.postCount;
     }},
   { id: "porch_carrier", label: "Porch: rafter carrier / header (on posts)", cat: "Porch framing", uom: "LF", packSize: null,
     priceCost: 2.45, priceSell: 3.10, priceRetail: 4.10,
@@ -5997,42 +6020,40 @@ const MATERIALS = [
       return shedMemberCostLF('lumber', dim);
     },
     formula: i => {
-      const d = i.porchDims || {};
-      if (i.porchConstruction !== 'stick' || !(d.W > 0 && d.L > 0)) return 0;
-      const plies = String(d.headerSize || 'dbl2x10').indexOf('dbl') === 0 ? 2 : 1;
-      return Math.ceil(d.L * plies * 1.05);
+      if (i.porchConstruction !== 'stick' || !i.porchAgg || !i.porchAgg.count) return 0;
+      const plies = String((i.porchDims || {}).headerSize || 'dbl2x10').indexOf('dbl') === 0 ? 2 : 1;
+      return Math.ceil(i.porchAgg.edgeLF * plies * 1.05);
     }},
   { id: "porch_rafter_2x8", label: "Porch: SYP rafter @ 16\" OC (cut to slope + 1' tail)", cat: "Porch framing", uom: "LF", packSize: null,
     priceCost: 1.65, priceSell: 2.10, priceRetail: 2.80,
     labelFn: i => `Porch: ${shedSizeLabel((i.porchDims || {}).rafterSize || '2x8')} SYP rafter @ 16" OC (cut to slope + 1' tail)`,
     customUnitPrice: i => shedMemberCostLF('lumber', (i.porchDims || {}).rafterSize || '2x8'),
     formula: i => {
-      const d = i.porchDims || {};
-      if (i.porchConstruction !== 'stick' || !(d.W > 0 && d.L > 0)) return 0;
-      const rise = d.W * ((d.pitch || 3) / 12);
-      const cutLen = Math.sqrt(d.W * d.W + rise * rise) + 1;
-      const count = Math.ceil(d.L / (16 / 12)) + 1;
-      return Math.ceil(count * cutLen * 1.05);
+      if (i.porchConstruction !== 'stick' || !i.porchAgg || !i.porchAgg.count) return 0;
+      return Math.ceil(i.porchAgg.rafterLF * 1.05);
+    }},
+  { id: "porch_hip_rafter", label: "Porch: hip rafter (wrap-around corners, 2-ply)", cat: "Porch framing", uom: "LF", packSize: null,
+    priceCost: 2.45, priceSell: 3.10, priceRetail: 4.10,
+    labelFn: i => `Porch: hip rafter — doubled ${shedSizeLabel((i.porchDims || {}).rafterSize || '2x8')} SYP (${(i.porchAgg || {}).hipCount || 0} wrap corner${((i.porchAgg || {}).hipCount || 0) === 1 ? '' : 's'})`,
+    customUnitPrice: i => shedMemberCostLF('lumber', (i.porchDims || {}).rafterSize || '2x8'),
+    formula: i => {
+      if (i.porchConstruction !== 'stick' || !i.porchAgg || !i.porchAgg.hipCount) return 0;
+      return Math.ceil(i.porchAgg.hipLF * 2 * 1.05);   // 2-ply hip beams
     }},
   { id: "porch_lath", label: "Porch: roof lathing (rows @ 2' OC up the slope)", cat: "Porch framing", uom: "LF", packSize: null,
     priceCost: 0.55, priceSell: 0.75, priceRetail: 0.95,
     labelFn: i => `Porch: ${shedSizeLabel((i.porchDims || {}).lathSize || '2x4')} SYP roof lathing (rows @ 2' OC up the slope)`,
     customUnitPrice: i => shedMemberCostLF('lumber', (i.porchDims || {}).lathSize || '2x4'),
     formula: i => {
-      const d = i.porchDims || {};
-      if (i.porchConstruction !== 'stick' || !(d.W > 0 && d.L > 0)) return 0;
-      if ((d.lathSize || '2x4') === 'none') return 0;
-      const rise = d.W * ((d.pitch || 3) / 12);
-      const slope = Math.sqrt(d.W * d.W + rise * rise) + 1;
-      const rows = Math.ceil(slope / 2) + 1;
-      return Math.ceil(rows * d.L * 1.05);
+      if (i.porchConstruction !== 'stick' || !i.porchAgg || !i.porchAgg.count) return 0;
+      if (((i.porchDims || {}).lathSize || '2x4') === 'none') return 0;
+      return Math.ceil(i.porchAgg.lathLF * 1.05);
     }},
   { id: "porch_ledger_pt", label: "Porch: 2×10 PT ledger band at building (rafter tie-in)", cat: "Porch framing", uom: "LF", packSize: null,
     priceCost: 3.00, priceSell: 3.80, priceRetail: 4.80,
     formula: i => {
-      const d = i.porchDims || {};
-      if (i.porchConstruction !== 'stick' || !(d.W > 0 && d.L > 0)) return 0;
-      return Math.ceil(d.L * 1.05);
+      if (i.porchConstruction !== 'stick' || !i.porchAgg || !i.porchAgg.count) return 0;
+      return Math.ceil(i.porchAgg.edgeLF * 1.05);
     }},
   // Steel mono-slope trusses — only when steel framing
   { id: "shed_steel_truss", label: "Side shed: steel mono-slope truss", cat: "Side shed", uom: "ea", packSize: null,
@@ -8215,7 +8236,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v211';
+const BB_VERSION = 'v212';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -11719,43 +11740,72 @@ function getInputs() {
     footprint: numEff('footprint'),
     living: numEff('living_sqft'),
     garageSqft: numEff('garage_sqft'),
-    porchSqft: (() => { const w = num('porch_width'), l = num('porch_length'); return (w > 0 && l > 0) ? w * l : numEff('porch_sqft'); })(),
+    get porchSqft() { const a = this.porchAgg; return a.sqft > 0 ? a.sqft : numEff('porch_sqft'); },
     shopSqft: numEff('shop_sqft'),
     standaloneShedMode: _standaloneShed,
-    // Porch geometry + placement (v210) — drives auto counts, stick-porch framing and the 3D render
-    porchDims: (() => {
-      const w = num('porch_width'), l = num('porch_length');
-      return {
-        W: w, L: l,
-        side: (document.getElementById('porch_attached_side') || {}).value || 'front',
-        postSpacingFt: num('porch_post_spacing') || 10,
-        pitch: num('porch_pitch') || 3,
-        postH: num('porch_post_height') || 9,
-        rafterSize: (document.getElementById('porch_rafter_size') || {}).value || '2x8',
-        headerSize: (document.getElementById('porch_header_size') || {}).value || 'dbl2x10',
-        lathSize: (document.getElementById('porch_lath_size') || {}).value || '2x4',
-      };
+    // Shared porch config (sizes apply to every enabled porch side)
+    porchDims: {
+      postSpacingFt: num('porch_post_spacing') || 10,
+      pitch: num('porch_pitch') || 3,
+      postH: num('porch_post_height') || 9,
+      rafterSize: (document.getElementById('porch_rafter_size') || {}).value || '2x8',
+      headerSize: (document.getElementById('porch_header_size') || {}).value || 'dbl2x10',
+      lathSize: (document.getElementById('porch_lath_size') || {}).value || '2x4',
+    },
+    // Multi-porch aggregate (v212): one slot per side; adjacent FULL-length porches tie
+    // with a hip at the shared corner (wrap-around) — hip framing + corner sqft included,
+    // shared corner post merged (one fewer post per hip).
+    porchAgg: (() => {
+      const sp = num('porch_post_spacing') || 10;
+      const pitch = num('porch_pitch') || 3;
+      const sides = [];
+      ['front', 'back', 'left', 'right'].forEach(side => {
+        const el = document.getElementById('porch_' + side + '_on');
+        if (!el || !el.checked) return;
+        const d = num('porch_' + side + '_depth') || 8;
+        const wallLen = (side === 'front' || side === 'back') ? L : W;
+        const lRaw = num('porch_' + side + '_len');
+        const len = (lRaw > 0 && lRaw < wallLen) ? lRaw : wallLen;
+        sides.push({ side, W: d, L: len, full: len >= wallLen });
+      });
+      const bySide = {};
+      sides.forEach(p => { bySide[p.side] = p; });
+      let hipCount = 0, hipLF = 0, cornerSqft = 0;
+      [['front', 'right'], ['right', 'back'], ['back', 'left'], ['left', 'front']].forEach(pair => {
+        const pa = bySide[pair[0]], pb = bySide[pair[1]];
+        if (pa && pb && pa.full && pb.full) {
+          const d = (pa.W + pb.W) / 2;
+          hipCount++;
+          hipLF += Math.ceil(Math.sqrt(2 * d * d + Math.pow(d * pitch / 12, 2)) + 1);
+          cornerSqft += d * d;
+        }
+      });
+      let sqft = cornerSqft, postCount = 0, beamCount = 0, edgeLF = 0, rafterLF = 0, lathLF = 0;
+      sides.forEach(p => {
+        sqft += p.W * p.L;
+        postCount += Math.ceil(p.L / sp) + 1;
+        beamCount += Math.ceil(p.L / 4) + 1;
+        edgeLF += p.L;
+        const rise = p.W * (pitch / 12);
+        const cut = Math.sqrt(p.W * p.W + rise * rise) + 1;
+        rafterLF += (Math.ceil(p.L / (16 / 12)) + 1) * cut;
+        lathLF += (Math.ceil(cut / 2) + 1) * p.L;
+      });
+      postCount = Math.max(0, postCount - hipCount);   // merged corner posts
+      return { sides, count: sides.length, sqft: Math.round(sqft), postCount, beamCount,
+               edgeLF: Math.ceil(edgeLF), rafterLF: Math.ceil(rafterLF), lathLF: Math.ceil(lathLF),
+               hipCount, hipLF };
     })(),
     // Cypress timber-frame porch inputs (only meaningful when porchConstruction === 'cypress')
     porchConstruction: currentPorchConstruction,
-    cypressPorchActive: currentPorchConstruction === 'cypress' && (num('porch_sqft') > 0 || (num('porch_width') > 0 && num('porch_length') > 0)),
-    cypressPostCount: (() => {
-      const manual = num('cypress_post_count');
-      if (manual > 0) return manual;
-      const l = num('porch_length');
-      return l > 0 ? Math.ceil(l / (num('porch_post_spacing') || 10)) + 1 : 0;
-    })(),
+    get cypressPorchActive() { return currentPorchConstruction === 'cypress' && (this.porchAgg.sqft > 0 || num('porch_sqft') > 0); },
+    get cypressPostCount() { const m = num('cypress_post_count'); return m > 0 ? m : this.porchAgg.postCount; },
     cypressPostHeight: (document.getElementById('cypress_post_height') || {}).value || '10',
-    cypressBeamCount: (() => {
-      const manual = num('cypress_beam_count');
-      if (manual > 0) return manual;
-      const l = num('porch_length');
-      return l > 0 ? Math.ceil(l / 4) + 1 : 0;   // ceiling joists ~48" OC
-    })(),
+    get cypressBeamCount() { const m = num('cypress_beam_count'); return m > 0 ? m : this.porchAgg.beamCount; },
     cypressBeamLength: (document.getElementById('cypress_beam_length') || {}).value || '10',
     cypressCeiling: (document.getElementById('cypress_ceiling') || {}).value || 'syp',
     cypressPostBases: (document.getElementById('cypress_post_bases') || {}).value || 'yes',
-    cypressHipCount: num('cypress_hip_count'),
+    get cypressHipCount() { const m = num('cypress_hip_count'); return m > 0 ? m : this.porchAgg.hipCount; },
     cypressHipLength: num('cypress_hip_length') || 14,
     cypressRidgeMaterial: (document.getElementById('cypress_ridge_material') || {}).value || 'match',
     cypressStyle: currentCypressStyle, // 'shed' or 'gable'
@@ -16967,99 +17017,162 @@ function generateModel() {
 // Side shed / lean-to from the Additions tab: single slope off one wall of the main
 // building. Built in local space (attach line at z=0, sloping outward toward +z,
 // length along x), then rotated/positioned onto the chosen wall.
-// Open porch (v210): posts + carrier + ledger + rafters + roof plane on the chosen side.
-// No walls — porches are open structures. Cypress style renders honey 8×8s and 4×6 rafters;
-// stick style renders PT 6×6 posts and 2×8 lumber rafters.
+// Multi-porch renderer (v212): one open porch per enabled side, wrap-around hips at
+// shared corners, and a real timber-frame look for cypress (8x8 posts, knee braces,
+// 4x6 rafters, T&G ceiling in warm wood tones).
 function buildPorch3D(dims, wallBase) {
   const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
-  const pW = n('porch_width'), pL = n('porch_length');
-  if (!(pW > 0 && pL > 0)) return;
-  const side = (document.getElementById('porch_attached_side') || {}).value || 'front';
+  const on = id => { const el = document.getElementById(id); return !!(el && el.checked); };
+  const { L, W } = dims;
+  const sides = [];
+  ['front', 'back', 'left', 'right'].forEach(side => {
+    if (!on('porch_' + side + '_on')) return;
+    const d = n('porch_' + side + '_depth') || 8;
+    const wallLen = (side === 'front' || side === 'back') ? L : W;
+    const lRaw = n('porch_' + side + '_len');
+    const len = (lRaw > 0 && lRaw < wallLen) ? lRaw : wallLen;
+    sides.push({ side, d, len, full: len >= wallLen });
+  });
+  if (!sides.length) return;
   const spFt = n('porch_post_spacing') || 10;
   const pitch = n('porch_pitch') || 3;
   const postH = n('porch_post_height') || 9;
   const styleBtn = document.querySelector('[data-porchtype].active');
   const isCypress = !!(styleBtn && styleBtn.dataset.porchtype === 'cypress');
-  const { L, W } = dims;
   const colors = bb3dSelectedColors();
-  const rise = pW * (pitch / 12);
-  const angle = Math.atan(pitch / 12);
-  const hHigh = postH + rise;                        // roof meets the main wall here
-  const slopeLen = Math.sqrt(pW * pW + rise * rise) + 1 / Math.cos(angle);   // +1' tail
-
-  const grp = new THREE.Group();
-  const ud = { categoryKey: 'side_shed', label: isCypress ? 'Cypress timber porch' : 'Porch (stick framed)' };
-  const addP = m => { m.castShadow = m.receiveShadow = true; if (!m.userData || !m.userData.label) m.userData = ud; grp.add(m); allMeshes.push(m); };
   const woodM = hex => new THREE.MeshStandardMaterial({ color: hex, roughness: 0.9 });
   const POST_HEX = isCypress ? 0xd8b56e : 0x8b6f47;
-  const postT = isCypress ? 0.67 : 0.46;             // 8×8 cypress vs 6×6 PT
-
-  // Slab pad
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(pL, 0.4, pW),
-    new THREE.MeshStandardMaterial({ color: CATEGORY_COLORS.foundation.hex, roughness: 0.95 }));
-  slab.position.set(0, 0.2, pW / 2);
-  addP(slab);
-
-  // Posts along the outboard edge
-  const postN = Math.max(2, Math.ceil(pL / spFt) + 1);
-  for (let p = 0; p < postN; p++) {
-    const px = -pL / 2 + (pL / (postN - 1)) * p;
-    const post = new THREE.Mesh(new THREE.BoxGeometry(postT, postH, postT), woodM(POST_HEX));
-    post.position.set(px, wallBase + postH / 2, pW - postT / 2);
-    post.userData = { categoryKey: 'side_shed', label: isCypress ? 'Porch post — 8×8 cypress' : 'Porch post — 6×6 PT' };
-    addP(post);
-  }
-
-  // Carrier beam across the post tops — stick size follows the header select
+  const RAFT_HEX = isCypress ? 0xd8b56e : 0xd2ad79;
+  const postT = isCypress ? 0.67 : 0.46;
+  const rafSel = (document.getElementById('porch_rafter_size') || {}).value || '2x8';
+  const rafH = ({ '2x6': 0.5, '2x8': 0.62, '2x10': 0.79, '2x12': 0.96 })[rafSel] || 0.62;
   const hdrSel = (document.getElementById('porch_header_size') || {}).value || 'dbl2x10';
   const hdrDim = hdrSel.indexOf('dbl') === 0 ? hdrSel.slice(3) : hdrSel;
   const hdrH = ({ '2x8': 0.62, '2x10': 0.79, '2x12': 0.96 })[hdrDim] || 0.79;
-  const carrier = new THREE.Mesh(new THREE.BoxGeometry(pL, isCypress ? 0.5 : hdrH, isCypress ? 0.5 : 0.26), woodM(isCypress ? 0xd8b56e : 0xbe9352));
-  carrier.position.set(0, wallBase + postH - 0.3, pW - 0.25);
-  carrier.userData = { categoryKey: 'side_shed', label: isCypress ? 'Porch carrier — cypress' : 'Porch carrier — double ' + hdrDim.replace('x', '×'), isFraming: false };
-  addP(carrier);
+  const bySide = {};
+  sides.forEach(p => { bySide[p.side] = p; });
 
-  // Ledger at the main wall
-  const ledger = new THREE.Mesh(new THREE.BoxGeometry(pL, 0.79, 0.14), woodM(0x8b6f47));
-  ledger.position.set(0, wallBase + hHigh - 0.6, 0.1);
-  ledger.userData = { categoryKey: 'side_shed', label: 'Porch ledger band at building' };
-  addP(ledger);
+  sides.forEach(p => {
+    const rise = p.d * (pitch / 12);
+    const angle = Math.atan(pitch / 12);
+    const hHigh = postH + rise;
+    const slopeLen = Math.sqrt(p.d * p.d + rise * rise) + 1 / Math.cos(angle);
+    const grp = new THREE.Group();
+    const baseLabel = isCypress ? 'Cypress timber porch' : 'Porch (stick framed)';
+    const addP = (m, lbl) => { m.castShadow = m.receiveShadow = true; m.userData = { categoryKey: 'side_shed', label: lbl || baseLabel }; grp.add(m); allMeshes.push(m); };
 
-  // Rafters — cypress 4×6 @48" or lumber @16" in the selected size
-  const rSp = isCypress ? 4 : 16 / 12;
-  const rN = Math.ceil(pL / rSp);
-  const rafSel = (document.getElementById('porch_rafter_size') || {}).value || '2x8';
-  const rafH = ({ '2x6': 0.5, '2x8': 0.62, '2x10': 0.79, '2x12': 0.96 })[rafSel] || 0.62;
-  const rDims = isCypress ? [0.33, 0.5] : [0.13, rafH];
-  for (let r = 0; r <= rN; r++) {
-    const rx = -pL / 2 + Math.min(pL, r * rSp);
-    const raf = new THREE.Mesh(new THREE.BoxGeometry(rDims[0], rDims[1], slopeLen), woodM(isCypress ? 0xd8b56e : 0xd2ad79));
-    raf.rotation.x = angle;
-    raf.position.set(rx,
-      wallBase + hHigh - 0.25 - Math.sin(angle) * (slopeLen / 2),
-      Math.cos(angle) * (slopeLen / 2) - 0.1);
-    raf.userData = { categoryKey: 'side_shed', label: isCypress ? 'Porch rafter — 4×6 cypress' : 'Porch rafter — ' + rafSel.replace('x', '×'), isFraming: false };
-    addP(raf);
-  }
+    // Slab pad
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(p.len, 0.4, p.d),
+      new THREE.MeshStandardMaterial({ color: CATEGORY_COLORS.foundation.hex, roughness: 0.95 }));
+    slab.position.set(0, 0.2, p.d / 2);
+    addP(slab, 'Porch slab');
 
-  // Roof plane in the roof color
-  const rTex = makeTuffRibTexture(true, colors.roof);
-  rTex.repeat.set(pL / 3, 1);
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(pL + 0.4, 0.1, slopeLen),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, map: rTex, roughness: 0.30, metalness: 0.55 }));
-  roof.rotation.x = angle;
-  roof.position.set(0,
-    wallBase + hHigh + 0.1 - Math.sin(angle) * (slopeLen / 2),
-    Math.cos(angle) * (slopeLen / 2) - 0.1);
-  roof.userData = { categoryKey: 'side_shed', label: 'Porch roof' };
-  addP(roof);
+    // Posts + (cypress) knee braces
+    const postN = Math.max(2, Math.ceil(p.len / spFt) + 1);
+    for (let k = 0; k < postN; k++) {
+      const px = -p.len / 2 + (p.len / (postN - 1)) * k;
+      const post = new THREE.Mesh(new THREE.BoxGeometry(postT, postH, postT), woodM(POST_HEX));
+      post.position.set(px, wallBase + postH / 2, p.d - postT / 2);
+      addP(post, isCypress ? 'Porch post — 8×8 cypress' : 'Porch post — 6×6 PT');
+      if (isCypress) {
+        [-1, 1].forEach(sgn => {
+          const br = new THREE.Mesh(new THREE.BoxGeometry(0.29, 3.1, 0.29), woodM(0xcfa95f));
+          br.rotation.z = sgn * Math.PI / 4;
+          br.position.set(px + sgn * 1.05, wallBase + postH - 1.4, p.d - postT / 2);
+          addP(br, 'Cypress knee brace — 4×6');
+        });
+      }
+    }
 
-  // Place onto the chosen wall (same transform as the side shed)
-  if (side === 'front')      { grp.rotation.y = 0;            grp.position.set(0, 0,  W / 2); }
-  else if (side === 'back')  { grp.rotation.y = Math.PI;      grp.position.set(0, 0, -W / 2); }
-  else if (side === 'right') { grp.rotation.y = Math.PI / 2;  grp.position.set( L / 2, 0, 0); }
-  else                       { grp.rotation.y = -Math.PI / 2; grp.position.set(-L / 2, 0, 0); }
-  buildingGroup.add(grp);
+    // Carrier on the posts
+    const carrier = new THREE.Mesh(
+      new THREE.BoxGeometry(p.len, isCypress ? 0.67 : hdrH, isCypress ? 0.67 : 0.26),
+      woodM(isCypress ? 0xd8b56e : 0xbe9352));
+    carrier.position.set(0, wallBase + postH - 0.3, p.d - 0.3);
+    addP(carrier, isCypress ? 'Porch carrier — 8×8 cypress beam' : 'Porch carrier — double ' + hdrDim.replace('x', '×'));
+
+    // Ledger at the building
+    const ledger = new THREE.Mesh(new THREE.BoxGeometry(p.len, 0.79, 0.14), woodM(0x8b6f47));
+    ledger.position.set(0, wallBase + hHigh - 0.6, 0.1);
+    addP(ledger, 'Porch ledger band at building');
+
+    // Rafters
+    const rSp = isCypress ? 4 : 16 / 12;
+    const rN = Math.ceil(p.len / rSp);
+    for (let k = 0; k <= rN; k++) {
+      const rx = -p.len / 2 + Math.min(p.len, k * rSp);
+      const raf = new THREE.Mesh(
+        new THREE.BoxGeometry(isCypress ? 0.33 : 0.13, isCypress ? 0.5 : rafH, slopeLen),
+        woodM(RAFT_HEX));
+      raf.rotation.x = angle;
+      raf.position.set(rx, wallBase + hHigh - 0.25 - Math.sin(angle) * (slopeLen / 2), Math.cos(angle) * (slopeLen / 2) - 0.1);
+      addP(raf, isCypress ? 'Porch rafter — 4×6 cypress' : 'Porch rafter — ' + rafSel.replace('x', '×'));
+    }
+
+    // Cypress T&G ceiling under the rafters — warm wood plane
+    if (isCypress && ((document.getElementById('cypress_ceiling') || {}).value || 'syp') !== 'none') {
+      const tg = new THREE.Mesh(new THREE.PlaneGeometry(p.len, slopeLen - 1),
+        new THREE.MeshStandardMaterial({ color: 0xe8d4a8, roughness: 0.82, side: THREE.DoubleSide }));
+      tg.rotation.x = -Math.PI / 2 + angle;
+      tg.position.set(0, wallBase + hHigh - 0.72 - Math.sin(angle) * ((slopeLen - 1) / 2), Math.cos(angle) * ((slopeLen - 1) / 2));
+      addP(tg, 'T&G ceiling — 2×8 #1 SYP');
+    }
+
+    // Roof plane in the roof color
+    const rTex = makeTuffRibTexture(true, colors.roof);
+    rTex.repeat.set(p.len / 3, 1);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(p.len + 0.4, 0.1, slopeLen),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, map: rTex, roughness: 0.30, metalness: 0.55 }));
+    roof.rotation.x = angle;
+    roof.position.set(0, wallBase + hHigh + 0.1 - Math.sin(angle) * (slopeLen / 2), Math.cos(angle) * (slopeLen / 2) - 0.1);
+    addP(roof, 'Porch roof');
+
+    // Place onto the chosen wall
+    if (p.side === 'front')      { grp.rotation.y = 0;            grp.position.set(0, 0,  W / 2); }
+    else if (p.side === 'back')  { grp.rotation.y = Math.PI;      grp.position.set(0, 0, -W / 2); }
+    else if (p.side === 'right') { grp.rotation.y = Math.PI / 2;  grp.position.set( L / 2, 0, 0); }
+    else                         { grp.rotation.y = -Math.PI / 2; grp.position.set(-L / 2, 0, 0); }
+    buildingGroup.add(grp);
+  });
+
+  // Wrap-around corners: hip beam tying the two roofs + shared corner post
+  [['front', 'right', 1, 1], ['right', 'back', 1, -1], ['back', 'left', -1, -1], ['left', 'front', -1, 1]]
+    .forEach(([a, b2, sx, sz]) => {
+      const pa = bySide[a], pb = bySide[b2];
+      if (!(pa && pb && pa.full && pb.full)) return;
+      const d = (pa.d + pb.d) / 2;
+      const rise = d * (pitch / 12);
+      const cx = sx * (L / 2), cz = sz * (W / 2);
+      const ux = sx / Math.SQRT2, uz = sz / Math.SQRT2;   // 45° out-diagonal
+      const start = new THREE.Vector3(cx, wallBase + postH + rise - 0.35, cz);
+      const end = new THREE.Vector3(cx + ux * d * Math.SQRT2, wallBase + postH - 0.3, cz + uz * d * Math.SQRT2);
+      const hipLen = start.distanceTo(end) + 0.6;
+      const hip = new THREE.Mesh(
+        new THREE.BoxGeometry(isCypress ? 0.33 : 0.26, isCypress ? 0.5 : 0.79, hipLen),
+        woodM(isCypress ? 0xd8b56e : 0xbe9352));
+      hip.position.copy(start.clone().add(end).multiplyScalar(0.5));
+      hip.lookAt(end);
+      hip.userData = { categoryKey: 'side_shed', label: isCypress ? 'Hip beam — cypress (wrap corner)' : 'Hip rafter — 2-ply (wrap corner)' };
+      hip.castShadow = hip.receiveShadow = true;
+      buildingGroup.add(hip); allMeshes.push(hip);
+      // shared corner post at the hip foot
+      const cp = new THREE.Mesh(new THREE.BoxGeometry(postT, postH, postT), woodM(POST_HEX));
+      cp.position.set(end.x - ux * postT, wallBase + postH / 2, end.z - uz * postT);
+      cp.userData = { categoryKey: 'side_shed', label: 'Porch corner post (wrap)' };
+      cp.castShadow = cp.receiveShadow = true;
+      buildingGroup.add(cp); allMeshes.push(cp);
+      if (isCypress) {
+        [-1, 1].forEach(sgn => {
+          const br = new THREE.Mesh(new THREE.BoxGeometry(0.29, 3.1, 0.29), woodM(0xcfa95f));
+          br.rotation.y = Math.atan2(ux, uz);
+          br.rotation.z = sgn * Math.PI / 4;
+          br.position.set(end.x - ux * postT + sgn * 0.75 * uz, wallBase + postH - 1.4, end.z - uz * postT - sgn * 0.75 * ux);
+          br.userData = { categoryKey: 'side_shed', label: 'Cypress knee brace — 4×6' };
+          br.castShadow = br.receiveShadow = true;
+          buildingGroup.add(br); allMeshes.push(br);
+        });
+      }
+    });
 }
 
 function buildSideShed(dims, wallBase) {
