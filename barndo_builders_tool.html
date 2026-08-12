@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v209</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v210</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2499,7 +2499,8 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           <select id="wall_system" onchange="updateWallSystemUI(); recalc()">
             <option value="auto">Auto — follow construction</option>
             <option value="sheathed">Sheathed (7/16" Zip + skin)</option>
-            <option value="purlin">Lath / girt only — no sheathing (metal) · member below</option>
+            <option value="purlin">Lath / girt only — 2×6 girts (metal, no sheathing)</option>
+            <option value="purlin_1x4">Lath / girt only — 1×4 lath (metal, no sheathing)</option>
           </select>
         </div>
         <div class="qbs-field">
@@ -2635,10 +2636,28 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
 
     
     <!-- PORCHES / TIMBER PORCHES — available for all tiers -->
-    <div class="qbs-card" id="porch-construction-card" style="display: none;">
-      <h3>Porches / timber porches <span class="badge">Available on all builds · driven by porch sqft</span></h3>
-      <p class="qbs-sub" style="margin-bottom: 16px;">Set on the Dimensions tab. Pick how the porch is framed below. <strong style="color: var(--copper);">Cypress timber frame</strong> adds 8×8 decorative posts, 4×6 beams, T&amp;G ceiling, and decorative post bases — Rainey-style build.</p>
-      
+    <div class="qbs-card" id="porch-construction-card">
+      <h3>Porches / timber porches <span class="badge">Open structure · posts + roof, no walls · any build</span></h3>
+      <p class="qbs-sub" style="margin-bottom: 16px;">Enter porch dimensions and where it attaches — sqft, post count and beam count auto-figure (manual entries below override). <strong style="color: var(--copper);">Cypress timber frame</strong> adds 8×8 decorative posts, 4×6 beams, T&amp;G ceiling, and decorative post bases — Rainey-style build.</p>
+
+      <div class="qbs-grid-4" style="margin-bottom: 16px;">
+        <div class="qbs-field"><label>Porch depth (ft)</label><input type="number" id="porch_width" value="0" step="0.5" oninput="recalc()" /><div class="qbs-note">Out from the main wall</div></div>
+        <div class="qbs-field"><label>Porch length (ft)</label><input type="number" id="porch_length" value="0" step="0.5" oninput="recalc()" /><div class="qbs-note">Along the main wall</div></div>
+        <div class="qbs-field">
+          <label>Attached side</label>
+          <select id="porch_attached_side" onchange="recalc()">
+            <option value="front">Front (long wall)</option>
+            <option value="back">Back (long wall)</option>
+            <option value="left">Left (gable end)</option>
+            <option value="right">Right (gable end)</option>
+          </select>
+        </div>
+        <div class="qbs-field"><label>Post spacing (ft)</label><input type="number" id="porch_post_spacing" value="10" step="0.5" oninput="recalc()" /></div>
+        <div class="qbs-field"><label>Roof pitch (X/12)</label><input type="number" id="porch_pitch" value="3" step="0.5" oninput="recalc()" /></div>
+        <div class="qbs-field"><label>Post height (ft)</label><input type="number" id="porch_post_height" value="9" step="0.5" oninput="recalc()" /><div class="qbs-note">Height at the outboard posts</div></div>
+      </div>
+      <div class="qbs-note" style="margin-bottom: 16px;">Porch sqft auto-fills from depth × length (falls back to the Porch area field on Building geometry). Porches are open — posts and roof only, no walls. Need an enclosed addition? Use the Side shed / lean-to card.</div>
+
       <div style="margin-bottom: 20px;">
         <label style="display: block; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px;">Construction style</label>
         <div class="qbs-tier-group">
@@ -2875,6 +2894,15 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
               <option value="left">Left (gable end)</option>
               <option value="right">Right (gable end)</option>
             </select>
+          </div>
+          <div class="qbs-field" style="grid-column: span 2;">
+            <label>Enclosed walls <span style="text-transform:none; letter-spacing:0; color:var(--text-3);">(uncheck = open bay — posts only)</span></label>
+            <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:13px; padding-top:4px;">
+              <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="shed_wall_out" checked onchange="recalc()" style="width:15px;height:15px;"> Outboard wall</label>
+              <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="shed_wall_left" checked onchange="recalc()" style="width:15px;height:15px;"> End — left</label>
+              <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="shed_wall_right" checked onchange="recalc()" style="width:15px;height:15px;"> End — right</label>
+            </div>
+            <div class="qbs-note">On the 3D you can also click a lean-to wall (or its faint open outline) to close/open it.</div>
           </div>
         </div>
         <div style="font-family: var(--font-headline); font-size: 14px; color: var(--copper); margin: 14px 0 6px;">Posts · rafter carrier · ledger band</div>
@@ -5907,6 +5935,47 @@ const MATERIALS = [
     },
     customUnitPrice: i => shedMemberCostLF((i.shed || {}).ledgerMaterial || 'pt', (i.shed || {}).ledgerSize || '2x10'),
     formula: i => i.shedActive ? Math.ceil(i.shed.L * 1.05) : 0 },
+
+  // ---------------- STICK-FRAMED PORCH (open structure — posts + carrier + rafters) ----------------
+  // Only when porch construction = stick AND porch dimensions entered. Cypress porches keep
+  // pricing through the Cypress timber porch catalog lines.
+  { id: "porch_post_pt", label: "Porch: 6×6 PT post", cat: "Porch framing", uom: "ea", packSize: null,
+    priceCost: 61.97, priceSell: 78, priceRetail: 95,
+    labelFn: i => `Porch: 6×6 PT post @ ${(i.porchDims || {}).postSpacingFt || 10}' OC`,
+    customUnitPrice: i => {
+      const d = i.porchDims || {};
+      const stockLen = Math.max(8, Math.ceil(((d.postH || 9) + 4) / 2) * 2);
+      return shedMemberCostLF('pt', '6x6') * stockLen;
+    },
+    formula: i => {
+      const d = i.porchDims || {};
+      if (i.porchConstruction !== 'stick' || !(d.W > 0 && d.L > 0)) return 0;
+      return Math.ceil(d.L / (d.postSpacingFt || 10)) + 1;
+    }},
+  { id: "porch_carrier", label: "Porch: rafter carrier — double 2×10 SYP (on posts)", cat: "Porch framing", uom: "LF", packSize: null,
+    priceCost: 2.45, priceSell: 3.10, priceRetail: 4.10,
+    formula: i => {
+      const d = i.porchDims || {};
+      if (i.porchConstruction !== 'stick' || !(d.W > 0 && d.L > 0)) return 0;
+      return Math.ceil(d.L * 2 * 1.05);   // 2-ply
+    }},
+  { id: "porch_rafter_2x8", label: "Porch: 2×8 SYP rafter @ 16\" OC (cut to slope + 1' tail)", cat: "Porch framing", uom: "LF", packSize: null,
+    priceCost: 1.65, priceSell: 2.10, priceRetail: 2.80,
+    formula: i => {
+      const d = i.porchDims || {};
+      if (i.porchConstruction !== 'stick' || !(d.W > 0 && d.L > 0)) return 0;
+      const rise = d.W * ((d.pitch || 3) / 12);
+      const cutLen = Math.sqrt(d.W * d.W + rise * rise) + 1;
+      const count = Math.ceil(d.L / (16 / 12)) + 1;
+      return Math.ceil(count * cutLen * 1.05);
+    }},
+  { id: "porch_ledger_pt", label: "Porch: 2×10 PT ledger band at building (rafter tie-in)", cat: "Porch framing", uom: "LF", packSize: null,
+    priceCost: 3.00, priceSell: 3.80, priceRetail: 4.80,
+    formula: i => {
+      const d = i.porchDims || {};
+      if (i.porchConstruction !== 'stick' || !(d.W > 0 && d.L > 0)) return 0;
+      return Math.ceil(d.L * 1.05);
+    }},
   // Steel mono-slope trusses — only when steel framing
   { id: "shed_steel_truss", label: "Side shed: steel mono-slope truss", cat: "Side shed", uom: "ea", packSize: null,
     priceCost: 145, priceSell: 195, priceRetail: 250,
@@ -5922,12 +5991,18 @@ const MATERIALS = [
     formula: i => {
       if (!i.shedActive) return 0;
       const sh = i.shed;
-      let area = sh.L * sh.H + 2 * (sh.W * (sh.H + (sh.hHigh || sh.H)) / 2);
-      const winQ = (i.shedActive ? (parseFloat((document.getElementById('shed_window_qty') || {}).value) || 0) : 0);
-      const winW = parseFloat((document.getElementById('shed_window_w') || {}).value) || 3;
-      const winH = parseFloat((document.getElementById('shed_window_h') || {}).value) || 3;
-      area -= winQ * winW * winH;
-      if (sh.wainscot) area -= 3 * sh.exteriorWallLF;   // band covered by the wainscot line
+      // ENCLOSED walls only (v210): outboard rectangle + each end-wall trapezoid
+      const trap = sh.W * (sh.H + (sh.hHigh || sh.H)) / 2;
+      let area = (sh.wallOut !== false ? sh.L * sh.H : 0)
+               + (sh.wallLeft !== false ? trap : 0)
+               + (sh.wallRight !== false ? trap : 0);
+      if (sh.wallOut !== false) {
+        const winQ = parseFloat((document.getElementById('shed_window_qty') || {}).value) || 0;
+        const winW = parseFloat((document.getElementById('shed_window_w') || {}).value) || 3;
+        const winH = parseFloat((document.getElementById('shed_window_h') || {}).value) || 3;
+        area -= winQ * winW * winH;
+      }
+      if (sh.wainscot) area -= 3 * sh.exteriorWallLF;   // band covered by the wainscot line (enclosed LF)
       return Math.ceil(Math.max(0, area) / 3 * 1.05);
     }},
 
@@ -7389,12 +7464,13 @@ function syncPostFrameSpacing() {
 // (forced, or Auto on a post-frame build). Stud-framed shops with 2×6 lathing show it too.
 function updateWallSystemUI() {
   const sel = (document.getElementById('wall_system') || {}).value || 'auto';
-  const eff = sel === 'auto' ? (currentConstruction === 'post' ? 'purlin' : 'sheathed') : sel;
+  const eff = (sel === 'purlin_1x4') ? 'purlin' : (sel === 'auto' ? (currentConstruction === 'post' ? 'purlin' : 'sheathed') : sel);
   const show = (eff === 'purlin');
   const f = document.getElementById('wall-lathing-field');
   const m = document.getElementById('wall-lathmember-field');
   if (f) f.style.display = show ? '' : 'none';
-  if (m) m.style.display = show ? '' : 'none';
+  // Member select is redundant when the Wall system option itself says 1×4
+  if (m) m.style.display = (show && sel !== 'purlin_1x4') ? '' : 'none';
 }
 
 // Side shed / lean-to card is always available (v208): lean-tos and porches apply to
@@ -7407,12 +7483,11 @@ function updateAdditionsTabVisibility() {
 // Show/hide the Porch card based on whether porch_sqft > 0.
 // When porch is empty, show a helpful hint card instead so the tab isn't empty.
 function updatePorchCardVisibility() {
+  // v210: porch card is always available — it now carries its own dimension inputs.
   const card = document.getElementById('porch-construction-card');
   const hint = document.getElementById('porch-empty-hint');
-  const porchEl = document.getElementById('porch_sqft');
-  const porchSqft = porchEl ? (parseFloat(porchEl.value) || 0) : 0;
-  if (card) card.style.display = porchSqft > 0 ? '' : 'none';
-  if (hint) hint.style.display = porchSqft > 0 ? 'none' : '';
+  if (card) card.style.display = '';
+  if (hint) hint.style.display = 'none';
 }
 
 // ---------- ROOF AREA CALCULATOR (plan area × pitch slope factor, multi-pitch) ----------
@@ -8080,7 +8155,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v209';
+const BB_VERSION = 'v210';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -11406,7 +11481,11 @@ function getInputs() {
     //   shared wall = sL (excluded)
     // For gable-end attachment: shed length runs PERPENDICULAR (along main W)
     //   same logic essentially — outboard + 2 end walls
-    const shedExteriorWallLF = sL + (2 * sW); // outboard + 2 ends, no shared wall
+    // Per-wall enclosure (v210): unchecked = open bay. Wall LF counts ENCLOSED walls only —
+    // girts, PT band, wainscot and wrap area all key off this.
+    const ck = id => { const el = document.getElementById(id); return el ? el.checked : true; };
+    const shedWallOut = ck('shed_wall_out'), shedWallLeft = ck('shed_wall_left'), shedWallRight = ck('shed_wall_right');
+    const shedExteriorWallLF = (shedWallOut ? sL : 0) + (shedWallLeft ? sW : 0) + (shedWallRight ? sW : 0);
     // Roof area = single slope × shed length
     const shedRoofArea = sTopChord * sL;
     // Mono panels at TR/PBR coverage 3 ft
@@ -11469,6 +11548,7 @@ function getInputs() {
       carrierSize: (document.getElementById('shed_carrier_size') || {}).value || 'dbl2x10',
       ledgerMaterial: (document.getElementById('shed_ledger_material') || {}).value || 'pt',
       ledgerSize: (document.getElementById('shed_ledger_size') || {}).value || '2x10',
+      wallOut: shedWallOut, wallLeft: shedWallLeft, wallRight: shedWallRight,
     };
   }
   
@@ -11579,15 +11659,36 @@ function getInputs() {
     footprint: numEff('footprint'),
     living: numEff('living_sqft'),
     garageSqft: numEff('garage_sqft'),
-    porchSqft: numEff('porch_sqft'),
+    porchSqft: (() => { const w = num('porch_width'), l = num('porch_length'); return (w > 0 && l > 0) ? w * l : numEff('porch_sqft'); })(),
     shopSqft: numEff('shop_sqft'),
     standaloneShedMode: _standaloneShed,
+    // Porch geometry + placement (v210) — drives auto counts, stick-porch framing and the 3D render
+    porchDims: (() => {
+      const w = num('porch_width'), l = num('porch_length');
+      return {
+        W: w, L: l,
+        side: (document.getElementById('porch_attached_side') || {}).value || 'front',
+        postSpacingFt: num('porch_post_spacing') || 10,
+        pitch: num('porch_pitch') || 3,
+        postH: num('porch_post_height') || 9,
+      };
+    })(),
     // Cypress timber-frame porch inputs (only meaningful when porchConstruction === 'cypress')
     porchConstruction: currentPorchConstruction,
-    cypressPorchActive: currentPorchConstruction === 'cypress' && num('porch_sqft') > 0,
-    cypressPostCount: num('cypress_post_count'),
+    cypressPorchActive: currentPorchConstruction === 'cypress' && (num('porch_sqft') > 0 || (num('porch_width') > 0 && num('porch_length') > 0)),
+    cypressPostCount: (() => {
+      const manual = num('cypress_post_count');
+      if (manual > 0) return manual;
+      const l = num('porch_length');
+      return l > 0 ? Math.ceil(l / (num('porch_post_spacing') || 10)) + 1 : 0;
+    })(),
     cypressPostHeight: (document.getElementById('cypress_post_height') || {}).value || '10',
-    cypressBeamCount: num('cypress_beam_count'),
+    cypressBeamCount: (() => {
+      const manual = num('cypress_beam_count');
+      if (manual > 0) return manual;
+      const l = num('porch_length');
+      return l > 0 ? Math.ceil(l / 4) + 1 : 0;   // ceiling joists ~48" OC
+    })(),
     cypressBeamLength: (document.getElementById('cypress_beam_length') || {}).value || '10',
     cypressCeiling: (document.getElementById('cypress_ceiling') || {}).value || 'syp',
     cypressPostBases: (document.getElementById('cypress_post_bases') || {}).value || 'yes',
@@ -11670,8 +11771,11 @@ function getInputs() {
     meterManual: num('meter_manual'),
     roofSystem: document.getElementById('roof_system').value,
     proArmorScope: (document.getElementById('pro_armor_scope') || {}).value || 'roof',
-    wallSystem: (() => { const v = (document.getElementById('wall_system') || {}).value || 'auto'; return v === 'auto' ? (currentConstruction === 'post' ? 'purlin' : 'sheathed') : v; })(),
-    lathSize: (document.getElementById('lath_size') || {}).value || '2x6',
+    wallSystem: (() => { const v = (document.getElementById('wall_system') || {}).value || 'auto'; if (v === 'purlin_1x4') return 'purlin'; return v === 'auto' ? (currentConstruction === 'post' ? 'purlin' : 'sheathed') : v; })(),
+    lathSize: (() => {
+      if (((document.getElementById('wall_system') || {}).value) === 'purlin_1x4') return '1x4';
+      return (document.getElementById('lath_size') || {}).value || '2x6';
+    })(),
     roofProduct: document.getElementById('roof_product').value,
     roofColor: document.getElementById('roof_color').value,
     sidingProduct: document.getElementById('siding_product').value,
@@ -16779,6 +16883,7 @@ function generateModel() {
 
   // === SIDE SHED / LEAN-TO (from the Additions tab card) ===
   try { buildSideShed(dims, wallBase); } catch (e) { console.warn('3D side shed skipped:', e); }
+  try { buildPorch3D(dims, wallBase); } catch (e) { console.warn('3D porch skipped:', e); }
 
   // Trim color from the selector — ridge cap, rake/roof trim, corners, fascia
   try {
@@ -16799,6 +16904,96 @@ function generateModel() {
 // Side shed / lean-to from the Additions tab: single slope off one wall of the main
 // building. Built in local space (attach line at z=0, sloping outward toward +z,
 // length along x), then rotated/positioned onto the chosen wall.
+// Open porch (v210): posts + carrier + ledger + rafters + roof plane on the chosen side.
+// No walls — porches are open structures. Cypress style renders honey 8×8s and 4×6 rafters;
+// stick style renders PT 6×6 posts and 2×8 lumber rafters.
+function buildPorch3D(dims, wallBase) {
+  const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+  const pW = n('porch_width'), pL = n('porch_length');
+  if (!(pW > 0 && pL > 0)) return;
+  const side = (document.getElementById('porch_attached_side') || {}).value || 'front';
+  const spFt = n('porch_post_spacing') || 10;
+  const pitch = n('porch_pitch') || 3;
+  const postH = n('porch_post_height') || 9;
+  const styleBtn = document.querySelector('[data-porchtype].active');
+  const isCypress = !!(styleBtn && styleBtn.dataset.porchtype === 'cypress');
+  const { L, W } = dims;
+  const colors = bb3dSelectedColors();
+  const rise = pW * (pitch / 12);
+  const angle = Math.atan(pitch / 12);
+  const hHigh = postH + rise;                        // roof meets the main wall here
+  const slopeLen = Math.sqrt(pW * pW + rise * rise) + 1 / Math.cos(angle);   // +1' tail
+
+  const grp = new THREE.Group();
+  const ud = { categoryKey: 'side_shed', label: isCypress ? 'Cypress timber porch' : 'Porch (stick framed)' };
+  const addP = m => { m.castShadow = m.receiveShadow = true; if (!m.userData || !m.userData.label) m.userData = ud; grp.add(m); allMeshes.push(m); };
+  const woodM = hex => new THREE.MeshStandardMaterial({ color: hex, roughness: 0.9 });
+  const POST_HEX = isCypress ? 0xd8b56e : 0x8b6f47;
+  const postT = isCypress ? 0.67 : 0.46;             // 8×8 cypress vs 6×6 PT
+
+  // Slab pad
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(pL, 0.4, pW),
+    new THREE.MeshStandardMaterial({ color: CATEGORY_COLORS.foundation.hex, roughness: 0.95 }));
+  slab.position.set(0, 0.2, pW / 2);
+  addP(slab);
+
+  // Posts along the outboard edge
+  const postN = Math.max(2, Math.ceil(pL / spFt) + 1);
+  for (let p = 0; p < postN; p++) {
+    const px = -pL / 2 + (pL / (postN - 1)) * p;
+    const post = new THREE.Mesh(new THREE.BoxGeometry(postT, postH, postT), woodM(POST_HEX));
+    post.position.set(px, wallBase + postH / 2, pW - postT / 2);
+    post.userData = { categoryKey: 'side_shed', label: isCypress ? 'Porch post — 8×8 cypress' : 'Porch post — 6×6 PT' };
+    addP(post);
+  }
+
+  // Carrier beam across the post tops
+  const carrier = new THREE.Mesh(new THREE.BoxGeometry(pL, isCypress ? 0.5 : 0.79, isCypress ? 0.5 : 0.26), woodM(isCypress ? 0xd8b56e : 0xbe9352));
+  carrier.position.set(0, wallBase + postH - 0.3, pW - 0.25);
+  carrier.userData = { categoryKey: 'side_shed', label: isCypress ? 'Porch carrier — cypress' : 'Porch carrier — double 2×10', isFraming: false };
+  addP(carrier);
+
+  // Ledger at the main wall
+  const ledger = new THREE.Mesh(new THREE.BoxGeometry(pL, 0.79, 0.14), woodM(0x8b6f47));
+  ledger.position.set(0, wallBase + hHigh - 0.6, 0.1);
+  ledger.userData = { categoryKey: 'side_shed', label: 'Porch ledger band at building' };
+  addP(ledger);
+
+  // Rafters — cypress 4×6 @48" or lumber 2×8 @16"
+  const rSp = isCypress ? 4 : 16 / 12;
+  const rN = Math.ceil(pL / rSp);
+  const rDims = isCypress ? [0.33, 0.5] : [0.13, 0.62];
+  for (let r = 0; r <= rN; r++) {
+    const rx = -pL / 2 + Math.min(pL, r * rSp);
+    const raf = new THREE.Mesh(new THREE.BoxGeometry(rDims[0], rDims[1], slopeLen), woodM(isCypress ? 0xd8b56e : 0xd2ad79));
+    raf.rotation.x = angle;
+    raf.position.set(rx,
+      wallBase + hHigh - 0.25 - Math.sin(angle) * (slopeLen / 2),
+      Math.cos(angle) * (slopeLen / 2) - 0.1);
+    raf.userData = { categoryKey: 'side_shed', label: isCypress ? 'Porch rafter — 4×6 cypress' : 'Porch rafter — 2×8', isFraming: false };
+    addP(raf);
+  }
+
+  // Roof plane in the roof color
+  const rTex = makeTuffRibTexture(true, colors.roof);
+  rTex.repeat.set(pL / 3, 1);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(pL + 0.4, 0.1, slopeLen),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, map: rTex, roughness: 0.30, metalness: 0.55 }));
+  roof.rotation.x = angle;
+  roof.position.set(0,
+    wallBase + hHigh + 0.1 - Math.sin(angle) * (slopeLen / 2),
+    Math.cos(angle) * (slopeLen / 2) - 0.1);
+  roof.userData = { categoryKey: 'side_shed', label: 'Porch roof' };
+  addP(roof);
+
+  // Place onto the chosen wall (same transform as the side shed)
+  if (side === 'front')      { grp.rotation.y = 0;            grp.position.set(0, 0,  W / 2); }
+  else if (side === 'back')  { grp.rotation.y = Math.PI;      grp.position.set(0, 0, -W / 2); }
+  else if (side === 'right') { grp.rotation.y = Math.PI / 2;  grp.position.set( L / 2, 0, 0); }
+  else                       { grp.rotation.y = -Math.PI / 2; grp.position.set(-L / 2, 0, 0); }
+  buildingGroup.add(grp);
+}
+
 function buildSideShed(dims, wallBase) {
   const en = document.getElementById('shed_enabled');
   if (!en || !en.checked) return;
@@ -16911,16 +17106,33 @@ function buildSideShed(dims, wallBase) {
     }
   })();
 
-  // Outboard wall skin (siding color)
-  const sidTex = makeTuffRibTexture(false, colors.siding);
-  sidTex.repeat.set(sL / 3, 1);
-  const outWall = new THREE.Mesh(new THREE.PlaneGeometry(sL, sH),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, map: sidTex, roughness: 0.38, metalness: 0.45, side: THREE.DoubleSide }));
-  outWall.position.set(0, wallBase + sH / 2, sW + 0.02);
-  addSkin(outWall);
+  // Per-wall enclosure state (checkboxes on the shed card). Open walls render as a faint
+  // clickable outline; clicking any shed wall (solid or ghost) toggles it via toggleShedWall.
+  const wallCk = id => { const el = document.getElementById(id); return el ? el.checked : true; };
+  const encOut = wallCk('shed_wall_out'), encLeft = wallCk('shed_wall_left'), encRight = wallCk('shed_wall_right');
+  const ghostMat = () => new THREE.MeshStandardMaterial({ color: 0x7fb2ff, transparent: true, opacity: 0.10, roughness: 0.9, side: THREE.DoubleSide, depthWrite: false });
+  const tagWall = (mesh, key, open) => {
+    mesh.userData = { categoryKey: 'side_shed', label: (open ? 'OPEN bay — click to enclose (' : 'Shed wall — click to open (') + key + ')', shedWallKey: key };
+  };
+
+  // Outboard wall skin (siding color) — or ghost when the bay is open
+  if (encOut) {
+    const sidTex = makeTuffRibTexture(false, colors.siding);
+    sidTex.repeat.set(sL / 3, 1);
+    const outWall = new THREE.Mesh(new THREE.PlaneGeometry(sL, sH),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, map: sidTex, roughness: 0.38, metalness: 0.45, side: THREE.DoubleSide }));
+    outWall.position.set(0, wallBase + sH / 2, sW + 0.02);
+    addSkin(outWall);
+    tagWall(outWall, 'out', false);
+  } else {
+    const ghost = new THREE.Mesh(new THREE.PlaneGeometry(sL, sH), ghostMat());
+    ghost.position.set(0, wallBase + sH / 2, sW + 0.02);
+    grp.add(ghost); allMeshes.push(ghost);
+    tagWall(ghost, 'out', true);
+  }
 
   // Shed wainscot band + Z bar (outboard wall) when the shed wainscot is on
-  if ((document.getElementById('shed_wainscot') || {}).value === '36') {
+  if (encOut && (document.getElementById('shed_wainscot') || {}).value === '36') {
     const wTex = makeTuffRibTexture(false, colors.wainscot);
     wTex.repeat.set(sL / 3, 1);
     const band = new THREE.Mesh(new THREE.PlaneGeometry(sL, 3),
@@ -16935,6 +17147,7 @@ function buildSideShed(dims, wallBase) {
 
   // Shed windows — black single-hung look, spaced across the outboard wall
   (function shedWindows() {
+    if (!encOut) return;   // open bay — no wall to hold windows
     const q = parseInt((document.getElementById('shed_window_qty') || {}).value, 10) || 0;
     if (q <= 0) return;
     const winW = parseFloat((document.getElementById('shed_window_w') || {}).value) || 3;
@@ -16956,17 +17169,26 @@ function buildSideShed(dims, wallBase) {
     }
   })();
 
-  // End walls — trapezoids, tall at the main wall, low at the outboard wall
+  // End walls — trapezoids, tall at the main wall, low at the outboard wall.
+  // Enclosed → siding skin; open → faint clickable ghost.
   [-1, 1].forEach(sx => {
+    const key = sx < 0 ? 'left' : 'right';
+    const enc = sx < 0 ? encLeft : encRight;
     const shp = new THREE.Shape();
     shp.moveTo(0, 0); shp.lineTo(sW, 0); shp.lineTo(sW, sH); shp.lineTo(0, hHigh); shp.closePath();
     const g2 = new THREE.ExtrudeGeometry(shp, { depth: 0.05, bevelEnabled: false });
-    const t2 = makeTuffRibTexture(false, colors.siding);
-    t2.repeat.set(1 / 3, 1 / Math.max(1, hHigh));   // ribs every 3 ft across the end wall
-    const m2 = new THREE.Mesh(g2, new THREE.MeshStandardMaterial({ color: 0xffffff, map: t2, roughness: 0.38, metalness: 0.45, side: THREE.DoubleSide }));
+    let m2;
+    if (enc) {
+      const t2 = makeTuffRibTexture(false, colors.siding);
+      t2.repeat.set(1 / 3, 1 / Math.max(1, hHigh));   // ribs every 3 ft across the end wall
+      m2 = new THREE.Mesh(g2, new THREE.MeshStandardMaterial({ color: 0xffffff, map: t2, roughness: 0.38, metalness: 0.45, side: THREE.DoubleSide }));
+    } else {
+      m2 = new THREE.Mesh(g2, ghostMat());
+    }
     m2.rotation.y = -Math.PI / 2;                    // shape x → outward (+z), depth → inward
     m2.position.set(sx * (sL / 2) + (sx > 0 ? 0 : 0.05), wallBase, 0);
-    addSkin(m2);
+    if (enc) { addSkin(m2); } else { grp.add(m2); allMeshes.push(m2); }
+    tagWall(m2, key, !enc);
   });
 
   // Mono-slope roof in the ROOF color, ribs running down the slope
@@ -17927,10 +18149,26 @@ function onCanvasClick(event) {
     return;
   }
 
-  // Default (audit) — show the material detail for the clicked surface
+  // Shed / lean-to wall toggle — clicking a shed wall (or its open-bay ghost outline)
+  // closes/opens that wall. First-hit only, so clicks through the main building don't toggle.
   const intersects = raycaster.intersectObjects(allMeshes, false);
+  if (intersects.length && intersects[0].object.userData && intersects[0].object.userData.shedWallKey) {
+    toggleShedWall(intersects[0].object.userData.shedWallKey);
+    return;
+  }
+
+  // Default (audit) — show the material detail for the clicked surface
   if (intersects.length === 0) { setSelectionDetail(null); return; }
   setSelectionDetail(intersects[0].object.userData);
+}
+
+function toggleShedWall(key) {
+  const id = key === 'out' ? 'shed_wall_out' : (key === 'left' ? 'shed_wall_left' : 'shed_wall_right');
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.checked = !el.checked;
+  if (typeof recalc === 'function') { try { recalc(); } catch (e) {} }
+  generateModel();
 }
 
 // ---- Placement / editing actions (all write back through recalc) ----
@@ -18444,6 +18682,23 @@ window.bb3dCmd = function(cmd) {
     renderOpeningGuide();
     generateModel();
   }
+};
+
+// Debug/QA hook: project a world point to screen pixels (for click targeting in tests).
+window.bb3dProjectPoint = function(x, y, z) {
+  if (!initialized || !camera || !renderer) return null;
+  const v = new THREE.Vector3(x, y, z).project(camera);
+  const r = renderer.domElement.getBoundingClientRect();
+  return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - (v.y + 1) / 2) * r.height, behind: v.z > 1 };
+};
+
+// Debug/QA hook: list meshes (label, world position, visibility) — optional substring filter.
+window.bb3dListMeshes = function(filter) {
+  if (!initialized) return [];
+  return allMeshes
+    .filter(m => !filter || String((m.userData || {}).label || '').indexOf(filter) >= 0)
+    .map(m => ({ label: (m.userData || {}).label || '(none)', key: (m.userData || {}).shedWallKey || null,
+                 visible: m.visible, pos: m.getWorldPosition(new THREE.Vector3()).toArray().map(v => +v.toFixed(1)) }));
 };
 
 window.bb3dRefresh = function() {
