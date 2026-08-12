@@ -6073,7 +6073,7 @@ const MATERIALS = [
     formula: i => {
       if (i.porchConstruction !== 'stick' || !i.porchAgg || !i.porchAgg.count) return 0;
       const plies = String((i.porchDims || {}).headerSize || 'dbl2x10').indexOf('dbl') === 0 ? 2 : 1;
-      return Math.ceil(i.porchAgg.edgeLF * plies * 1.05);
+      return Math.ceil((i.porchAgg.headerLF || i.porchAgg.edgeLF) * plies * 1.05);
     }},
   { id: "porch_rafter_2x8", label: "Porch: SYP rafter @ 16\" OC (cut to slope + 1' tail)", cat: "Porch framing", uom: "LF", packSize: null,
     priceCost: 1.65, priceSell: 2.10, priceRetail: 2.80,
@@ -6904,7 +6904,7 @@ const MATERIALS = [
     },
     formula: i => {
       if (!i.cypressPorchActive || !i.porchAgg || !i.porchAgg.edgeLF) return 0;
-      return Math.ceil(i.porchAgg.edgeLF * 1.05);
+      return Math.ceil((i.porchAgg.headerLF || i.porchAgg.edgeLF) * 1.05);
     }},
 
   // 4×6 cypress beams (length-conditional)
@@ -11875,12 +11875,14 @@ function getInputs() {
         const myTies = activeTies.filter(c => c[1] === p.side || c[2] === p.side).length;
         if (myTies >= 2) { p.L = wallLen; p.full = true; }
       });
-      let hipCount = 0, hipLF = 0, cornerSqft = 0;
+      let hipCount = 0, hipLF = 0, cornerSqft = 0, tieHeaderLF = 0;
       activeTies.forEach(c => {
-        const d = (bySide[c[1]].W + bySide[c[2]].W) / 2;
+        const dA = bySide[c[1]].W, dB = bySide[c[2]].W;
+        const d = (dA + dB) / 2;
         hipCount++;
         hipLF += Math.ceil(Math.sqrt(2 * d * d + Math.pow(d * pitch / 12, 2)) + 1);
-        cornerSqft += d * d;
+        cornerSqft += dA * dB;
+        tieHeaderLF += dA + dB;   // headers run from both sides out to the corner post
       });
       let sqft = cornerSqft, postCount = 0, beamCount = 0, edgeLF = 0, rafterLF = 0, lathLF = 0;
       const cypressAuto = currentPorchConstruction === 'cypress';
@@ -11897,7 +11899,8 @@ function getInputs() {
       });
       postCount = Math.max(0, postCount - hipCount);   // merged corner posts
       return { sides, count: sides.length, sqft: Math.round(sqft), postCount, beamCount,
-               edgeLF: Math.ceil(edgeLF), rafterLF: Math.ceil(rafterLF), lathLF: Math.ceil(lathLF),
+               edgeLF: Math.ceil(edgeLF), headerLF: Math.ceil(edgeLF + tieHeaderLF),
+               rafterLF: Math.ceil(rafterLF), lathLF: Math.ceil(lathLF),
                hipCount, hipLF };
     })(),
     // Cypress timber-frame porch inputs (only meaningful when porchConstruction === 'cypress')
@@ -17267,47 +17270,77 @@ function buildPorch3D(dims, wallBase) {
     buildingGroup.add(grp);
   });
 
-  // Wrap-around corners (v215): corner ROOF — two triangles meeting at the hip
-  // diagonal — plus a correctly-oriented hip beam and the shared corner post.
+  // Wrap-around corners (v215r2, per builder): the CONCRETE extends so the porches
+  // meet, BOTH headers run out to the shared corner post, and roof metal covers the
+  // corner — two textured triangles meeting at the hip diagonal over a hip beam.
   activeTies
     .forEach(([tieKey, a, b2, sx, sz]) => {
       const pa = bySide[a], pb = bySide[b2];
-      const d = (pa.d + pb.d) / 2;
-      const rise = d * (pitch / 12);
+      // front/back porch depth extends in z; left/right porch depth extends in x
+      const zd = (a === 'front' || a === 'back') ? pa.d : pb.d;
+      const xd = (a === 'front' || a === 'back') ? pb.d : pa.d;
       const cx = sx * (L / 2), cz = sz * (W / 2);
-      const yH = wallBase + postH + rise + 0.08;   // roof height at the building corner
-      const yE = wallBase + postH + 0.08;          // eave height at the outboard edge
-      const ox = cx + sx * d, oz = cz + sz * d;    // outer corner of the wrap
-      const tri = (p1, p2, p3) => {
+      const ox = cx + sx * xd, oz = cz + sz * zd;      // outer corner of the wrap
+      const yE = wallBase + postH + 0.08;              // eave height
+      const addB = (m, lbl) => { m.userData = { categoryKey: 'side_shed', label: lbl };
+        m.castShadow = m.receiveShadow = true; buildingGroup.add(m); allMeshes.push(m); };
+
+      // 1. Concrete extends — corner slab fills so the porches meet
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(xd, 0.4, zd),
+        new THREE.MeshStandardMaterial({ color: CATEGORY_COLORS.foundation.hex, roughness: 0.95 }));
+      slab.position.set(cx + sx * xd / 2, 0.2, cz + sz * zd / 2);
+      addB(slab, 'Porch corner slab (wrap)');
+
+      // 2. Headers run from BOTH sides to the corner post
+      const hdrY = wallBase + postH - 0.3;
+      const hH = isCypress ? (TIMBER_H[tHdrSize] || 0.67) : hdrH;
+      const hT = isCypress ? (TIMBER_DIMS[tHdrSize] || 0.67) : 0.26;
+      const hHex = isCypress ? (tHdrType === 'yp' ? YP_HEX : CYP_HEX) : 0xbe9352;
+      const hLbl = isCypress
+        ? `Porch header — ${tHdrSize.replace('x','×')} ${tHdrType === 'yp' ? 'YP' : 'cypress'} timber (to corner post)`
+        : 'Porch header — double ' + hdrDim.replace('x','×') + ' (to corner post)';
+      // extension of the front/back porch header: runs along x at the outboard z line
+      const extA = new THREE.Mesh(new THREE.BoxGeometry(xd, hH, hT), woodM(hHex));
+      extA.position.set(cx + sx * xd / 2, hdrY, cz + sz * (zd - 0.3));
+      addB(extA, hLbl);
+      // extension of the gable-end porch header: runs along z at the outboard x line
+      const extB = new THREE.Mesh(new THREE.BoxGeometry(hT, hH, zd), woodM(hHex));
+      extB.position.set(cx + sx * (xd - 0.3), hdrY, cz + sz * zd / 2);
+      addB(extB, hLbl);
+
+      // 3. Shared corner post under the header junction
+      const cp = new THREE.Mesh(new THREE.BoxGeometry(postT, postH, postT), woodM(POST_HEX));
+      cp.position.set(cx + sx * (xd - postT / 2), wallBase + postH / 2, cz + sz * (zd - postT / 2));
+      addB(cp, 'Porch corner post (wrap)');
+
+      // 4. Roof metal over the corner — two textured triangles meeting at the hip
+      const yHA = wallBase + postH + zd * (pitch / 12) + 0.08;   // apex per porch slope
+      const yHB = wallBase + postH + xd * (pitch / 12) + 0.08;
+      const triTex = makeTuffRibTexture(true, colors.roof);
+      triTex.repeat.set(Math.max(1, xd / 3), 1);
+      const tri = (p1, p2, p3, lbl) => {
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.Float32BufferAttribute(
           [p1[0], p1[1], p1[2], p2[0], p2[1], p2[2], p3[0], p3[1], p3[2]], 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1], 2));
         g.computeVertexNormals();
-        const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xf2f2f0, roughness: 0.35, metalness: 0.5, side: THREE.DoubleSide }));
-        m.userData = { categoryKey: 'side_shed', label: 'Porch corner roof (hip)' };
-        m.castShadow = m.receiveShadow = true;
-        buildingGroup.add(m); allMeshes.push(m);
+        const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({
+          color: 0xffffff, map: triTex, roughness: 0.30, metalness: 0.55, side: THREE.DoubleSide }));
+        addB(m, lbl);
       };
-      tri([cx, yH, cz], [cx, yE, oz], [ox, yE, oz]);   // continues porch A's slope
-      tri([cx, yH, cz], [ox, yE, cz], [ox, yE, oz]);   // continues porch B's slope
-      // Hip beam under the diagonal — oriented by direction vector (no lookAt pitfalls)
-      const hs = new THREE.Vector3(cx, yH - 0.4, cz);
-      const he = new THREE.Vector3(ox, yE - 0.4, oz);
+      tri([cx, yHA, cz], [cx, yE, oz], [ox, yE, oz], 'Porch corner roof metal (hip)');
+      tri([cx, yHB, cz], [ox, yE, cz], [ox, yE, oz], 'Porch corner roof metal (hip)');
+
+      // 5. Hip beam under the diagonal
+      const hs = new THREE.Vector3(cx, Math.min(yHA, yHB) - 0.4, cz);
+      const he = new THREE.Vector3(ox, yE - 0.45, oz);
       const dir = he.clone().sub(hs);
       const hip = new THREE.Mesh(
         new THREE.BoxGeometry(isCypress ? 0.33 : 0.26, isCypress ? 0.5 : 0.79, dir.length()),
         woodM(isCypress ? CYP_HEX : 0xbe9352));
       hip.position.copy(hs.clone().add(he).multiplyScalar(0.5));
       hip.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.clone().normalize());
-      hip.userData = { categoryKey: 'side_shed', label: isCypress ? 'Hip beam — timber (wrap corner)' : 'Hip rafter — 2-ply (wrap corner)' };
-      hip.castShadow = hip.receiveShadow = true;
-      buildingGroup.add(hip); allMeshes.push(hip);
-      // Shared corner post at the hip foot
-      const cp = new THREE.Mesh(new THREE.BoxGeometry(postT, postH, postT), woodM(POST_HEX));
-      cp.position.set(ox - sx * postT / 2, wallBase + postH / 2, oz - sz * postT / 2);
-      cp.userData = { categoryKey: 'side_shed', label: 'Porch corner post (wrap)' };
-      cp.castShadow = cp.receiveShadow = true;
-      buildingGroup.add(cp); allMeshes.push(cp);
+      addB(hip, isCypress ? 'Hip beam — timber (wrap corner)' : 'Hip rafter — 2-ply (wrap corner)');
     });
 }
 
