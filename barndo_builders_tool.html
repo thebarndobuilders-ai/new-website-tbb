@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v212</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v213</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2675,12 +2675,22 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           <div class="qbs-note">Depth · length (0 = full wall)</div>
         </div>
       </div>
+      <div class="qbs-field" style="margin-bottom: 12px;">
+        <label>Porch ties — wrap corners</label>
+        <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:13px; padding-top:4px;">
+          <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="porch_tie_fl" onchange="recalc()" style="width:15px;height:15px;"> Front + Left gable</label>
+          <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="porch_tie_fr" onchange="recalc()" style="width:15px;height:15px;"> Front + Right gable</label>
+          <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="porch_tie_bl" onchange="recalc()" style="width:15px;height:15px;"> Back + Left gable</label>
+          <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="porch_tie_br" onchange="recalc()" style="width:15px;height:15px;"> Back + Right gable</label>
+        </div>
+        <div class="qbs-note">Check a tie and the two porches at that corner pull to the corner and their roofs join with a <strong>hip</strong> — hip framing auto-counts, corner posts merge. Both porches of the corner must be enabled.</div>
+      </div>
       <div class="qbs-grid-3" style="margin-bottom: 12px;">
-        <div class="qbs-field"><label>Post spacing (ft)</label><input type="number" id="porch_post_spacing" value="10" step="0.5" oninput="recalc()" /></div>
+        <div class="qbs-field" id="porch-spacing-field"><label>Post spacing (ft)</label><input type="number" id="porch_post_spacing" value="10" step="0.5" oninput="recalc()" /><div class="qbs-note">Stick porches. Cypress auto-figures even bays ≤ 12'.</div></div>
         <div class="qbs-field"><label>Roof pitch (X/12)</label><input type="number" id="porch_pitch" value="3" step="0.5" oninput="recalc()" /></div>
         <div class="qbs-field"><label>Post height (ft)</label><input type="number" id="porch_post_height" value="9" step="0.5" oninput="recalc()" /><div class="qbs-note">Height at the outboard posts</div></div>
       </div>
-      <div class="qbs-note" style="margin-bottom: 16px;"><strong style="color: var(--copper);">Wrap-around:</strong> enable two touching sides at full-wall length and the roofs tie together with a <strong>hip</strong> at the shared corner — hip framing auto-counts and the corner posts merge. Porch sqft auto-figures from all enabled sides (falls back to the Porch area field on Building geometry). Porches are open — posts and roof, no walls; for an enclosed addition use the Side shed / lean-to card.</div>
+      <div class="qbs-note" style="margin-bottom: 16px;">Porch sqft auto-figures from all enabled sides plus tied corners (falls back to the Porch area field on Building geometry). Porches are open — posts and roof, no walls; for an enclosed addition use the Side shed / lean-to card.</div>
 
       <div style="margin-bottom: 20px;">
         <label style="display: block; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px;">Construction style</label>
@@ -7325,6 +7335,9 @@ function setPorchConstruction(t) {
   if (cfg) cfg.style.display = (t === 'cypress') ? '' : 'none';
   const sc = document.getElementById('porch-stick-config');
   if (sc) sc.style.display = (t === 'stick') ? '' : 'none';
+  // Cypress auto-figures post spacing (even bays ≤ 12') — no input needed
+  const psf = document.getElementById('porch-spacing-field');
+  if (psf) psf.style.display = (t === 'cypress') ? 'none' : '';
   recalc();
 }
 
@@ -8236,7 +8249,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v212';
+const BB_VERSION = 'v213';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -11770,20 +11783,30 @@ function getInputs() {
       });
       const bySide = {};
       sides.forEach(p => { bySide[p.side] = p; });
+      // Explicit porch ties (v213): a checked tie whose two porches are both enabled
+      // pulls those porches to the shared corner and joins the roofs with a hip.
+      const tieOn = id => { const el = document.getElementById(id); return !!(el && el.checked); };
+      const TIE_CORNERS = [['fr', 'front', 'right'], ['br', 'back', 'right'], ['bl', 'back', 'left'], ['fl', 'front', 'left']];
+      const activeTies = TIE_CORNERS.filter(c => tieOn('porch_tie_' + c[0]) && bySide[c[1]] && bySide[c[2]]);
+      // A side tied at BOTH corners must span the full wall
+      sides.forEach(p => {
+        const wallLen = (p.side === 'front' || p.side === 'back') ? L : W;
+        const myTies = activeTies.filter(c => c[1] === p.side || c[2] === p.side).length;
+        if (myTies >= 2) { p.L = wallLen; p.full = true; }
+      });
       let hipCount = 0, hipLF = 0, cornerSqft = 0;
-      [['front', 'right'], ['right', 'back'], ['back', 'left'], ['left', 'front']].forEach(pair => {
-        const pa = bySide[pair[0]], pb = bySide[pair[1]];
-        if (pa && pb && pa.full && pb.full) {
-          const d = (pa.W + pb.W) / 2;
-          hipCount++;
-          hipLF += Math.ceil(Math.sqrt(2 * d * d + Math.pow(d * pitch / 12, 2)) + 1);
-          cornerSqft += d * d;
-        }
+      activeTies.forEach(c => {
+        const d = (bySide[c[1]].W + bySide[c[2]].W) / 2;
+        hipCount++;
+        hipLF += Math.ceil(Math.sqrt(2 * d * d + Math.pow(d * pitch / 12, 2)) + 1);
+        cornerSqft += d * d;
       });
       let sqft = cornerSqft, postCount = 0, beamCount = 0, edgeLF = 0, rafterLF = 0, lathLF = 0;
+      const cypressAuto = currentPorchConstruction === 'cypress';
       sides.forEach(p => {
         sqft += p.W * p.L;
-        postCount += Math.ceil(p.L / sp) + 1;
+        // Cypress auto-figures spacing: even bays no wider than 12'
+        postCount += cypressAuto ? Math.ceil(p.L / 12) + 1 : Math.ceil(p.L / sp) + 1;
         beamCount += Math.ceil(p.L / 4) + 1;
         edgeLF += p.L;
         const rise = p.W * (pitch / 12);
@@ -17051,6 +17074,22 @@ function buildPorch3D(dims, wallBase) {
   const hdrH = ({ '2x8': 0.62, '2x10': 0.79, '2x12': 0.96 })[hdrDim] || 0.79;
   const bySide = {};
   sides.forEach(p => { bySide[p.side] = p; });
+  // Explicit porch ties: pull tied porches to the shared corner, join roofs with a hip
+  const tieOn = id => { const el = document.getElementById(id); return !!(el && el.checked); };
+  const TIE_CORNERS = [['fr', 'front', 'right', 1, 1], ['br', 'back', 'right', 1, -1], ['bl', 'back', 'left', -1, -1], ['fl', 'front', 'left', -1, 1]];
+  const activeTies = TIE_CORNERS.filter(c => tieOn('porch_tie_' + c[0]) && bySide[c[1]] && bySide[c[2]]);
+  sides.forEach(p => {
+    const wallLen = (p.side === 'front' || p.side === 'back') ? L : W;
+    const myTies = activeTies.filter(c => c[1] === p.side || c[2] === p.side);
+    if (myTies.length >= 2) { p.len = wallLen; p.full = true; p.off = 0; return; }
+    p.off = 0;
+    if (myTies.length === 1 && p.len < wallLen) {
+      const key = myTies[0][0];
+      // world-axis offset toward the tied corner
+      if (p.side === 'front' || p.side === 'back') p.off = (key === 'fr' || key === 'br' ? 1 : -1) * (wallLen - p.len) / 2;
+      else p.off = (key === 'fr' || key === 'fl' ? 1 : -1) * (wallLen - p.len) / 2;
+    }
+  });
 
   sides.forEach(p => {
     const rise = p.d * (pitch / 12);
@@ -17067,18 +17106,20 @@ function buildPorch3D(dims, wallBase) {
     slab.position.set(0, 0.2, p.d / 2);
     addP(slab, 'Porch slab');
 
-    // Posts + (cypress) knee braces
-    const postN = Math.max(2, Math.ceil(p.len / spFt) + 1);
+    // Posts + (cypress) knee braces — cypress auto-figures even bays ≤ 12'
+    const postN = Math.max(2, (isCypress ? Math.ceil(p.len / 12) : Math.ceil(p.len / spFt)) + 1);
     for (let k = 0; k < postN; k++) {
       const px = -p.len / 2 + (p.len / (postN - 1)) * k;
       const post = new THREE.Mesh(new THREE.BoxGeometry(postT, postH, postT), woodM(POST_HEX));
       post.position.set(px, wallBase + postH / 2, p.d - postT / 2);
       addP(post, isCypress ? 'Porch post — 8×8 cypress' : 'Porch post — 6×6 PT');
       if (isCypress) {
+        // Knee braces run from the post UP and OUT into the carrier: bottom on the
+        // post face, top leaning away along the beam (rotation sign flipped v213).
         [-1, 1].forEach(sgn => {
           const br = new THREE.Mesh(new THREE.BoxGeometry(0.29, 3.1, 0.29), woodM(0xcfa95f));
-          br.rotation.z = sgn * Math.PI / 4;
-          br.position.set(px + sgn * 1.05, wallBase + postH - 1.4, p.d - postT / 2);
+          br.rotation.z = -sgn * Math.PI / 4;
+          br.position.set(px + sgn * 0.78, wallBase + postH - 1.45, p.d - postT / 2);
           addP(br, 'Cypress knee brace — 4×6');
         });
       }
@@ -17127,19 +17168,19 @@ function buildPorch3D(dims, wallBase) {
     roof.position.set(0, wallBase + hHigh + 0.1 - Math.sin(angle) * (slopeLen / 2), Math.cos(angle) * (slopeLen / 2) - 0.1);
     addP(roof, 'Porch roof');
 
-    // Place onto the chosen wall
-    if (p.side === 'front')      { grp.rotation.y = 0;            grp.position.set(0, 0,  W / 2); }
-    else if (p.side === 'back')  { grp.rotation.y = Math.PI;      grp.position.set(0, 0, -W / 2); }
-    else if (p.side === 'right') { grp.rotation.y = Math.PI / 2;  grp.position.set( L / 2, 0, 0); }
-    else                         { grp.rotation.y = -Math.PI / 2; grp.position.set(-L / 2, 0, 0); }
+    // Place onto the chosen wall (p.off slides a tied porch to its corner)
+    const off = p.off || 0;
+    if (p.side === 'front')      { grp.rotation.y = 0;            grp.position.set(off, 0,  W / 2); }
+    else if (p.side === 'back')  { grp.rotation.y = Math.PI;      grp.position.set(off, 0, -W / 2); }
+    else if (p.side === 'right') { grp.rotation.y = Math.PI / 2;  grp.position.set( L / 2, 0, off); }
+    else                         { grp.rotation.y = -Math.PI / 2; grp.position.set(-L / 2, 0, off); }
     buildingGroup.add(grp);
   });
 
-  // Wrap-around corners: hip beam tying the two roofs + shared corner post
-  [['front', 'right', 1, 1], ['right', 'back', 1, -1], ['back', 'left', -1, -1], ['left', 'front', -1, 1]]
-    .forEach(([a, b2, sx, sz]) => {
+  // Wrap-around corners: hip beam tying the two roofs + shared corner post (explicit ties)
+  activeTies
+    .forEach(([tieKey, a, b2, sx, sz]) => {
       const pa = bySide[a], pb = bySide[b2];
-      if (!(pa && pb && pa.full && pb.full)) return;
       const d = (pa.d + pb.d) / 2;
       const rise = d * (pitch / 12);
       const cx = sx * (L / 2), cz = sz * (W / 2);
@@ -17165,8 +17206,8 @@ function buildPorch3D(dims, wallBase) {
         [-1, 1].forEach(sgn => {
           const br = new THREE.Mesh(new THREE.BoxGeometry(0.29, 3.1, 0.29), woodM(0xcfa95f));
           br.rotation.y = Math.atan2(ux, uz);
-          br.rotation.z = sgn * Math.PI / 4;
-          br.position.set(end.x - ux * postT + sgn * 0.75 * uz, wallBase + postH - 1.4, end.z - uz * postT - sgn * 0.75 * ux);
+          br.rotation.z = -sgn * Math.PI / 4;
+          br.position.set(end.x - ux * postT + sgn * 0.55 * uz, wallBase + postH - 1.45, end.z - uz * postT - sgn * 0.55 * ux);
           br.userData = { categoryKey: 'side_shed', label: 'Cypress knee brace — 4×6' };
           br.castShadow = br.receiveShadow = true;
           buildingGroup.add(br); allMeshes.push(br);
