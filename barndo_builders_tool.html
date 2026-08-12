@@ -2777,6 +2777,14 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
               <option value="yp">Yellow pine (YP) timber</option>
             </select>
           </div>
+          <div class="qbs-field">
+            <label>Y-bracing</label>
+            <select id="porch_ybrace" onchange="recalc()">
+              <option value="yes" selected>Yes — braces at posts &amp; corners</option>
+              <option value="none">None</option>
+            </select>
+            <div class="qbs-note">Decorative knee braces post-to-header</div>
+          </div>
         </div>
         
         <!-- Roof style sub-selector — Shed/wrap or Crows foot gable -->
@@ -17157,6 +17165,7 @@ function buildPorch3D(dims, wallBase) {
   const tPostType = selV('porch_timber_post_type', 'cypress');
   const tHdrSize = selV('porch_timber_header_size', '8x8');
   const tHdrType = selV('porch_timber_header_type', 'cypress');
+  const wantBraces = selV('porch_ybrace', 'yes') !== 'none';
   const POST_HEX = isCypress ? (tPostType === 'yp' ? YP_HEX : CYP_HEX) : 0x8b6f47;
   const RAFT_HEX = isCypress ? CYP_HEX : 0xd2ad79;
   const postT = isCypress ? (TIMBER_DIMS[tPostSize] || 0.67) : 0.46;
@@ -17206,7 +17215,7 @@ function buildPorch3D(dims, wallBase) {
       const post = new THREE.Mesh(new THREE.BoxGeometry(postT, postH, postT), woodM(POST_HEX));
       post.position.set(px, wallBase + postH / 2, p.d - postT / 2);
       addP(post, isCypress ? `Porch post — ${tPostSize.replace('x','×')} ${tPostType === 'yp' ? 'YP' : 'cypress'} timber` : 'Porch post — 6×6 PT');
-      if (isCypress) {
+      if (isCypress && wantBraces) {
         // Knee braces run from the post UP and OUT into the carrier: bottom on the
         // post face, top leaning away along the beam (rotation sign flipped v213).
         [-1, 1].forEach(sgn => {
@@ -17310,8 +17319,23 @@ function buildPorch3D(dims, wallBase) {
 
       // 3. Shared corner post under the header junction
       const cp = new THREE.Mesh(new THREE.BoxGeometry(postT, postH, postT), woodM(POST_HEX));
-      cp.position.set(cx + sx * (xd - postT / 2), wallBase + postH / 2, cz + sz * (zd - postT / 2));
+      const pxc = cx + sx * (xd - postT / 2), pzc = cz + sz * (zd - postT / 2);
+      cp.position.set(pxc, wallBase + postH / 2, pzc);
       addB(cp, 'Porch corner post (wrap)');
+      // Y-bracing on the corner post — one brace up into EACH header (timber porches)
+      if (isCypress && wantBraces) {
+        const brY = wallBase + postH - 1.45;
+        // into header A (runs along x): brace tilts in the x-y plane, top leans back along the porch
+        const brA = new THREE.Mesh(new THREE.BoxGeometry(0.29, 3.1, 0.29), woodM(0xcfa95f));
+        brA.rotation.z = sx * Math.PI / 4;
+        brA.position.set(pxc - sx * 0.78, brY, cz + sz * (zd - 0.3));
+        addB(brA, 'Cypress knee brace — 4×6 (corner post)');
+        // into header B (runs along z): brace tilts in the z-y plane
+        const brB = new THREE.Mesh(new THREE.BoxGeometry(0.29, 3.1, 0.29), woodM(0xcfa95f));
+        brB.rotation.x = -sz * Math.PI / 4;
+        brB.position.set(cx + sx * (xd - 0.3), brY, pzc - sz * 0.78);
+        addB(brB, 'Cypress knee brace — 4×6 (corner post)');
+      }
 
       // 4. Roof metal over the corner — two textured triangles meeting at the hip
       const yHA = wallBase + postH + zd * (pitch / 12) + 0.08;   // apex per porch slope
