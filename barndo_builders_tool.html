@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v210</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v211</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2666,6 +2666,42 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         </div>
       </div>
       
+      <!-- Stick-frame sizes — only visible when stick is selected (default) -->
+      <div id="porch-stick-config" style="margin-top: 20px;">
+        <h4 style="font-family: var(--font-headline); font-size: 13px; color: var(--copper); margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.06em;">Stick framing sizes</h4>
+        <div class="qbs-grid-3">
+          <div class="qbs-field">
+            <label>Rafter size</label>
+            <select id="porch_rafter_size" onchange="recalc()">
+              <option value="2x6">2×6</option>
+              <option value="2x8" selected>2×8</option>
+              <option value="2x10">2×10</option>
+              <option value="2x12">2×12</option>
+            </select>
+            <div class="qbs-note">SYP, 16" OC, cut to slope + 1' tail</div>
+          </div>
+          <div class="qbs-field">
+            <label>Header / carrier size</label>
+            <select id="porch_header_size" onchange="recalc()">
+              <option value="dbl2x8">Double 2×8</option>
+              <option value="dbl2x10" selected>Double 2×10</option>
+              <option value="dbl2x12">Double 2×12</option>
+            </select>
+            <div class="qbs-note">Beam on the posts the rafters bear on</div>
+          </div>
+          <div class="qbs-field">
+            <label>Roof lathing</label>
+            <select id="porch_lath_size" onchange="recalc()">
+              <option value="none">None (sheathed roof)</option>
+              <option value="1x4">1×4 lath</option>
+              <option value="2x4" selected>2×4 purlin</option>
+              <option value="2x6">2×6 purlin</option>
+            </select>
+            <div class="qbs-note">Rows at 2' OC up the slope — metal screws to these</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Cypress-specific config — only visible when cypress is selected -->
       <div id="cypress-porch-config" style="display: none; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--hairline);">
         <h4 style="font-family: var(--font-headline); font-size: 13px; color: var(--copper); margin: 0 0 16px 0; text-transform: uppercase; letter-spacing: 0.06em;">Cypress timber details</h4>
@@ -5426,7 +5462,7 @@ function postPlateCount(i, size) {
 // Cypress derived from the Cypress timber porch catalog (8×8 ≈ $19/LF, 4×6 ≈ $6.50/LF).
 // Adjust on Pricing master via the line's price override once real supplier numbers land.
 const SHED_LF_COST = {
-  lumber:  { '2x6': 1.25, '2x8': 1.65, '2x10': 2.45, '2x12': 3.30 },
+  lumber:  { '1x4': 0.30, '2x4': 0.55, '2x6': 1.25, '2x8': 1.65, '2x10': 2.45, '2x12': 3.30 },
   pt:      { '2x6': 1.55, '2x8': 2.10, '2x10': 3.00, '2x12': 4.00,
              '4x4': 1.05, '4x6': 2.60, '6x6': 3.90, '6x8': 5.60, '8x8': 8.60 },
   cypress: { '4x4': 3.30, '4x6': 6.50, '6x6': 9.80, '6x8': 13.00, '8x8': 19.00 },
@@ -5952,15 +5988,24 @@ const MATERIALS = [
       if (i.porchConstruction !== 'stick' || !(d.W > 0 && d.L > 0)) return 0;
       return Math.ceil(d.L / (d.postSpacingFt || 10)) + 1;
     }},
-  { id: "porch_carrier", label: "Porch: rafter carrier — double 2×10 SYP (on posts)", cat: "Porch framing", uom: "LF", packSize: null,
+  { id: "porch_carrier", label: "Porch: rafter carrier / header (on posts)", cat: "Porch framing", uom: "LF", packSize: null,
     priceCost: 2.45, priceSell: 3.10, priceRetail: 4.10,
+    labelFn: i => `Porch: rafter carrier / header — ${shedSizeLabel((i.porchDims || {}).headerSize || 'dbl2x10')} SYP (on posts)`,
+    customUnitPrice: i => {
+      const sz = (i.porchDims || {}).headerSize || 'dbl2x10';
+      const dim = String(sz).indexOf('dbl') === 0 ? sz.slice(3) : sz;
+      return shedMemberCostLF('lumber', dim);
+    },
     formula: i => {
       const d = i.porchDims || {};
       if (i.porchConstruction !== 'stick' || !(d.W > 0 && d.L > 0)) return 0;
-      return Math.ceil(d.L * 2 * 1.05);   // 2-ply
+      const plies = String(d.headerSize || 'dbl2x10').indexOf('dbl') === 0 ? 2 : 1;
+      return Math.ceil(d.L * plies * 1.05);
     }},
-  { id: "porch_rafter_2x8", label: "Porch: 2×8 SYP rafter @ 16\" OC (cut to slope + 1' tail)", cat: "Porch framing", uom: "LF", packSize: null,
+  { id: "porch_rafter_2x8", label: "Porch: SYP rafter @ 16\" OC (cut to slope + 1' tail)", cat: "Porch framing", uom: "LF", packSize: null,
     priceCost: 1.65, priceSell: 2.10, priceRetail: 2.80,
+    labelFn: i => `Porch: ${shedSizeLabel((i.porchDims || {}).rafterSize || '2x8')} SYP rafter @ 16" OC (cut to slope + 1' tail)`,
+    customUnitPrice: i => shedMemberCostLF('lumber', (i.porchDims || {}).rafterSize || '2x8'),
     formula: i => {
       const d = i.porchDims || {};
       if (i.porchConstruction !== 'stick' || !(d.W > 0 && d.L > 0)) return 0;
@@ -5968,6 +6013,19 @@ const MATERIALS = [
       const cutLen = Math.sqrt(d.W * d.W + rise * rise) + 1;
       const count = Math.ceil(d.L / (16 / 12)) + 1;
       return Math.ceil(count * cutLen * 1.05);
+    }},
+  { id: "porch_lath", label: "Porch: roof lathing (rows @ 2' OC up the slope)", cat: "Porch framing", uom: "LF", packSize: null,
+    priceCost: 0.55, priceSell: 0.75, priceRetail: 0.95,
+    labelFn: i => `Porch: ${shedSizeLabel((i.porchDims || {}).lathSize || '2x4')} SYP roof lathing (rows @ 2' OC up the slope)`,
+    customUnitPrice: i => shedMemberCostLF('lumber', (i.porchDims || {}).lathSize || '2x4'),
+    formula: i => {
+      const d = i.porchDims || {};
+      if (i.porchConstruction !== 'stick' || !(d.W > 0 && d.L > 0)) return 0;
+      if ((d.lathSize || '2x4') === 'none') return 0;
+      const rise = d.W * ((d.pitch || 3) / 12);
+      const slope = Math.sqrt(d.W * d.W + rise * rise) + 1;
+      const rows = Math.ceil(slope / 2) + 1;
+      return Math.ceil(rows * d.L * 1.05);
     }},
   { id: "porch_ledger_pt", label: "Porch: 2×10 PT ledger band at building (rafter tie-in)", cat: "Porch framing", uom: "LF", packSize: null,
     priceCost: 3.00, priceSell: 3.80, priceRetail: 4.80,
@@ -7241,9 +7299,11 @@ function setPorchConstruction(t) {
   document.querySelectorAll('.qbs-tier-btn').forEach(b => {
     if (b.dataset.porchtype) b.classList.toggle('active', b.dataset.porchtype === t);
   });
-  // Show/hide the cypress-specific config sub-section
+  // Show/hide the style-specific config sub-sections
   const cfg = document.getElementById('cypress-porch-config');
   if (cfg) cfg.style.display = (t === 'cypress') ? '' : 'none';
+  const sc = document.getElementById('porch-stick-config');
+  if (sc) sc.style.display = (t === 'stick') ? '' : 'none';
   recalc();
 }
 
@@ -8155,7 +8215,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v210';
+const BB_VERSION = 'v211';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -11671,6 +11731,9 @@ function getInputs() {
         postSpacingFt: num('porch_post_spacing') || 10,
         pitch: num('porch_pitch') || 3,
         postH: num('porch_post_height') || 9,
+        rafterSize: (document.getElementById('porch_rafter_size') || {}).value || '2x8',
+        headerSize: (document.getElementById('porch_header_size') || {}).value || 'dbl2x10',
+        lathSize: (document.getElementById('porch_lath_size') || {}).value || '2x4',
       };
     })(),
     // Cypress timber-frame porch inputs (only meaningful when porchConstruction === 'cypress')
@@ -16947,10 +17010,13 @@ function buildPorch3D(dims, wallBase) {
     addP(post);
   }
 
-  // Carrier beam across the post tops
-  const carrier = new THREE.Mesh(new THREE.BoxGeometry(pL, isCypress ? 0.5 : 0.79, isCypress ? 0.5 : 0.26), woodM(isCypress ? 0xd8b56e : 0xbe9352));
+  // Carrier beam across the post tops — stick size follows the header select
+  const hdrSel = (document.getElementById('porch_header_size') || {}).value || 'dbl2x10';
+  const hdrDim = hdrSel.indexOf('dbl') === 0 ? hdrSel.slice(3) : hdrSel;
+  const hdrH = ({ '2x8': 0.62, '2x10': 0.79, '2x12': 0.96 })[hdrDim] || 0.79;
+  const carrier = new THREE.Mesh(new THREE.BoxGeometry(pL, isCypress ? 0.5 : hdrH, isCypress ? 0.5 : 0.26), woodM(isCypress ? 0xd8b56e : 0xbe9352));
   carrier.position.set(0, wallBase + postH - 0.3, pW - 0.25);
-  carrier.userData = { categoryKey: 'side_shed', label: isCypress ? 'Porch carrier — cypress' : 'Porch carrier — double 2×10', isFraming: false };
+  carrier.userData = { categoryKey: 'side_shed', label: isCypress ? 'Porch carrier — cypress' : 'Porch carrier — double ' + hdrDim.replace('x', '×'), isFraming: false };
   addP(carrier);
 
   // Ledger at the main wall
@@ -16959,10 +17025,12 @@ function buildPorch3D(dims, wallBase) {
   ledger.userData = { categoryKey: 'side_shed', label: 'Porch ledger band at building' };
   addP(ledger);
 
-  // Rafters — cypress 4×6 @48" or lumber 2×8 @16"
+  // Rafters — cypress 4×6 @48" or lumber @16" in the selected size
   const rSp = isCypress ? 4 : 16 / 12;
   const rN = Math.ceil(pL / rSp);
-  const rDims = isCypress ? [0.33, 0.5] : [0.13, 0.62];
+  const rafSel = (document.getElementById('porch_rafter_size') || {}).value || '2x8';
+  const rafH = ({ '2x6': 0.5, '2x8': 0.62, '2x10': 0.79, '2x12': 0.96 })[rafSel] || 0.62;
+  const rDims = isCypress ? [0.33, 0.5] : [0.13, rafH];
   for (let r = 0; r <= rN; r++) {
     const rx = -pL / 2 + Math.min(pL, r * rSp);
     const raf = new THREE.Mesh(new THREE.BoxGeometry(rDims[0], rDims[1], slopeLen), woodM(isCypress ? 0xd8b56e : 0xd2ad79));
@@ -16970,7 +17038,7 @@ function buildPorch3D(dims, wallBase) {
     raf.position.set(rx,
       wallBase + hHigh - 0.25 - Math.sin(angle) * (slopeLen / 2),
       Math.cos(angle) * (slopeLen / 2) - 0.1);
-    raf.userData = { categoryKey: 'side_shed', label: isCypress ? 'Porch rafter — 4×6 cypress' : 'Porch rafter — 2×8', isFraming: false };
+    raf.userData = { categoryKey: 'side_shed', label: isCypress ? 'Porch rafter — 4×6 cypress' : 'Porch rafter — ' + rafSel.replace('x', '×'), isFraming: false };
     addP(raf);
   }
 
