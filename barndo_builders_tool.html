@@ -2733,6 +2733,14 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
             </select>
             <div class="qbs-note">Rows at 2' OC up the slope — metal screws to these</div>
           </div>
+          <div class="qbs-field">
+            <label>Y-bracing</label>
+            <select id="porch_ybrace_stick" onchange="recalc()">
+              <option value="yes" selected>Yes — 2×6 SYP (1× 2×6×8 per post)</option>
+              <option value="none">None</option>
+            </select>
+            <div class="qbs-note">One 2×6×8 does the braces per post</div>
+          </div>
         </div>
       </div>
 
@@ -2780,10 +2788,10 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           <div class="qbs-field">
             <label>Y-bracing</label>
             <select id="porch_ybrace" onchange="recalc()">
-              <option value="yes" selected>Yes — braces at posts &amp; corners</option>
+              <option value="yes" selected>Yes — 4×6 cypress (1× 4×6×8 per post)</option>
               <option value="none">None</option>
             </select>
-            <div class="qbs-note">Decorative knee braces post-to-header</div>
+            <div class="qbs-note">One 4×6×8 does the braces per post — posts &amp; corners</div>
           </div>
         </div>
         
@@ -6108,6 +6116,14 @@ const MATERIALS = [
       if (((i.porchDims || {}).lathSize || '2x4') === 'none') return 0;
       return Math.ceil(i.porchAgg.lathLF * 1.05);
     }},
+  { id: "porch_ybrace_26", label: "Porch: Y-brace — 2×6×8 SYP (1 per post)", cat: "Porch framing", uom: "ea", packSize: null,
+    priceCost: 10.00, priceSell: 12.60, priceRetail: 15.80,
+    customUnitPrice: i => shedMemberCostLF('lumber', '2x6') * 8,
+    formula: i => {
+      if (i.porchConstruction !== 'stick' || !i.porchAgg || !i.porchAgg.count) return 0;
+      if ((i.porchDims || {}).ybraceStick === 'none') return 0;
+      return i.porchAgg.postCount;
+    }},
   { id: "porch_ledger_pt", label: "Porch: 2×10 PT ledger band at building (rafter tie-in)", cat: "Porch framing", uom: "LF", packSize: null,
     priceCost: 3.00, priceSell: 3.80, priceRetail: 4.80,
     formula: i => {
@@ -6913,6 +6929,16 @@ const MATERIALS = [
     formula: i => {
       if (!i.cypressPorchActive || !i.porchAgg || !i.porchAgg.edgeLF) return 0;
       return Math.ceil((i.porchAgg.headerLF || i.porchAgg.edgeLF) * 1.05);
+    }},
+
+  // Y-braces — one 4×6×8 cypress does the bracing per post (v215)
+  { id: "porch_ybrace_46_cypress", label: "Porch: Y-brace — 4×6×8 cypress (1 per post)", cat: "Cypress timber porch", uom: "ea", packSize: null,
+    priceCost: 52.00, priceSell: 66, priceRetail: 82,
+    customUnitPrice: i => shedMemberCostLF('cypress', '4x6') * 8,
+    formula: i => {
+      if (!i.cypressPorchActive) return 0;
+      if ((i.porchDims || {}).ybraceTimber === 'none') return 0;
+      return i.cypressPostCount;
     }},
 
   // 4×6 cypress beams (length-conditional)
@@ -11853,6 +11879,8 @@ function getInputs() {
       timberPostType: (document.getElementById('porch_timber_post_type') || {}).value || 'cypress',
       timberHeaderSize: (document.getElementById('porch_timber_header_size') || {}).value || '8x8',
       timberHeaderType: (document.getElementById('porch_timber_header_type') || {}).value || 'cypress',
+      ybraceStick: (document.getElementById('porch_ybrace_stick') || {}).value || 'yes',
+      ybraceTimber: (document.getElementById('porch_ybrace') || {}).value || 'yes',
     },
     // Multi-porch aggregate (v212): one slot per side; adjacent FULL-length porches tie
     // with a hip at the shared corner (wrap-around) — hip framing + corner sqft included,
@@ -17352,12 +17380,17 @@ function buildPorch3D(dims, wallBase) {
           color: 0xffffff, map: triTex, roughness: 0.30, metalness: 0.55, side: THREE.DoubleSide }));
         addB(m, lbl);
       };
-      tri([cx, yHA, cz], [cx, yE, oz], [ox, yE, oz], 'Porch corner roof metal (hip)');
-      tri([cx, yHB, cz], [ox, yE, cz], [ox, yE, oz], 'Porch corner roof metal (hip)');
+      // Each porch's roof plane runs FLAT (its own slope, same 1' eave tail) out to the
+      // hip line; the two planes meet exactly on the building-corner → corner-post diagonal.
+      const oh = 1;
+      const oxo = ox + sx * oh, ozo = oz + sz * oh;
+      const yEo = wallBase + postH - (pitch / 12) * oh + 0.08;
+      tri([cx, yHA, cz], [cx, yEo, ozo], [oxo, yEo, ozo], 'Porch corner roof metal (hip)');
+      tri([cx, yHB, cz], [oxo, yEo, cz], [oxo, yEo, ozo], 'Porch corner roof metal (hip)');
 
-      // 5. Hip beam under the diagonal
+      // 5. Hip beam — from the corner of the BUILDING down to the CORNER POST
       const hs = new THREE.Vector3(cx, Math.min(yHA, yHB) - 0.4, cz);
-      const he = new THREE.Vector3(ox, yE - 0.45, oz);
+      const he = new THREE.Vector3(pxc, wallBase + postH - 0.25, pzc);
       const dir = he.clone().sub(hs);
       const hip = new THREE.Mesh(
         new THREE.BoxGeometry(isCypress ? 0.33 : 0.26, isCypress ? 0.5 : 0.79, dir.length()),
