@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v208</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v209</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -4389,6 +4389,12 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
       #ws-left .openings-table input, #ws-left .openings-table select { font-size: 11px; padding: 3px 4px; }
       #ws-left #bulk-import-panel textarea { min-height: 100px; }
       #ws-left .openings-table tbody:empty::after { white-space: nowrap; }
+      /* Full Dimensions tab lives in the rail: wide cards scroll, 4-across grids go 2-across.
+         flex-shrink:0 is load-bearing — overflow≠visible turns flex min-height to 0 and the
+         column would otherwise squash every card to its header. */
+      #ws-left .qbs-card { overflow-x: auto; flex-shrink: 0; }
+      #ws-left .qbs-grid-4, #ws-left .qbs-grid-3 { grid-template-columns: 1fr 1fr; }
+      #ws-left table { font-size: 11px; }
     </style>
     <div style="display:grid; grid-template-columns:420px 1fr 400px; gap:12px; align-items:start;">
       <div id="ws-left" style="max-height:calc(100vh - 230px); overflow-y:auto; display:flex; flex-direction:column; gap:12px;"></div>
@@ -8074,7 +8080,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v208';
+const BB_VERSION = 'v209';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -8731,19 +8737,16 @@ function wsEnter() {
   const center = document.getElementById('ws-center');
   if (!left || !center) return;
   center.innerHTML = '';
-  const cardOf = id => { const el = document.getElementById(id); return el ? el.closest('.qbs-card') : null; };
-  // left rail: tier, dimensions, products/colors, floor system
-  _wsAdoptNode(document.querySelector('.qbs-tier-btn') ? document.querySelector('.qbs-tier-btn').closest('.qbs-card') : null, left);
-  _wsAdoptNode(cardOf('width'), left);
-  _wsAdoptNode(cardOf('siding_product'), left);
-  _wsAdoptNode(cardOf('windows-tbody'), left);   // Openings: windows / ext doors / int doors / garage doors
-  _wsAdoptNode(document.getElementById('side-shed-card'), left);   // Lean-to / side shed / porch selections
-  _wsAdoptNode(cardOf('floor_system'), left);
-  // quick-nav to everything not in the rail
+  // Adopt EVERY Dimensions-tab card, in order — the Builder rail IS the Dimensions
+  // tab (construction system, post-frame details, trusses, porches, trim — all of it).
+  // Cards keep their own conditional show/hide logic; they restore home on leave.
+  const inputsTab = document.getElementById('tab-inputs');
+  if (inputsTab) Array.from(inputsTab.children).forEach(node => _wsAdoptNode(node, left));
+  // quick-nav to the other tabs
   const nav = document.createElement('div');
   nav.className = 'qbs-card';
   nav.innerHTML = '<h3>More</h3><div style="display:flex; flex-wrap:wrap; gap:6px;">'
-    + [['inputs', 'Full Dimensions'], ['takeoff', 'Takeoff'], ['materials', 'Materials'], ['subs', 'Subs & labor'], ['quote', 'Quote'], ['proposal', 'Proposal']]
+    + [['takeoff', 'Takeoff'], ['materials', 'Materials'], ['subs', 'Subs & labor'], ['quote', 'Quote'], ['proposal', 'Proposal']]
       .map(([t, l]) => `<button onclick="switchTab('${t}')" style="font-size:11px;">${l}</button>`).join('') + '</div>';
   nav.id = 'ws-nav-card';
   left.appendChild(nav);
