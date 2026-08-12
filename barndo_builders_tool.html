@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v207</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v208</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2796,7 +2796,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
     </div>
     
     <div class="qbs-card" id="side-shed-card">
-      <h3>Side shed / lean-to <span class="badge">Shop/Barn or Post-frame only · attaches to main building</span></h3>
+      <h3>Side shed / lean-to <span class="badge">Porches & side sheds · any build · attaches to main building</span></h3>
       <p class="qbs-sub" style="margin-bottom: 14px;">Adds a single-slope addition along one side of the main building. Tool adds shed materials (rafters or trusses, panels, posts, girts, purlins, trim) on top of the main building takeoff.</p>
       
       <div class="qbs-grid-4">
@@ -7391,15 +7391,11 @@ function updateWallSystemUI() {
   if (m) m.style.display = show ? '' : 'none';
 }
 
-// Show/hide the Side shed card based on tier + construction (its inputs now live on the Dimensions tab).
+// Side shed / lean-to card is always available (v208): lean-tos and porches apply to
+// any tier/construction — posts carry the roof regardless of the main build.
 function updateAdditionsTabVisibility() {
-  const tierEl = document.querySelector('.qbs-tier-btn[data-tier].active');
-  const tier = tierEl ? tierEl.dataset.tier : null;
-  const isShopBarn = (tier === 'shop');
-  const isPostFrame = (currentConstruction === 'post');
-  const shedApplies = isShopBarn || isPostFrame;
   const shedCard = document.getElementById('side-shed-card');
-  if (shedCard) shedCard.style.display = shedApplies ? '' : 'none';
+  if (shedCard) shedCard.style.display = '';
 }
 
 // Show/hide the Porch card based on whether porch_sqft > 0.
@@ -8078,7 +8074,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v207';
+const BB_VERSION = 'v208';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -8741,6 +8737,7 @@ function wsEnter() {
   _wsAdoptNode(cardOf('width'), left);
   _wsAdoptNode(cardOf('siding_product'), left);
   _wsAdoptNode(cardOf('windows-tbody'), left);   // Openings: windows / ext doors / int doors / garage doors
+  _wsAdoptNode(document.getElementById('side-shed-card'), left);   // Lean-to / side shed / porch selections
   _wsAdoptNode(cardOf('floor_system'), left);
   // quick-nav to everything not in the rail
   const nav = document.createElement('div');
