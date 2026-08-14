@@ -17251,14 +17251,14 @@ function buildCrowsFoot3D(dims, wallBase) {
   // Crows-foot truss ON the header at the gable face — all 4×6 cypress.
   // The FAN radiates from the bottom center UP into the rafters (bird's-foot),
   // kingpost vertical to the peak.
-  const king = new THREE.Mesh(new THREE.BoxGeometry(0.33, rise, 0.5), woodM(CY2));
+  const king = new THREE.Mesh(new THREE.BoxGeometry(0.5, rise, 0.33), woodM(CY2));
   king.position.set(0, wallBase + gh + rise / 2, faceZ);
   add(king, 'Crows foot kingpost — 4×6 cypress');
   [-1, 1].forEach(s => {
     const xe = half * 0.55;                     // where the strut meets the rafter line
     const ye = rise * 0.45;                     // rafter underside height at that point
     const strutLen = Math.sqrt(xe * xe + ye * ye);
-    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.33, strutLen, 0.5), woodM(CY2));
+    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.5, strutLen, 0.33), woodM(CY2));
     strut.rotation.z = -s * Math.atan2(xe, ye); // bottom at center, top leaning out
     strut.position.set(s * xe / 2, wallBase + gh + ye / 2, faceZ);
     add(strut, 'Crows foot fan strut — 4×6 cypress');
@@ -17427,11 +17427,23 @@ function buildPorch3D(dims, wallBase) {
     ledger.position.set(0, wallBase + hHigh - 0.6, 0.1);
     addP(ledger, 'Porch ledger band at building');
 
-    // Rafters
+    const gableCut = (() => {
+      if (p.side !== 'front') return null;
+      const pt = document.querySelector('[data-porchtype].active');
+      const st = document.querySelector('[data-cypressstyle].active');
+      if (!(pt && pt.dataset.porchtype === 'cypress' && st && st.dataset.cypressstyle === 'gable')) return null;
+      const gwv = parseFloat((document.getElementById('cypress_gable_width') || {}).value) || 0;
+      const gdv = parseFloat((document.getElementById('cypress_gable_length') || {}).value) || 0;
+      if (!(gwv > 0 && gdv > 0)) return null;
+      const c = -(p.off || 0);                     // gable center in porch-local x
+      return [c - gwv / 2, c + gwv / 2];
+    })();
+    // Rafters (skip the open gable bay — the crows foot spans it)
     const rSp = isCypress ? 4 : 16 / 12;
     const rN = Math.ceil(p.len / rSp);
     for (let k = 0; k <= rN; k++) {
       const rx = -p.len / 2 + Math.min(p.len, k * rSp);
+      if (gableCut && rx > gableCut[0] - 0.2 && rx < gableCut[1] + 0.2) continue;
       const raf = new THREE.Mesh(
         new THREE.BoxGeometry(isCypress ? 0.33 : 0.13, isCypress ? 0.5 : rafH, slopeLen),
         woodM(RAFT_HEX));
@@ -17449,14 +17461,28 @@ function buildPorch3D(dims, wallBase) {
       addP(tg, 'T&G ceiling — 2×8 #1 SYP');
     }
 
-    // Roof plane in the roof color
-    const rTex = makeTuffRibTexture(true, colors.roof);
-    rTex.repeat.set(p.len / 3, 1);
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(p.len + 0.4, 0.1, slopeLen),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, map: rTex, roughness: 0.30, metalness: 0.55 }));
-    roof.rotation.x = angle;
-    roof.position.set(0, wallBase + hHigh + 0.1 - Math.sin(angle) * (slopeLen / 2), Math.cos(angle) * (slopeLen / 2) - 0.1);
-    addP(roof, 'Porch roof');
+    // Roof plane in the roof color. When the crows-foot gable sits on THIS porch
+    // (front side), the shed metal SPLITS at the gable — no paneling under it —
+    // and the gable's own roof spans the gap.
+    const segs = [];
+    if (gableCut) {
+      const a = Math.max(-p.len / 2, Math.min(p.len / 2, gableCut[0]));
+      const b2 = Math.max(-p.len / 2, Math.min(p.len / 2, gableCut[1]));
+      if (a - (-p.len / 2) > 0.4) segs.push([-p.len / 2, a]);
+      if (p.len / 2 - b2 > 0.4) segs.push([b2, p.len / 2]);
+    } else {
+      segs.push([-p.len / 2, p.len / 2]);
+    }
+    segs.forEach(sg => {
+      const segLen = sg[1] - sg[0];
+      const rTex = makeTuffRibTexture(true, colors.roof);
+      rTex.repeat.set(segLen / 3, 1);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(segLen + 0.2, 0.1, slopeLen),
+        new THREE.MeshStandardMaterial({ color: 0xffffff, map: rTex, roughness: 0.30, metalness: 0.55 }));
+      roof.rotation.x = angle;
+      roof.position.set((sg[0] + sg[1]) / 2, wallBase + hHigh + 0.1 - Math.sin(angle) * (slopeLen / 2), Math.cos(angle) * (slopeLen / 2) - 0.1);
+      addP(roof, 'Porch roof');
+    });
 
     // Place onto the chosen wall (p.off slides a tied porch to its corner)
     const off = p.off || 0;
