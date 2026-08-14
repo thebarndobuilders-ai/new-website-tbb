@@ -2883,17 +2883,22 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
             <div class="qbs-field">
               <label>Gable width (ft)</label>
               <input type="number" id="cypress_gable_width" value="0" step="1" oninput="recalc()" />
-              <div class="qbs-note">Span across the gable (perpendicular to ridge)</div>
+              <div class="qbs-note">Outside of post to outside of post</div>
             </div>
             <div class="qbs-field">
-              <label>Gable length / ridge (ft)</label>
+              <label>Gable depth (ft)</label>
               <input type="number" id="cypress_gable_length" value="0" step="1" oninput="recalc()" />
-              <div class="qbs-note">Ridge length (projection out from house)</div>
+              <div class="qbs-note">Front side of posts back to the building siding (= ridge run)</div>
             </div>
             <div class="qbs-field">
               <label>Gable pitch (X/12)</label>
               <input type="number" id="cypress_gable_pitch" value="8" step="1" oninput="recalc()" />
               <div class="qbs-note">Standard 8/12 unless steeper</div>
+            </div>
+            <div class="qbs-field">
+              <label>Gable height (ft)</label>
+              <input type="number" id="cypress_gable_height" value="9" step="0.5" oninput="recalc()" />
+              <div class="qbs-note">Ground to top of the posts</div>
             </div>
           </div>
           <div class="qbs-grid-3" style="margin-top: 12px;">
@@ -4540,6 +4545,8 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
       #ws-left .openings-section { overflow-x: auto; }
       #ws-left .openings-table th, #ws-left .openings-table td { padding: 4px 3px; font-size: 11px; }
       #ws-left .openings-table input, #ws-left .openings-table select { font-size: 11px; padding: 3px 4px; }
+      /* qty + number cells must stay wide enough to read the count */
+      #ws-left .openings-table input[type="number"] { min-width: 52px; width: 52px !important; font-size: 13px; }
       #ws-left #bulk-import-panel textarea { min-height: 100px; }
       #ws-left .openings-table tbody:empty::after { white-space: nowrap; }
       /* Full Dimensions tab lives in the rail: wide cards scroll, 4-across grids go 2-across.
@@ -17174,96 +17181,125 @@ function generateModel() {
 // Side shed / lean-to from the Additions tab: single slope off one wall of the main
 // building. Built in local space (attach line at z=0, sloping outward toward +z,
 // length along x), then rotated/positioned onto the chosen wall.
-// Crows-foot gable entry (v217): decorative cypress timber gable projecting from the
-// front wall — 8×8 posts, headers, open gable face with kingpost + crows-foot fan
-// struts at the peak, gabled metal roof with ridge cap. Renders when the porch is
-// Timber frame + "Crows foot gable" style and gable width/length are set.
+// Gable timber frame porch (v217, per builder): TWO posts, ONE header/carrier
+// carrying the crows-foot truss; ridge runs from the building out to the truss peak;
+// rafters hang the slopes with a FLY RAFTER pair floating past the open gable face.
+// No roof paneling under it — the gable structure IS the roof. Width = outside of
+// post to outside of post · depth = front of post to the building siding · height =
+// ground to top of posts.
 function buildCrowsFoot3D(dims, wallBase) {
   const styleBtn = document.querySelector('[data-porchtype].active');
   if (!(styleBtn && styleBtn.dataset.porchtype === 'cypress')) return;
   const styleSel = document.querySelector('[data-cypressstyle].active');
   if (!(styleSel && styleSel.dataset.cypressstyle === 'gable')) return;
   const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
-  const gw = n('cypress_gable_width');    // span across the gable face
-  const gl = n('cypress_gable_length');   // projection out from the building (ridge length)
-  if (!(gw > 0 && gl > 0)) return;
+  const gw = n('cypress_gable_width');     // outside post → outside post
+  const gd = n('cypress_gable_length');    // front of posts → building siding
+  if (!(gw > 0 && gd > 0)) return;
   const gp = n('cypress_gable_pitch') || 8;
-  const postH = n('porch_post_height') || 9;
+  const gh = n('cypress_gable_height') || 9;
   const { W } = dims;
   const colors = bb3dSelectedColors();
-  const CY = 0xd8a95e, CY2 = 0xcfa95f;
+  const selV = (id, dflt) => { const el = document.getElementById(id); return (el && el.value) || dflt; };
+  const TIMBER_DIMS = { '6x6': 0.46, '6x8': 0.55, '8x8': 0.67, '8x10': 0.75, '10x10': 0.83 };
+  const tPostSize = selV('porch_timber_post_size', '8x8');
+  const tPostType = selV('porch_timber_post_type', 'cypress');
+  const tHdrSize = selV('porch_timber_header_size', '8x8');
+  const tHdrType = selV('porch_timber_header_type', 'cypress');
+  const wantBraces = selV('porch_ybrace', 'yes') !== 'none';
+  const CYP_HEX = 0xd8a95e, YP_HEX = 0xdcc98d, CY2 = 0xcfa95f;
+  const postHex = tPostType === 'yp' ? YP_HEX : CYP_HEX;
+  const hdrHex = tHdrType === 'yp' ? YP_HEX : CYP_HEX;
+  const postT = TIMBER_DIMS[tPostSize] || 0.67;
+  const hdrT = TIMBER_DIMS[tHdrSize] || 0.67;
   const woodM = hex => new THREE.MeshStandardMaterial({ color: hex, roughness: 0.9 });
   const grp = new THREE.Group();
   const add = (m, lbl) => { m.castShadow = m.receiveShadow = true;
     m.userData = { categoryKey: 'side_shed', label: lbl }; grp.add(m); allMeshes.push(m); };
+
   const half = gw / 2;
   const rise = half * (gp / 12);
-  // Gable eaves ride ABOVE the porch shed roof so the crows foot reads clearly
-  const roofBase = postH + 2.2;
+  const ang = Math.atan(gp / 12);
+  const faceZ = gd - postT / 2;            // post/truss centerline (front face at z = gd)
 
   // Slab pad
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(gw, 0.4, gl),
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(gw, 0.4, gd),
     new THREE.MeshStandardMaterial({ color: CATEGORY_COLORS.foundation.hex, roughness: 0.95 }));
-  slab.position.set(0, 0.2, gl / 2);
-  add(slab, 'Crows foot gable slab');
+  slab.position.set(0, 0.2, gd / 2);
+  add(slab, 'Gable porch slab');
 
-  // Two 8×8 cypress posts at the outer corners + knee braces
+  // TWO posts — outside faces at ±width/2
   [-1, 1].forEach(s => {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.67, postH, 0.67), woodM(CY));
-    post.position.set(s * (half - 0.34), wallBase + postH / 2, gl - 0.34);
-    add(post, 'Crows foot post — 8×8 cypress');
-    [-1, 1].forEach(sgn => {
-      const br = new THREE.Mesh(new THREE.BoxGeometry(0.29, 3.1, 0.29), woodM(CY2));
-      br.rotation.z = -sgn * Math.PI / 4;
-      br.position.set(s * (half - 0.34) + sgn * 0.78, wallBase + postH - 1.45, gl - 0.34);
-      add(br, 'Cypress knee brace — 4×6');
-    });
+    const post = new THREE.Mesh(new THREE.BoxGeometry(postT, gh, postT), woodM(postHex));
+    post.position.set(s * (half - postT / 2), wallBase + gh / 2, faceZ);
+    add(post, `Gable post — ${tPostSize.replace('x','×')} ${tPostType === 'yp' ? 'YP' : 'cypress'}`);
+    if (wantBraces) {
+      [-1, 1].forEach(sgn => {
+        const br = new THREE.Mesh(new THREE.BoxGeometry(0.29, 3.1, 0.29), woodM(CY2));
+        br.rotation.z = -sgn * Math.PI / 4;
+        br.position.set(s * (half - postT / 2) + sgn * 0.78, wallBase + gh - 1.45, faceZ);
+        add(br, 'Cypress knee brace — 4×6');
+      });
+    }
   });
 
-  // Headers: across the front posts + both sides back to the building
-  const hdrF = new THREE.Mesh(new THREE.BoxGeometry(gw, 0.67, 0.67), woodM(CY));
-  hdrF.position.set(0, wallBase + postH - 0.34, gl - 0.34);
-  add(hdrF, 'Crows foot header — 8×8 cypress');
-  [-1, 1].forEach(s => {
-    const hdrS = new THREE.Mesh(new THREE.BoxGeometry(0.67, 0.67, gl), woodM(CY));
-    hdrS.position.set(s * (half - 0.34), wallBase + postH - 0.34, gl / 2);
-    add(hdrS, 'Crows foot side beam — 8×8 cypress');
-  });
+  // ONE header / carrier across the posts — carries the crows foot
+  const hdr = new THREE.Mesh(new THREE.BoxGeometry(gw, hdrT, hdrT), woodM(hdrHex));
+  hdr.position.set(0, wallBase + gh - hdrT / 2, faceZ);
+  add(hdr, `Gable header / carrier — ${tHdrSize.replace('x','×')} ${tHdrType === 'yp' ? 'YP' : 'cypress'}`);
 
-  // Open gable face: bottom chord + kingpost + crows-foot fan struts at the peak
-  const chord = new THREE.Mesh(new THREE.BoxGeometry(gw, 0.5, 0.5), woodM(CY));
-  chord.position.set(0, wallBase + roofBase - 0.25, gl - 0.34);
-  add(chord, 'Crows foot bottom chord — cypress');
+  // Crows-foot truss ON the header at the gable face: kingpost + fan struts
   const king = new THREE.Mesh(new THREE.BoxGeometry(0.29, rise, 0.29), woodM(CY2));
-  king.position.set(0, wallBase + roofBase + rise / 2 - 0.15, gl - 0.34);
+  king.position.set(0, wallBase + gh + rise / 2, faceZ);
   add(king, 'Crows foot kingpost — 4×6 cypress');
   [-1, 1].forEach(s => {
-    const strutLen = Math.sqrt(Math.pow(half * 0.45, 2) + Math.pow(rise * 0.85, 2));
+    const strutLen = Math.sqrt(Math.pow(half * 0.5, 2) + Math.pow(rise * 0.85, 2));
     const strut = new THREE.Mesh(new THREE.BoxGeometry(0.24, strutLen, 0.24), woodM(CY2));
-    strut.rotation.z = s * Math.atan2(half * 0.45, rise * 0.85);
-    strut.position.set(s * half * 0.225, wallBase + roofBase + rise * 0.45, gl - 0.34);
+    strut.rotation.z = s * Math.atan2(half * 0.5, rise * 0.85);
+    strut.position.set(s * half * 0.25, wallBase + gh + rise * 0.42, faceZ);
     add(strut, 'Crows foot fan strut — cypress');
   });
 
-  // Gabled metal roof — ridge runs OUT from the building, ribs down each slope
-  const slopeLen = Math.sqrt(half * half + rise * rise) + 0.7;
-  const ang = Math.atan(rise / half);
+  // Ridge — from the building out to the truss peak
+  const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.5, gd + 0.1), woodM(CY2));
+  ridge.position.set(0, wallBase + gh + rise - 0.25, gd / 2);
+  add(ridge, 'Gable ridge — 4×6 cypress');
+
+  // Rafters — pairs down both slopes @48", from the building to the face,
+  // PLUS the FLY RAFTER pair floating past the open gable face
+  const eaveOH = 0.7;
+  const rl = Math.sqrt(Math.pow(half + eaveOH, 2) + Math.pow((half + eaveOH) * gp / 12, 2));
+  const rafZs = [];
+  for (let z1 = 0.4; z1 <= gd - 0.3; z1 += 4) rafZs.push(z1);
+  if (rafZs[rafZs.length - 1] < faceZ - 0.5) rafZs.push(faceZ);
+  rafZs.push(gd + 0.8);                                     // the fly rafter pair
+  rafZs.forEach((z1, idx) => {
+    const isFly = idx === rafZs.length - 1;
+    [-1, 1].forEach(s => {
+      const raf = new THREE.Mesh(new THREE.BoxGeometry(rl, 0.5, 0.33), woodM(CY2));
+      raf.rotation.z = -s * ang;
+      raf.position.set(s * Math.cos(ang) * rl / 2, wallBase + gh + rise - 0.15 - Math.sin(ang) * rl / 2, z1);
+      add(raf, isFly ? 'Fly rafter — 4×6 cypress (gable overhang)' : 'Gable rafter — 4×6 cypress');
+    });
+  });
+
+  // Roof metal — two slopes, extending past the fly rafter; ribs down the slope
   [-1, 1].forEach(s => {
     const rTex = makeTuffRibTexture(true, colors.roof);
-    rTex.repeat.set((gl + 0.8) / 3, 1);
-    const slope = new THREE.Mesh(new THREE.BoxGeometry(slopeLen, 0.1, gl + 0.8),
+    rTex.repeat.set((gd + 1.4) / 3, 1);
+    const slope = new THREE.Mesh(new THREE.BoxGeometry(rl + 0.2, 0.1, gd + 1.3),
       new THREE.MeshStandardMaterial({ color: 0xffffff, map: rTex, roughness: 0.30, metalness: 0.55 }));
     slope.rotation.z = -s * ang;
-    slope.position.set(s * Math.cos(ang) * slopeLen / 2,
-      wallBase + roofBase + rise - Math.sin(ang) * slopeLen / 2,
-      gl / 2 + 0.2);
-    add(slope, 'Crows foot gable roof metal');
+    slope.position.set(s * Math.cos(ang) * (rl + 0.2) / 2,
+      wallBase + gh + rise + 0.25 - Math.sin(ang) * (rl + 0.2) / 2,
+      (gd + 1.3) / 2 - 0.1);
+    add(slope, 'Gable porch roof metal');
   });
   // Ridge cap
-  const cap = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, gl + 0.8),
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, gd + 1.3),
     new THREE.MeshStandardMaterial({ color: 0xf4f4f2, roughness: 0.28, metalness: 0.6 }));
-  cap.position.set(0, wallBase + roofBase + rise + 0.08, gl / 2 + 0.2);
-  add(cap, 'Crows foot ridge cap — metal');
+  cap.position.set(0, wallBase + gh + rise + 0.34, (gd + 1.3) / 2 - 0.1);
+  add(cap, 'Gable ridge cap — metal');
 
   // Center on the front wall
   grp.position.set(0, 0, W / 2);
