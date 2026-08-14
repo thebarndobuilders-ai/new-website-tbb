@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v216</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v217</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8386,7 +8386,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v216';
+const BB_VERSION = 'v217';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17360,27 +17360,23 @@ function buildCrowsFoot3D(dims, wallBase) {
     slope.castShadow = slope.receiveShadow = true;
     slope.userData = { categoryKey: 'side_shed', label: 'Gable porch roof metal' };
     grp.add(slope); allMeshes.push(slope);
-    // Warm wood underside beneath the metal — what you see looking up through the
-    // open gable face (no white metal backdrop behind the crows foot)
-    const under = new THREE.Mesh(g.clone(), new THREE.MeshStandardMaterial({
-      color: 0xcfa574, roughness: 0.85, side: THREE.DoubleSide }));
-    under.position.y = -0.16;
-    under.castShadow = false; under.receiveShadow = true;
-    under.userData = { categoryKey: 'side_shed', label: 'Gable roof underside — T&G / purlins' };
-    grp.add(under); allMeshes.push(under);
   });
-  // T&G back panel closing the vault at the building end — warm wood fills the
-  // triangle behind the crows foot instead of white siding showing through
+  // Back panel closing the gable at the building end — BUILDING SIDING in the
+  // selected siding color, so the backdrop behind the crows foot always matches
+  // the building (follows the color pickers).
   {
     const bg = new THREE.BufferGeometry();
     const chordY = wallBase + gh - 0.1;
     const peakY = wallBase + gh + effRise + 0.1;
     bg.setAttribute('position', new THREE.Float32BufferAttribute(
       [0, peakY, 0.25, -effHalf - 0.3, chordY, 0.25, effHalf + 0.3, chordY, 0.25], 3));
+    bg.setAttribute('uv', new THREE.Float32BufferAttribute(
+      [0, 1, -(effHalf + 0.3) / 3, 0, (effHalf + 0.3) / 3, 0], 2));
     bg.computeVertexNormals();
+    const sTex = makeTuffRibTexture(false, colors.siding);
     const back = new THREE.Mesh(bg, new THREE.MeshStandardMaterial({
-      color: 0xd9b57f, roughness: 0.88, side: THREE.DoubleSide }));
-    back.userData = { categoryKey: 'side_shed', label: 'Gable vault T&G back panel' };
+      color: 0xffffff, map: sTex, roughness: 0.38, metalness: 0.45, side: THREE.DoubleSide }));
+    back.userData = { categoryKey: 'side_shed', label: 'Gable backdrop — building siding' };
     back.receiveShadow = true;
     grp.add(back); allMeshes.push(back);
   }
@@ -17541,14 +17537,18 @@ function buildPorch3D(dims, wallBase) {
       addP(raf, isCypress ? 'Porch rafter — 4×6 cypress' : 'Porch rafter — ' + rafSel.replace('x', '×'));
     }
 
-    // Cypress T&G ceiling under the rafters — warm wood plane
-    if (isCypress && ((document.getElementById('cypress_ceiling') || {}).value || 'syp') !== 'none') {
-      const tg = new THREE.Mesh(new THREE.PlaneGeometry(p.len, slopeLen - 1),
+    // Cypress T&G ceiling under the rafters — warm wood plane. SKIPS the gable bay:
+    // standing under the gable you look up and see the porch timbers, not a ceiling.
+    const tgSegs = gableCut
+      ? [[-p.len / 2, gableCut.a], [gableCut.b, p.len / 2]].filter(sg => sg[1] - sg[0] > 0.4)
+      : [[-p.len / 2, p.len / 2]];
+    if (isCypress && ((document.getElementById('cypress_ceiling') || {}).value || 'syp') !== 'none') tgSegs.forEach(sg => {
+      const tg = new THREE.Mesh(new THREE.PlaneGeometry(sg[1] - sg[0], slopeLen - 1),
         new THREE.MeshStandardMaterial({ color: 0xe8d4a8, roughness: 0.82, side: THREE.DoubleSide }));
       tg.rotation.x = -Math.PI / 2 + angle;
-      tg.position.set(0, wallBase + hHigh - 0.72 - Math.sin(angle) * ((slopeLen - 1) / 2), Math.cos(angle) * ((slopeLen - 1) / 2));
+      tg.position.set((sg[0] + sg[1]) / 2, wallBase + hHigh - 0.72 - Math.sin(angle) * ((slopeLen - 1) / 2), Math.cos(angle) * ((slopeLen - 1) / 2));
       addP(tg, 'T&G ceiling — 2×8 #1 SYP');
-    }
+    });
 
     // Roof metal: NO paneling inside the gable bay. The porch metal is cut out of
     // the bay and filled back ONLY out to the two VALLEY lines (where the gable roof
