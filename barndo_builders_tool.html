@@ -6954,6 +6954,19 @@ const MATERIALS = [
       return i.cypressPostCount;
     }},
 
+  // Valley metal — where the crows-foot gable ties into the porch roof (2 valleys)
+  { id: "porch_valley_metal", label: "Porch valley metal — gable ties into porch roof (10' sticks)", cat: "Cypress timber porch", uom: "ea (10')", packSize: null,
+    priceCost: 18.86, priceSell: 24, priceRetail: 30,
+    formula: i => {
+      if (!i.cypressPorchActive || i.cypressStyle !== 'gable') return 0;
+      const front = ((i.porchAgg && i.porchAgg.sides) || []).find(s2 => s2.side === 'front');
+      if (!front) return 0;
+      const halfW = (i.cypressGableWidth || 0) / 2;
+      if (!(halfW > 0)) return 0;
+      const valleyLen = Math.sqrt(front.W * front.W + halfW * halfW) + 1;
+      return Math.ceil(2 * valleyLen * 1.05 / 10.25);
+    }},
+
   // 4×6 cypress beams (length-conditional)
   { id: "cypress_beam_4x6x10", label: "4×6×10 cypress beam (ceiling joist/rafter)", cat: "Cypress timber porch", uom: "ea", packSize: null,
     priceCost: 65.00, priceSell: 82, priceRetail: 102,
@@ -17404,8 +17417,11 @@ function buildPorch3D(dims, wallBase) {
       const gwv = parseFloat((document.getElementById('cypress_gable_width') || {}).value) || 0;
       const gdv = parseFloat((document.getElementById('cypress_gable_length') || {}).value) || 0;
       if (!(gwv > 0 && gdv > 0)) return null;
+      const ghv = parseFloat((document.getElementById('cypress_gable_height') || {}).value) || 9;
+      const gpv = parseFloat((document.getElementById('cypress_gable_pitch') || {}).value) || 8;
       const c = -(p.off || 0);                     // gable center in porch-local x
-      return [c - gwv / 2, c + gwv / 2];
+      return { a: c - gwv / 2, b: c + gwv / 2, c, gw: gwv,
+               ridgeH: ghv + (gwv / 2) * (gpv / 12), gp: gpv };
     })();
 
 
@@ -17413,7 +17429,7 @@ function buildPorch3D(dims, wallBase) {
     const postN = Math.max(2, (isCypress ? Math.ceil(p.len / 12) : Math.ceil(p.len / spFt)) + 1);
     for (let k = 0; k < postN; k++) {
       const px = -p.len / 2 + (p.len / (postN - 1)) * k;
-      if (gableCut && px > gableCut[0] - 0.6 && px < gableCut[1] + 0.6) continue;   // gable posts carry this bay
+      if (gableCut && px > gableCut.a - 0.6 && px < gableCut.b + 0.6) continue;   // gable posts carry this bay
       const post = new THREE.Mesh(new THREE.BoxGeometry(postT, postH, postT), woodM(POST_HEX));
       post.position.set(px, wallBase + postH / 2, p.d - postT / 2);
       addP(post, isCypress ? `Porch post — ${tPostSize.replace('x','×')} ${tPostType === 'yp' ? 'YP' : 'cypress'} timber` : 'Porch post — 6×6 PT');
@@ -17429,12 +17445,17 @@ function buildPorch3D(dims, wallBase) {
       }
     }
 
-    // Carrier on the posts
-    const carrier = new THREE.Mesh(
-      new THREE.BoxGeometry(p.len, isCypress ? (TIMBER_H[tHdrSize] || 0.67) : hdrH, isCypress ? (TIMBER_DIMS[tHdrSize] || 0.67) : 0.26),
-      woodM(isCypress ? (tHdrType === 'yp' ? YP_HEX : CYP_HEX) : 0xbe9352));
-    carrier.position.set(0, wallBase + postH - 0.3, p.d - 0.3);
-    addP(carrier, isCypress ? `Porch header — ${tHdrSize.replace('x','×')} ${tHdrType === 'yp' ? 'YP' : 'cypress'} timber (rafters bear on it)` : 'Porch carrier — double ' + hdrDim.replace('x', '×'));
+    // Carrier on the posts — BREAKS at the gable bay (the gable header carries that span)
+    const carSegs = gableCut
+      ? [[-p.len / 2, gableCut.a], [gableCut.b, p.len / 2]].filter(sg => sg[1] - sg[0] > 0.4)
+      : [[-p.len / 2, p.len / 2]];
+    carSegs.forEach(sg => {
+      const carrier = new THREE.Mesh(
+        new THREE.BoxGeometry(sg[1] - sg[0], isCypress ? (TIMBER_H[tHdrSize] || 0.67) : hdrH, isCypress ? (TIMBER_DIMS[tHdrSize] || 0.67) : 0.26),
+        woodM(isCypress ? (tHdrType === 'yp' ? YP_HEX : CYP_HEX) : 0xbe9352));
+      carrier.position.set((sg[0] + sg[1]) / 2, wallBase + postH - 0.3, p.d - 0.3);
+      addP(carrier, isCypress ? `Porch header — ${tHdrSize.replace('x','×')} ${tHdrType === 'yp' ? 'YP' : 'cypress'} timber (rafters bear on it)` : 'Porch carrier — double ' + hdrDim.replace('x', '×'));
+    });
 
     // Ledger at the building
     const ledger = new THREE.Mesh(new THREE.BoxGeometry(p.len, 0.79, 0.14), woodM(0x8b6f47));
@@ -17446,7 +17467,7 @@ function buildPorch3D(dims, wallBase) {
     const rN = Math.ceil(p.len / rSp);
     for (let k = 0; k <= rN; k++) {
       const rx = -p.len / 2 + Math.min(p.len, k * rSp);
-      if (gableCut && rx > gableCut[0] - 0.2 && rx < gableCut[1] + 0.2) continue;
+      if (gableCut && rx > gableCut.a - 0.2 && rx < gableCut.b + 0.2) continue;
       const raf = new THREE.Mesh(
         new THREE.BoxGeometry(isCypress ? 0.33 : 0.13, isCypress ? 0.5 : rafH, slopeLen),
         woodM(RAFT_HEX));
@@ -17464,16 +17485,70 @@ function buildPorch3D(dims, wallBase) {
       addP(tg, 'T&G ceiling — 2×8 #1 SYP');
     }
 
-    // Roof plane in the roof color — runs CONTINUOUS behind the gable; the gable
-    // roof planes cross it and the intersection seams read as the two VALLEYS
-    // running all the way down (per builder). Only rafters/posts skip the bay.
-    const rTex = makeTuffRibTexture(true, colors.roof);
-    rTex.repeat.set(p.len / 3, 1);
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(p.len + 0.4, 0.1, slopeLen),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, map: rTex, roughness: 0.30, metalness: 0.55 }));
-    roof.rotation.x = angle;
-    roof.position.set(0, wallBase + hHigh + 0.1 - Math.sin(angle) * (slopeLen / 2), Math.cos(angle) * (slopeLen / 2) - 0.1);
-    addP(roof, 'Porch roof');
+    // Roof metal: NO paneling inside the gable bay. The porch metal is cut out of
+    // the bay and filled back ONLY out to the two VALLEY lines (where the gable roof
+    // planes meet the porch plane), so the valleys run all the way down and the area
+    // under the gable framing stays open.
+    const roofMat = () => {
+      const t = makeTuffRibTexture(true, colors.roof);
+      t.repeat.set(1, 1);
+      return new THREE.MeshStandardMaterial({ color: 0xffffff, map: t, roughness: 0.30, metalness: 0.55, side: THREE.DoubleSide });
+    };
+    const zMaxPlan = Math.cos(angle) * slopeLen;
+    const ySurf = z => wallBase + hHigh + 0.1 - z * (pitch / 12);
+    if (gableCut) {
+      // valley half-width (from gable center) at plan depth z
+      const xgAt = z => Math.max(0.3, Math.min(gableCut.gw / 2 + 1.6,
+        (gableCut.ridgeH - (hHigh - z * (pitch / 12))) * 12 / gableCut.gp));
+      const xg0 = xgAt(0), xgM = xgAt(zMaxPlan);
+      // main segments outside the widest (eave) valley span
+      const segs = [[-p.len / 2, gableCut.c - xgM], [gableCut.c + xgM, p.len / 2]].filter(sg => sg[1] - sg[0] > 0.4);
+      segs.forEach(sg => {
+        const segLen = sg[1] - sg[0];
+        const mat = roofMat();
+        mat.map.repeat.set(segLen / 3, 1);
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(segLen + 0.2, 0.1, slopeLen), mat);
+        roof.rotation.x = angle;
+        roof.position.set((sg[0] + sg[1]) / 2, wallBase + hHigh + 0.1 - Math.sin(angle) * (slopeLen / 2), Math.cos(angle) * (slopeLen / 2) - 0.1);
+        addP(roof, 'Porch roof');
+      });
+      // wedge fills from the straight cut back to the diagonal valley line
+      [-1, 1].forEach(s => {
+        const g = new THREE.BufferGeometry();
+        const P1 = [gableCut.c + s * xg0, ySurf(0), 0];
+        const P2 = [gableCut.c + s * xgM, ySurf(0), 0];
+        const P3 = [gableCut.c + s * xgM, ySurf(zMaxPlan), zMaxPlan];
+        g.setAttribute('position', new THREE.Float32BufferAttribute(
+          [P1[0], P1[1], P1[2], P2[0], P2[1], P2[2], P3[0], P3[1], P3[2]], 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute(
+          [(P1[0] - gableCut.c) / 3, 0, (P2[0] - gableCut.c) / 3, 0, (P3[0] - gableCut.c) / 3, 1], 2));
+        g.computeVertexNormals();
+        const wedge = new THREE.Mesh(g, roofMat());
+        wedge.castShadow = wedge.receiveShadow = true;
+        wedge.userData = { categoryKey: 'side_shed', label: 'Porch roof — valley wedge' };
+        grp.add(wedge); allMeshes.push(wedge);
+      });
+      // VALLEY METAL — the two pieces set into place where the gable and porch roofs connect
+      [-1, 1].forEach(s => {
+        const v1 = new THREE.Vector3(gableCut.c + s * xg0, ySurf(0) + 0.14, 0);
+        const v2 = new THREE.Vector3(gableCut.c + s * xgM, ySurf(zMaxPlan) + 0.14, zMaxPlan);
+        const d2 = v2.clone().sub(v1);
+        const vm = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.07, d2.length() + 0.2),
+          new THREE.MeshStandardMaterial({ color: 0xe9e9e7, roughness: 0.3, metalness: 0.6 }));
+        vm.position.copy(v1.clone().add(v2).multiplyScalar(0.5));
+        vm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), d2.clone().normalize());
+        vm.castShadow = vm.receiveShadow = true;
+        vm.userData = { categoryKey: 'side_shed', label: 'Valley metal — gable to porch roof' };
+        grp.add(vm); allMeshes.push(vm);
+      });
+    } else {
+      const mat = roofMat();
+      mat.map.repeat.set(p.len / 3, 1);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(p.len + 0.4, 0.1, slopeLen), mat);
+      roof.rotation.x = angle;
+      roof.position.set(0, wallBase + hHigh + 0.1 - Math.sin(angle) * (slopeLen / 2), Math.cos(angle) * (slopeLen / 2) - 0.1);
+      addP(roof, 'Porch roof');
+    }
 
     // Place onto the chosen wall (p.off slides a tied porch to its corner)
     const off = p.off || 0;
