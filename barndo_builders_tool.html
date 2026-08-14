@@ -17246,6 +17246,13 @@ function buildCrowsFoot3D(dims, wallBase) {
   // ridge all the way DOWN to the header line — posts spread out to catch them.
   const effHalf = half + roofLift * 12 / gp;
   const effRise = effHalf * (gp / 12);        // = rise + roofLift
+  // Valley clipping when tied into the porch: over the porch, the gable roof and
+  // rafters STOP at the valley (like a real house) instead of crossing the porch metal.
+  const pDepth = frontPorchOn ? (parseFloat((document.getElementById('porch_front_depth') || {}).value) || 8) : 0;
+  const pPitch = frontPorchOn ? (parseFloat((document.getElementById('porch_pitch') || {}).value) || 3) : 3;
+  const porchHighY = gh + pDepth * (pPitch / 12);           // porch plane at the building wall
+  const gableRidgeY = gh + effRise;
+  const xValley = z => Math.max(0.6, (gableRidgeY - (porchHighY - z * (pPitch / 12))) * 12 / gp);
 
   // Slab pad
   const slab = new THREE.Mesh(new THREE.BoxGeometry(gw, 0.4, gd),
@@ -17314,30 +17321,50 @@ function buildCrowsFoot3D(dims, wallBase) {
   rafZs.push(gd + 0.8);                                     // the fly rafter pair
   rafZs.forEach((z1, idx) => {
     const isFly = idx === rafZs.length - 1;
+    const run = (frontPorchOn && z1 < pDepth)
+      ? Math.min(effHalf + eaveOH, xValley(z1))
+      : (effHalf + eaveOH);
+    const rlI = Math.sqrt(run * run + Math.pow(run * gp / 12, 2));
+    if (rlI < 0.8) return;
     [-1, 1].forEach(s => {
-      const raf = new THREE.Mesh(new THREE.BoxGeometry(rl, 0.5, 0.33), woodM(CY2));
+      const raf = new THREE.Mesh(new THREE.BoxGeometry(rlI, 0.5, 0.33), woodM(CY2));
       raf.rotation.z = -s * ang;
-      raf.position.set(s * Math.cos(ang) * rl / 2, wallBase + gh + effRise - 0.15 - Math.sin(ang) * rl / 2, z1);
+      raf.position.set(s * Math.cos(ang) * rlI / 2, wallBase + gh + effRise - 0.15 - Math.sin(ang) * rlI / 2, z1);
       add(raf, isFly ? 'Fly rafter — 4×6 cypress (gable overhang)' : 'Gable rafter — 4×6 cypress');
     });
   });
 
-  // Roof metal — two slopes, extending past the fly rafter; ribs down the slope
+  // Roof metal — two slopes CLIPPED at the valleys (outer edge follows the valley
+  // over the porch, full eave at the face) with the panel RIBS running DOWN the
+  // slope like real metal — the gable never crosses the porch metal.
+  const zB = -tExt, zF = gd + 0.8;
+  const yOnSlope = x => wallBase + gh + effRise + 0.25 - Math.abs(x) * (gp / 12);
   [-1, 1].forEach(s => {
+    const xw = frontPorchOn ? Math.min(effHalf + eaveOH, xValley(0.1)) : (effHalf + eaveOH);
+    const xf = effHalf + eaveOH;
+    const g = new THREE.BufferGeometry();
+    const A = [0, yOnSlope(0), zB];
+    const B = [0, yOnSlope(0), zF];
+    const C = [s * xf, yOnSlope(xf), zF];
+    const D = [s * xw, yOnSlope(xw), zB];
+    g.setAttribute('position', new THREE.Float32BufferAttribute(
+      [A[0], A[1], A[2], B[0], B[1], B[2], C[0], C[1], C[2],
+       A[0], A[1], A[2], C[0], C[1], C[2], D[0], D[1], D[2]], 3));
+    const uSpan = (zF - zB) / 3;   // panels every 3' ALONG the ridge; ribs run down-slope
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(
+      [0, 0, uSpan, 0, uSpan, 1, 0, 0, uSpan, 1, 0, xw / xf], 2));
+    g.computeVertexNormals();
     const rTex = makeTuffRibTexture(true, colors.roof);
-    rTex.repeat.set((gd + 1.4 + tExt) / 3, 1);
-    const slope = new THREE.Mesh(new THREE.BoxGeometry(rl + 0.2, 0.1, gd + 1.3 + tExt),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, map: rTex, roughness: 0.30, metalness: 0.55 }));
-    slope.rotation.z = -s * ang;
-    slope.position.set(s * Math.cos(ang) * (rl + 0.2) / 2,
-      wallBase + gh + effRise + 0.25 - Math.sin(ang) * (rl + 0.2) / 2,
-      (gd + 1.3 - tExt) / 2 - 0.1);
-    add(slope, 'Gable porch roof metal');
+    const slope = new THREE.Mesh(g, new THREE.MeshStandardMaterial({
+      color: 0xffffff, map: rTex, roughness: 0.30, metalness: 0.55, side: THREE.DoubleSide }));
+    slope.castShadow = slope.receiveShadow = true;
+    slope.userData = { categoryKey: 'side_shed', label: 'Gable porch roof metal' };
+    grp.add(slope); allMeshes.push(slope);
   });
   // Ridge cap
-  const cap = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, gd + 1.3 + tExt),
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, zF - zB),
     new THREE.MeshStandardMaterial({ color: 0xf4f4f2, roughness: 0.28, metalness: 0.6 }));
-  cap.position.set(0, wallBase + gh + effRise + 0.34, (gd + 1.3 - tExt) / 2 - 0.1);
+  cap.position.set(0, wallBase + gh + effRise + 0.34, (zB + zF) / 2);
   add(cap, 'Gable ridge cap — metal');
 
   // Center on the front wall
@@ -17512,8 +17539,13 @@ function buildPorch3D(dims, wallBase) {
     const zMaxPlan = Math.cos(angle) * slopeLen;
     const ySurf = z => wallBase + hHigh + 0.1 - z * (pitch / 12);
     if (gableCut) {
-      // Porch metal stops DEAD at the gable bay — nothing under the gable porch.
-      const segs = [[-p.len / 2, gableCut.a], [gableCut.b, p.len / 2]].filter(sg => sg[1] - sg[0] > 0.4);
+      // Real-house valley system: porch metal covers everything OUTSIDE the valley
+      // lines (straight segments + wedge fills), the gable covers inside, and metal
+      // valley pieces run the true diagonals where the two roofs meet.
+      const xv = z => Math.max(0.6, Math.min(gableCut.gw / 2 + 1.6,
+        (gableCut.ridgeH - (hHigh - z * (pitch / 12))) * 12 / gableCut.gp));
+      const xv0 = xv(0), xvE = xv(zMaxPlan);
+      const segs = [[-p.len / 2, gableCut.c - xvE], [gableCut.c + xvE, p.len / 2]].filter(sg => sg[1] - sg[0] > 0.4);
       segs.forEach(sg => {
         const segLen = sg[1] - sg[0];
         const mat = roofMat();
@@ -17523,13 +17555,25 @@ function buildPorch3D(dims, wallBase) {
         roof.position.set((sg[0] + sg[1]) / 2, wallBase + hHigh + 0.1 - Math.sin(angle) * (slopeLen / 2), Math.cos(angle) * (slopeLen / 2) - 0.1);
         addP(roof, 'Porch roof');
       });
-      // VALLEY METAL — two pieces set along the joints where the gable roof meets
-      // each porch roof, running from the wall all the way down to the gable corners.
-      const gEaveY = wallBase + postH + 0.4;   // gable eave lands on the header line at the posts
       [-1, 1].forEach(s => {
-        const bx = s < 0 ? gableCut.a : gableCut.b;
-        const v1 = new THREE.Vector3(bx, ySurf(0.2) + 0.16, 0.2);
-        const v2 = new THREE.Vector3(bx, gEaveY, p.d + 0.6);
+        const g = new THREE.BufferGeometry();
+        const P1 = [gableCut.c + s * xv0, ySurf(0), 0];
+        const P2 = [gableCut.c + s * xvE, ySurf(0), 0];
+        const P3 = [gableCut.c + s * xvE, ySurf(zMaxPlan), zMaxPlan];
+        g.setAttribute('position', new THREE.Float32BufferAttribute(
+          [P1[0], P1[1], P1[2], P2[0], P2[1], P2[2], P3[0], P3[1], P3[2]], 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute(
+          [(P1[0] - gableCut.c) / 3, 0, (P2[0] - gableCut.c) / 3, 0, (P3[0] - gableCut.c) / 3, 1], 2));
+        g.computeVertexNormals();
+        const wedge = new THREE.Mesh(g, roofMat());
+        wedge.castShadow = wedge.receiveShadow = true;
+        wedge.userData = { categoryKey: 'side_shed', label: 'Porch roof — outside the valley' };
+        grp.add(wedge); allMeshes.push(wedge);
+      });
+      // VALLEY METAL on the true diagonals — just like a real house valley
+      [-1, 1].forEach(s => {
+        const v1 = new THREE.Vector3(gableCut.c + s * xv0, ySurf(0) + 0.16, 0.1);
+        const v2 = new THREE.Vector3(gableCut.c + s * xvE, ySurf(zMaxPlan) + 0.16, zMaxPlan);
         const d2 = v2.clone().sub(v1);
         const vm = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.07, d2.length() + 0.2),
           new THREE.MeshStandardMaterial({ color: 0xe9e9e7, roughness: 0.3, metalness: 0.6 }));
