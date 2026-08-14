@@ -17360,7 +17360,30 @@ function buildCrowsFoot3D(dims, wallBase) {
     slope.castShadow = slope.receiveShadow = true;
     slope.userData = { categoryKey: 'side_shed', label: 'Gable porch roof metal' };
     grp.add(slope); allMeshes.push(slope);
+    // Warm wood underside beneath the metal — what you see looking up through the
+    // open gable face (no white metal backdrop behind the crows foot)
+    const under = new THREE.Mesh(g.clone(), new THREE.MeshStandardMaterial({
+      color: 0xcfa574, roughness: 0.85, side: THREE.DoubleSide }));
+    under.position.y = -0.16;
+    under.castShadow = false; under.receiveShadow = true;
+    under.userData = { categoryKey: 'side_shed', label: 'Gable roof underside — T&G / purlins' };
+    grp.add(under); allMeshes.push(under);
   });
+  // T&G back panel closing the vault at the building end — warm wood fills the
+  // triangle behind the crows foot instead of white siding showing through
+  {
+    const bg = new THREE.BufferGeometry();
+    const chordY = wallBase + gh - 0.1;
+    const peakY = wallBase + gh + effRise + 0.1;
+    bg.setAttribute('position', new THREE.Float32BufferAttribute(
+      [0, peakY, 0.25, -effHalf - 0.3, chordY, 0.25, effHalf + 0.3, chordY, 0.25], 3));
+    bg.computeVertexNormals();
+    const back = new THREE.Mesh(bg, new THREE.MeshStandardMaterial({
+      color: 0xd9b57f, roughness: 0.88, side: THREE.DoubleSide }));
+    back.userData = { categoryKey: 'side_shed', label: 'Gable vault T&G back panel' };
+    back.receiveShadow = true;
+    grp.add(back); allMeshes.push(back);
+  }
   // Ridge cap
   const cap = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, zF - zB),
     new THREE.MeshStandardMaterial({ color: 0xf4f4f2, roughness: 0.28, metalness: 0.6 }));
