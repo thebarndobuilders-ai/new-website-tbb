@@ -17237,6 +17237,11 @@ function buildCrowsFoot3D(dims, wallBase) {
   const rise = half * (gp / 12);
   const ang = Math.atan(gp / 12);
   const faceZ = gd - postT / 2;            // post/truss centerline (front face at z = gd)
+  // Tied to a porch: the header stays on the porch carrier line but the gable ROOF
+  // rises so its eave clears the porch roof plane (raised truss face, like the photo).
+  const roofLift = frontPorchOn
+    ? ((parseFloat((document.getElementById('porch_front_depth') || {}).value) || 8) * ((parseFloat((document.getElementById('porch_pitch') || {}).value) || 3) / 12) + 0.4)
+    : 0;
 
   // Slab pad
   const slab = new THREE.Mesh(new THREE.BoxGeometry(gw, 0.4, gd),
@@ -17267,12 +17272,12 @@ function buildCrowsFoot3D(dims, wallBase) {
   // Crows-foot truss ON the header at the gable face — all 4×6 cypress.
   // The FAN radiates from the bottom center UP into the rafters (bird's-foot),
   // kingpost vertical to the peak.
-  const king = new THREE.Mesh(new THREE.BoxGeometry(0.5, rise, 0.33), woodM(CY2));
-  king.position.set(0, wallBase + gh + rise / 2, faceZ);
+  const king = new THREE.Mesh(new THREE.BoxGeometry(0.5, roofLift + rise, 0.33), woodM(CY2));
+  king.position.set(0, wallBase + gh + (roofLift + rise) / 2, faceZ);
   add(king, 'Crows foot kingpost — 4×6 cypress');
   [-1, 1].forEach(s => {
     const xe = half * 0.55;                     // where the strut meets the rafter line
-    const ye = rise * 0.45;                     // rafter underside height at that point
+    const ye = roofLift + rise * 0.45;          // rafter underside height at that point (raised roof)
     const strutLen = Math.sqrt(xe * xe + ye * ye);
     const strut = new THREE.Mesh(new THREE.BoxGeometry(0.5, strutLen, 0.33), woodM(CY2));
     strut.rotation.z = -s * Math.atan2(xe, ye); // bottom at center, top leaning out
@@ -17285,14 +17290,14 @@ function buildCrowsFoot3D(dims, wallBase) {
   // the main roof slope (like the reference photo). Below the eave they stop at the wall.
   const mainWallH = n('wall_height') || 14;
   const mainPitch = (dims && dims.pitch) || 6;
-  const ridgeH = gh + rise;
+  const ridgeH = gh + roofLift + rise;
   const tExt = ridgeH > mainWallH
     ? Math.min(W / 2, (ridgeH - mainWallH) / (mainPitch / 12) + 0.5)
     : 0;
 
   // Ridge — from the building (or into the main roof) out to the truss peak
   const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.5, gd + 0.1 + tExt), woodM(CY2));
-  ridge.position.set(0, wallBase + gh + rise - 0.25, (gd - tExt) / 2);
+  ridge.position.set(0, wallBase + gh + roofLift + rise - 0.25, (gd - tExt) / 2);
   add(ridge, 'Gable ridge — 4×6 cypress');
 
   // Rafters — pairs down both slopes @48", from the building to the face,
@@ -17308,7 +17313,7 @@ function buildCrowsFoot3D(dims, wallBase) {
     [-1, 1].forEach(s => {
       const raf = new THREE.Mesh(new THREE.BoxGeometry(rl, 0.5, 0.33), woodM(CY2));
       raf.rotation.z = -s * ang;
-      raf.position.set(s * Math.cos(ang) * rl / 2, wallBase + gh + rise - 0.15 - Math.sin(ang) * rl / 2, z1);
+      raf.position.set(s * Math.cos(ang) * rl / 2, wallBase + gh + roofLift + rise - 0.15 - Math.sin(ang) * rl / 2, z1);
       add(raf, isFly ? 'Fly rafter — 4×6 cypress (gable overhang)' : 'Gable rafter — 4×6 cypress');
     });
   });
@@ -17321,14 +17326,14 @@ function buildCrowsFoot3D(dims, wallBase) {
       new THREE.MeshStandardMaterial({ color: 0xffffff, map: rTex, roughness: 0.30, metalness: 0.55 }));
     slope.rotation.z = -s * ang;
     slope.position.set(s * Math.cos(ang) * (rl + 0.2) / 2,
-      wallBase + gh + rise + 0.25 - Math.sin(ang) * (rl + 0.2) / 2,
+      wallBase + gh + roofLift + rise + 0.25 - Math.sin(ang) * (rl + 0.2) / 2,
       (gd + 1.3 - tExt) / 2 - 0.1);
     add(slope, 'Gable porch roof metal');
   });
   // Ridge cap
   const cap = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, gd + 1.3 + tExt),
     new THREE.MeshStandardMaterial({ color: 0xf4f4f2, roughness: 0.28, metalness: 0.6 }));
-  cap.position.set(0, wallBase + gh + rise + 0.34, (gd + 1.3 - tExt) / 2 - 0.1);
+  cap.position.set(0, wallBase + gh + roofLift + rise + 0.34, (gd + 1.3 - tExt) / 2 - 0.1);
   add(cap, 'Gable ridge cap — metal');
 
   // Center on the front wall
@@ -17513,7 +17518,7 @@ function buildPorch3D(dims, wallBase) {
       });
       // VALLEY METAL — two pieces set along the joints where the gable roof meets
       // each porch roof, running from the wall all the way down to the gable corners.
-      const gEaveY = wallBase + (document.getElementById('porch_front_on') && document.getElementById('porch_front_on').checked ? postH : (parseFloat((document.getElementById('cypress_gable_height') || {}).value) || 9)) + 0.25;
+      const gEaveY = wallBase + postH + p.d * (pitch / 12) + 0.5;   // raised gable eave line
       [-1, 1].forEach(s => {
         const bx = s < 0 ? gableCut.a : gableCut.b;
         const v1 = new THREE.Vector3(bx, ySurf(0.2) + 0.16, 0.2);
