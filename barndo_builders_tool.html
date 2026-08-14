@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v217</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v218</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8386,7 +8386,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v217';
+const BB_VERSION = 'v218';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -17266,7 +17266,9 @@ function buildCrowsFoot3D(dims, wallBase) {
     post.position.set(s * (effHalf - postT / 2), wallBase + gh / 2, faceZ);
     add(post, `Gable post — ${tPostSize.replace('x','×')} ${tPostType === 'yp' ? 'YP' : 'cypress'}`);
     if (wantBraces) {
+      // Gable posts sit at the header ends — brace INWARD only (toward each other)
       [-1, 1].forEach(sgn => {
+        if (sgn === s) return;                     // skip the brace pointing off the header end
         const br = new THREE.Mesh(new THREE.BoxGeometry(0.29, 3.1, 0.29), woodM(CY2));
         br.rotation.z = -sgn * Math.PI / 4;
         br.position.set(s * (effHalf - postT / 2) + sgn * 0.78, wallBase + gh - 1.45, faceZ);
@@ -17496,13 +17498,24 @@ function buildPorch3D(dims, wallBase) {
       addP(post, isCypress ? `Porch post — ${tPostSize.replace('x','×')} ${tPostType === 'yp' ? 'YP' : 'cypress'} timber` : 'Porch post — 6×6 PT');
       if (isCypress && wantBraces) {
         // Knee braces run from the post UP and OUT into the carrier: bottom on the
-        // post face, top leaning away along the beam (rotation sign flipped v213).
+        // post face, top leaning away along the beam. END posts only brace INWARD —
+        // no brace sticking past the header into open air.
+        const isEnd = (k === 0 || k === postN - 1);
         [-1, 1].forEach(sgn => {
+          if (k === 0 && sgn < 0) return;          // first post: no brace off the header end
+          if (k === postN - 1 && sgn > 0) return;  // last post: no brace off the header end
           const br = new THREE.Mesh(new THREE.BoxGeometry(0.29, 3.1, 0.29), woodM(0xcfa95f));
           br.rotation.z = -sgn * Math.PI / 4;
           br.position.set(px + sgn * 0.78, wallBase + postH - 1.45, p.d - postT / 2);
           addP(br, 'Cypress knee brace — 4×6');
         });
+        if (isEnd) {
+          // end posts brace TOWARD THE BUILDING instead — up into the end rafter
+          const br = new THREE.Mesh(new THREE.BoxGeometry(0.29, 3.1, 0.29), woodM(0xcfa95f));
+          br.rotation.x = -Math.PI / 4;
+          br.position.set(px, wallBase + postH - 1.45, p.d - postT / 2 - 0.78);
+          addP(br, 'Cypress knee brace — 4×6 (end post, toward building)');
+        }
       }
     }
 
