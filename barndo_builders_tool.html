@@ -17281,7 +17281,7 @@ function buildCrowsFoot3D(dims, wallBase) {
 
   // Rafters — pairs down both slopes @48", from the building to the face,
   // PLUS the FLY RAFTER pair floating past the open gable face
-  const eaveOH = 0.7;
+  const eaveOH = 1.3;   // deep enough that the valleys run all the way down
   const rl = Math.sqrt(Math.pow(half + eaveOH, 2) + Math.pow((half + eaveOH) * gp / 12, 2));
   const rafZs = [];
   for (let z1 = 0.4; z1 <= gd - 0.3; z1 += 4) rafZs.push(z1);
@@ -17396,10 +17396,24 @@ function buildPorch3D(dims, wallBase) {
     slab.position.set(0, 0.2, p.d / 2);
     addP(slab, 'Porch slab');
 
+    const gableCut = (() => {
+      if (p.side !== 'front') return null;
+      const pt = document.querySelector('[data-porchtype].active');
+      const st = document.querySelector('[data-cypressstyle].active');
+      if (!(pt && pt.dataset.porchtype === 'cypress' && st && st.dataset.cypressstyle === 'gable')) return null;
+      const gwv = parseFloat((document.getElementById('cypress_gable_width') || {}).value) || 0;
+      const gdv = parseFloat((document.getElementById('cypress_gable_length') || {}).value) || 0;
+      if (!(gwv > 0 && gdv > 0)) return null;
+      const c = -(p.off || 0);                     // gable center in porch-local x
+      return [c - gwv / 2, c + gwv / 2];
+    })();
+
+
     // Posts + (cypress) knee braces — cypress auto-figures even bays ≤ 12'
     const postN = Math.max(2, (isCypress ? Math.ceil(p.len / 12) : Math.ceil(p.len / spFt)) + 1);
     for (let k = 0; k < postN; k++) {
       const px = -p.len / 2 + (p.len / (postN - 1)) * k;
+      if (gableCut && px > gableCut[0] - 0.6 && px < gableCut[1] + 0.6) continue;   // gable posts carry this bay
       const post = new THREE.Mesh(new THREE.BoxGeometry(postT, postH, postT), woodM(POST_HEX));
       post.position.set(px, wallBase + postH / 2, p.d - postT / 2);
       addP(post, isCypress ? `Porch post — ${tPostSize.replace('x','×')} ${tPostType === 'yp' ? 'YP' : 'cypress'} timber` : 'Porch post — 6×6 PT');
@@ -17427,17 +17441,6 @@ function buildPorch3D(dims, wallBase) {
     ledger.position.set(0, wallBase + hHigh - 0.6, 0.1);
     addP(ledger, 'Porch ledger band at building');
 
-    const gableCut = (() => {
-      if (p.side !== 'front') return null;
-      const pt = document.querySelector('[data-porchtype].active');
-      const st = document.querySelector('[data-cypressstyle].active');
-      if (!(pt && pt.dataset.porchtype === 'cypress' && st && st.dataset.cypressstyle === 'gable')) return null;
-      const gwv = parseFloat((document.getElementById('cypress_gable_width') || {}).value) || 0;
-      const gdv = parseFloat((document.getElementById('cypress_gable_length') || {}).value) || 0;
-      if (!(gwv > 0 && gdv > 0)) return null;
-      const c = -(p.off || 0);                     // gable center in porch-local x
-      return [c - gwv / 2, c + gwv / 2];
-    })();
     // Rafters (skip the open gable bay — the crows foot spans it)
     const rSp = isCypress ? 4 : 16 / 12;
     const rN = Math.ceil(p.len / rSp);
@@ -17461,28 +17464,16 @@ function buildPorch3D(dims, wallBase) {
       addP(tg, 'T&G ceiling — 2×8 #1 SYP');
     }
 
-    // Roof plane in the roof color. When the crows-foot gable sits on THIS porch
-    // (front side), the shed metal SPLITS at the gable — no paneling under it —
-    // and the gable's own roof spans the gap.
-    const segs = [];
-    if (gableCut) {
-      const a = Math.max(-p.len / 2, Math.min(p.len / 2, gableCut[0]));
-      const b2 = Math.max(-p.len / 2, Math.min(p.len / 2, gableCut[1]));
-      if (a - (-p.len / 2) > 0.4) segs.push([-p.len / 2, a]);
-      if (p.len / 2 - b2 > 0.4) segs.push([b2, p.len / 2]);
-    } else {
-      segs.push([-p.len / 2, p.len / 2]);
-    }
-    segs.forEach(sg => {
-      const segLen = sg[1] - sg[0];
-      const rTex = makeTuffRibTexture(true, colors.roof);
-      rTex.repeat.set(segLen / 3, 1);
-      const roof = new THREE.Mesh(new THREE.BoxGeometry(segLen + 0.2, 0.1, slopeLen),
-        new THREE.MeshStandardMaterial({ color: 0xffffff, map: rTex, roughness: 0.30, metalness: 0.55 }));
-      roof.rotation.x = angle;
-      roof.position.set((sg[0] + sg[1]) / 2, wallBase + hHigh + 0.1 - Math.sin(angle) * (slopeLen / 2), Math.cos(angle) * (slopeLen / 2) - 0.1);
-      addP(roof, 'Porch roof');
-    });
+    // Roof plane in the roof color — runs CONTINUOUS behind the gable; the gable
+    // roof planes cross it and the intersection seams read as the two VALLEYS
+    // running all the way down (per builder). Only rafters/posts skip the bay.
+    const rTex = makeTuffRibTexture(true, colors.roof);
+    rTex.repeat.set(p.len / 3, 1);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(p.len + 0.4, 0.1, slopeLen),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, map: rTex, roughness: 0.30, metalness: 0.55 }));
+    roof.rotation.x = angle;
+    roof.position.set(0, wallBase + hHigh + 0.1 - Math.sin(angle) * (slopeLen / 2), Math.cos(angle) * (slopeLen / 2) - 0.1);
+    addP(roof, 'Porch roof');
 
     // Place onto the chosen wall (p.off slides a tied porch to its corner)
     const off = p.off || 0;
