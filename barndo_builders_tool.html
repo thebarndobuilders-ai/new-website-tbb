@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v220</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v221</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8388,7 +8388,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v220';
+const BB_VERSION = 'v221';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -9050,6 +9050,10 @@ function wsEnter() {
   // Cards keep their own conditional show/hide logic; they restore home on leave.
   const inputsTab = document.getElementById('tab-inputs');
   if (inputsTab) Array.from(inputsTab.children).forEach(node => _wsAdoptNode(node, left));
+  // Rail-only ordering: Floor system goes to the BOTTOM of the 3D tool sidebar
+  // (restores to its normal Dimensions-tab position on leave).
+  const floorEl = document.getElementById('floor_system');
+  if (floorEl) { const fc = floorEl.closest('.qbs-card'); if (fc && fc.parentNode === left) left.appendChild(fc); }
   // quick-nav to the other tabs
   const nav = document.createElement('div');
   nav.className = 'qbs-card';
