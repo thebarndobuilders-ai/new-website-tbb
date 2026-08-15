@@ -1254,12 +1254,12 @@
   
   /* ============ HEADER ============ */
   .qbs-header {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 3rem; padding: 0;
-    flex-wrap: wrap; gap: 24px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    margin-bottom: 2.25rem; padding: 0;
+    gap: 14px;
     border: none;
   }
-  .qbs-brand { display: flex; flex-direction: column; gap: 4px; }
+  .qbs-brand { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
   .qbs-brand-text {
     font-family: var(--font-headline);
     font-size: 32px;
@@ -1278,11 +1278,11 @@
     font-size: 11px;
     font-weight: 400;
     color: var(--text-3);
-    margin: 8px 0 0 4px;
+    margin: 6px 0 0 0;
     letter-spacing: 0.03em;
     text-transform: none;
   }
-  .qbs-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .qbs-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: center; }
   
   /* ============ BUTTONS ============ */
   .qbs-wrap button {
@@ -2194,8 +2194,8 @@
 <div class="qbs-wrap">
   <div class="qbs-header">
     <div class="qbs-brand">
-      <h1 class="qbs-brand-text" style="margin:0;line-height:0"><svg width="168" height="80" viewBox="60 -8 580 316" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="7" fill="none" stroke-linecap="square"><path d="M232 170 H150 V30 H610 V170 H528"/></g><text transform="rotate(-90 121 100)" x="121" y="100" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="136" lengthAdjust="spacing" fill="#fff">THE</text><text x="392" y="102" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="82" textLength="360" lengthAdjust="spacing" fill="#fff">BARNDO</text><text x="380" y="171" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="34" textLength="264" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="380" y="232" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="52" textLength="420" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M196 264 Q380 280 572 250 Q380 285 196 264 Z" fill="#fff"/></svg></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v226</p>
+      <h1 class="qbs-brand-text" style="margin:0;line-height:0"><svg width="252" height="122" viewBox="60 -8 580 316" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="7" fill="none" stroke-linecap="square"><path d="M232 170 H150 V30 H610 V170 H528"/></g><text transform="rotate(-90 121 100)" x="121" y="100" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="136" lengthAdjust="spacing" fill="#fff">THE</text><text x="392" y="102" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="82" textLength="360" lengthAdjust="spacing" fill="#fff">BARNDO</text><text x="380" y="171" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="34" textLength="264" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="380" y="232" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="52" textLength="420" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M196 264 Q380 280 572 250 Q380 285 196 264 Z" fill="#fff"/></svg></h1>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v227</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8416,7 +8416,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v226';
+const BB_VERSION = 'v227';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
