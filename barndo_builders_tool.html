@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v232</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v233</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3855,6 +3855,20 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <button onclick="renderProposal()">↻ Refresh</button>
       </div>
       <div id="proposal-output"></div>
+    </div>
+
+    <div class="qbs-card" id="proposal-email-card">
+      <h3>📧 Email the proposal <span class="badge">One click · 3D view included</span></h3>
+      <p class="qbs-sub" style="margin-bottom: 16px;">Hit <b>Send proposal</b> and two things happen: the proposal file (with the drag-to-spin 3D rendering baked in) downloads, and a ready-written email to your customer opens in your mail app. Attach the downloaded file and hit send — that's it.</p>
+      <div class="qbs-grid">
+        <div class="qbs-field"><label>To (customer email)</label><input type="email" id="prop_email_to" placeholder="customer@email.com" /></div>
+        <div class="qbs-field" style="grid-column: span 2"><label>Subject</label><input type="text" id="prop_email_subject" oninput="this.dataset.userEdited=1" /></div>
+      </div>
+      <div class="qbs-field" style="margin-top:10px"><label>Message</label><textarea id="prop_email_body" rows="9" style="width:100%;resize:vertical" oninput="this.dataset.userEdited=1"></textarea></div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
+        <button onclick="emailProposal()" style="font-weight:600">📨 Send proposal</button>
+        <span id="prop-email-status" class="qbs-note"></span>
+      </div>
     </div>
   </div>
 
@@ -8416,7 +8430,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v232';
+const BB_VERSION = 'v233';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -14595,6 +14609,7 @@ function proposalModel() {
 function renderProposal() {
   const el = document.getElementById('proposal-output');
   if (!el) return;
+  try { bbFillEmailCard(); } catch (e) {}
   const model = proposalModel();
   if (!model) {
     el.innerHTML = `<div class="qbs-note" style="padding:16px">Enter the building dimensions on the <b>Dimensions</b> tab first — the proposal builds itself from the quote.</div>`;
@@ -14669,16 +14684,31 @@ function renderProposal() {
 // proposal content + a drag-to-spin 3D turntable of THEIR building in
 // THEIR colors (frames captured from the live 3D viewer, no libraries).
 // =============================================================
-function exportClientShare() {
+// Small global toast for proposal-side messages (the takeoff tab has its own; browser dialogs are banned).
+function bbToast(msg) {
+  let t = document.getElementById('bb-global-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'bb-global-toast';
+    t.style.cssText = 'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1d1d1d;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:99999;box-shadow:0 4px 18px rgba(0,0,0,.45);max-width:80vw;text-align:center;transition:opacity .3s';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._h);
+  t._h = setTimeout(() => { t.style.opacity = '0'; }, 4500);
+}
+
+function buildClientShareHTML() {
   const model = proposalModel();
-  if (!model) return alert('Enter the building dimensions first — the share file builds itself from the quote.');
+  if (!model) { bbToast('Enter the building dimensions first — the proposal builds itself from the quote.'); return null; }
   const { i, c, dims, specs, scope } = model;
   const co = getCompany();
   let frames = null;
   try { frames = (typeof window.bb3dCaptureTurntable === 'function') ? window.bb3dCaptureTurntable(28, 1100, 640) : null; } catch (e) { frames = null; }
   if (!frames || !frames.length) {
-    if (!confirm('Could not capture the 3D model (open the 3D tab once, then retry for the spinning view). Export the share file without the 3D turntable?')) return;
     frames = [];
+    bbToast('3D view could not be captured — exporting the proposal without the spin view.');
   }
   const money = v => '$' + (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const total = (typeof _adjustedContractTotal === 'function' && _adjustedContractTotal() > 0) ? _adjustedContractTotal() : c.grand;
@@ -14713,7 +14743,7 @@ function exportClientShare() {
     .sub{color:#777;font-size:12px;line-height:1.5}
   </style></head><body><div class="wrap">
     <div class="hdr">
-      <div>${co.logo ? `<img src="${co.logo}" alt="${co.name}" style="max-height:64px;max-width:280px;display:block;margin-bottom:6px">` : `<h1>${co.name}</h1>`}
+      <div>${co.logo ? `<img src="${co.logo}" alt="${co.name}" style="max-height:88px;max-width:360px;display:block;margin-bottom:8px;border-radius:6px">` : `<h1>${co.name}</h1>`}
         <div class="sub">Construction Proposal${i.projectQuoteNum ? ' · Quote #' + i.projectQuoteNum : ''} · ${i.projectQuoteDate || new Date().toLocaleDateString()}</div>
         <div class="sub">${[co.address, co.city, co.phone, co.email, co.website].filter(Boolean).join(' · ')}</div></div>
       <div style="text-align:right" class="sub"><b style="color:#222;font-size:14px;">Prepared for</b><br>${i.client || '—'}<br>${i.project || ''}</div>
@@ -14744,17 +14774,73 @@ function exportClientShare() {
   <\/script>` : ''}
   </body></html>`;
   const name = ((i.project || i.client || 'proposal').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'proposal');
+  return { html, name: name + '_proposal.html', total, i, co };
+}
+
+function bbDownloadHTML(html, filename) {
   const blob = new Blob([html], { type: 'text/html' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = name + '_proposal.html';
+  a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
+function exportClientShare() {
+  const built = buildClientShareHTML();
+  if (!built) return;
+  bbDownloadHTML(built.html, built.name);
+  bbToast('Client proposal downloaded: ' + built.name);
+}
+
+// Pre-fill the email card from the client + quote (only fields the user hasn't typed in).
+function bbFillEmailCard() {
+  const model = proposalModel();
+  const co = getCompany();
+  const toEl = document.getElementById('prop_email_to');
+  const subEl = document.getElementById('prop_email_subject');
+  const bodyEl = document.getElementById('prop_email_body');
+  if (!toEl || !subEl || !bodyEl) return;
+  const i = model ? model.i : {};
+  const money = v => '$' + (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const total = model ? ((typeof _adjustedContractTotal === 'function' && _adjustedContractTotal() > 0) ? _adjustedContractTotal() : model.c.grand) : 0;
+  const bldg = (i.W > 0 && i.L > 0) ? `${i.W}' × ${i.L}' building` : 'your building';
+  if (!toEl.value && i.clientEmail) toEl.value = i.clientEmail;
+  if (!subEl.dataset.userEdited) subEl.value = `Your building proposal — ${i.project || bldg} — ${co.name}`;
+  if (!bodyEl.dataset.userEdited) {
+    const first = (i.client || '').trim().split(/\s+/)[0] || '';
+    bodyEl.value =
+`Hi${first ? ' ' + first : ''},
+
+Attached is your building proposal from ${co.name} — ${bldg}${total > 0 ? ' with a total investment of ' + money(total) : ''}.
+
+Open the attached file in any web browser to see the full proposal, including a 3D view of your building that you can spin with your mouse or finger.
+
+Questions or want to make changes? Just reply to this email${co.phone ? ' or call us at ' + co.phone : ''}.
+
+${co.name}${co.phone ? '\n' + co.phone : ''}${co.email ? '\n' + co.email : ''}`;
+  }
+}
+
+// One click: download the share file (3D baked in) and open a ready-to-send email.
+function emailProposal() {
+  const built = buildClientShareHTML();
+  if (!built) return;
+  bbDownloadHTML(built.html, built.name);
+  const to = (document.getElementById('prop_email_to') || { value: '' }).value.trim();
+  const subject = (document.getElementById('prop_email_subject') || { value: '' }).value;
+  const body = (document.getElementById('prop_email_body') || { value: '' }).value;
+  const a = document.createElement('a');
+  a.href = 'mailto:' + encodeURIComponent(to) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  const s = document.getElementById('prop-email-status');
+  if (s) s.textContent = `Downloaded ${built.name} and opened your email app — attach that file from Downloads, then hit send.`;
+  bbToast('Email opened — attach ' + built.name + ' from your Downloads folder, then send.');
+}
+
 function printProposal() {
   const model = proposalModel();
-  if (!model) return alert('Enter the building dimensions first — there is nothing to propose yet.');
+  if (!model) { bbToast('Enter the building dimensions first — there is nothing to propose yet.'); return; }
   const { i, c, dims, specs, scope } = model;
   const co = getCompany();
   const row = ([k, v]) => `<tr><td style="color:#555">${k}</td><td style="text-align:right;font-weight:600">${v}</td></tr>`;
