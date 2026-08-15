@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v218</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v219</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8386,7 +8386,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v218';
+const BB_VERSION = 'v219';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -9056,6 +9056,20 @@ function wsEnter() {
       .map(([t, l]) => `<button onclick="switchTab('${t}')" style="font-size:11px;">${l}</button>`).join('') + '</div>';
   nav.id = 'ws-nav-card';
   left.appendChild(nav);
+  // Per-card CLEAR buttons (v219): reset just that section, never the others
+  document.querySelectorAll('#ws-left > .qbs-card').forEach(card => {
+    if (card.id === 'ws-nav-card' || card.querySelector('.ws-clear-btn')) return;
+    if (!card.querySelector('input, select, textarea')) return;
+    const h3 = card.querySelector('h3');
+    if (!h3) return;
+    const btn = document.createElement('button');
+    btn.className = 'ws-clear-btn';
+    btn.textContent = '⟲ Clear';
+    btn.title = 'Reset THIS section to defaults (other sections untouched)';
+    btn.style.cssText = 'float:right; font-size:10px !important; padding:2px 8px !important; margin-left:8px;';
+    btn.onclick = e => { e.preventDefault(); e.stopPropagation(); wsClearCard(card); };
+    h3.appendChild(btn);
+  });
   // center: the live 3D viewport (canvas wrap's parent panel)
   const wrap3d = document.getElementById('audit3d-canvas-wrap');
   if (wrap3d) _wsAdoptNode(wrap3d.parentElement, center);
@@ -9064,8 +9078,37 @@ function wsEnter() {
   try { window.dispatchEvent(new Event('resize')); } catch (e) {}
   try { recalc(); } catch (e) { wsRenderLive(); }
 }
+// Reset ONE adopted card to its defaults — inputs back to their HTML defaults plus
+// the dynamic state the card owns (openings rows, shed toggle, porch construction).
+function wsClearCard(card) {
+  card.querySelectorAll('input, select, textarea').forEach(el => {
+    if (el.type === 'checkbox' || el.type === 'radio') el.checked = el.defaultChecked;
+    else if (el.tagName === 'SELECT') {
+      let idx = 0;
+      Array.from(el.options).forEach((o, i2) => { if (o.defaultSelected) idx = i2; });
+      el.selectedIndex = idx;
+    } else if (el.type !== 'file') el.value = el.defaultValue;
+  });
+  if (card.querySelector('#windows-tbody')) {
+    ['window', 'extdoor', 'intdoor', 'garage'].forEach(t => {
+      try { openingsState[t] = []; renderOpeningsTable(t); } catch (e) {}
+    });
+  }
+  if (card.querySelector('#shed_enabled')) {
+    try { onShedToggle(); } catch (e) {}
+    try { onShedRoofFramingChange(); } catch (e) {}
+  }
+  if (card.id === 'porch-construction-card') {
+    try { setPorchConstruction('stick'); } catch (e) {}
+    try { setCypressStyle('shed'); } catch (e) {}
+  }
+  if (card.querySelector('#wall_system')) { try { updateWallSystemUI(); } catch (e) {} }
+  try { recalc(); } catch (e) {}
+}
+
 function wsLeave() {
   if (!_wsAdopted) return;
+  document.querySelectorAll('.ws-clear-btn').forEach(b => b.remove());
   const nav = document.getElementById('ws-nav-card'); if (nav) nav.remove();
   while (_wsHomes.length) {
     const { node, ph } = _wsHomes.pop();
@@ -19383,8 +19426,12 @@ function applyVisibility() {
         ridge_cap: 1, roof_trim: 1, corner_trim: 1, fascia: 1, soffit: 1,
         windows: 1, ext_doors: 1, garage_doors: 1, mudsill: 1,
       };
-      if (skinCats[k] || ud.shedSkin) {
-        visible = false;   // shed metal (walls/roof/wainscot) strips off too
+      // Porch / gable / shed metal and finish strips off too — frame view shows
+      // ONLY the skeleton (posts, headers, rafters, braces, trusses, slab).
+      const lbl = String(ud.label || '');
+      const finishLbl = /roof metal|Porch roof|ridge cap|Valley metal|hip\/ridge cap|backdrop|T&G ceiling|Shed wall|OPEN bay|wainscot|corner roof/i.test(lbl);
+      if (skinCats[k] || ud.shedSkin || finishLbl) {
+        visible = false;   // all metal + finish strips off, porches included
       } else {
         opacity = 1.0;    // framing, trusses, purlins, girts, slab all solid
       }
