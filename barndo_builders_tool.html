@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text">The Barndo <span class="qbs-brand-accent">Builders</span></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v221</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v222</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2225,6 +2225,7 @@
   <div class="qbs-tabs">
     <div class="qbs-tab" data-tab="leads" onclick="switchTab('leads')">Leads</div>
     <div class="qbs-tab active" data-tab="takeoff" onclick="switchTab('takeoff')">1. Takeoff</div>
+    <div class="qbs-tab" data-tab="barndos" onclick="switchTab('barndos')" style="color:var(--copper);">🏠 Barndos</div>
     <div class="qbs-tab" data-tab="workspace" onclick="switchTab('workspace')" style="color:var(--copper); font-weight:700;">⚡ 3D Buildout</div>
     <div class="qbs-tab" data-tab="inputs" onclick="switchTab('inputs')">2. Dimensions</div>
     <div class="qbs-tab" data-tab="foundation" onclick="switchTab('foundation')">3. Foundation</div>
@@ -4540,6 +4541,33 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
   <!-- BUILDER WORKSPACE — one-page mode. It ADOPTS the live cards from the
        Dimensions tab and the 3D viewport (same DOM nodes, moved temporarily),
        so state, math and listeners are shared 1:1 with the classic tabs. -->
+  <!-- 🏠 BARNDOS — model home catalog (dealer-ready config files + renderings) -->
+  <div class="qbs-tab-content" id="tab-barndos" style="display:none">
+    <div class="qbs-card">
+      <h3>🏠 Barndo model homes <span class="badge">Your lineup · loads straight into the 3D tool · dealer-ready files</span></h3>
+      <p class="qbs-sub" style="margin-bottom: 10px;">Set a home up in the ⚡ 3D Buildout (dimensions, porches, openings, colors), then save it here as a model. Click a model to load it — the material list and price regenerate live, so small client changes re-quote instantly.</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button onclick="barndoOpenSaveForm()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper);">＋ Save current build as model</button>
+        <button onclick="document.getElementById('barndo-import-file').click()">⬆ Import model file</button>
+        <input type="file" id="barndo-import-file" accept=".json,application/json" style="display:none" onchange="barndoImportFile(this)" />
+        <button onclick="barndoExportCatalog()">⬇ Export full catalog</button>
+      </div>
+      <div id="barndo-save-form" style="display:none; margin-top:14px; padding:14px; background:var(--copper-soft); border:1px solid rgba(251,146,60,0.3); border-radius:6px;">
+        <div class="qbs-grid-4">
+          <div class="qbs-field"><label>Model name</label><input type="text" id="barndo_m_name" placeholder="e.g. The Cypress Creek 40×60" /></div>
+          <div class="qbs-field"><label>Beds</label><input type="number" id="barndo_m_beds" value="3" step="1" /></div>
+          <div class="qbs-field"><label>Baths</label><input type="number" id="barndo_m_baths" value="2" step="0.5" /></div>
+          <div class="qbs-field"><label>Floor plan image (optional)</label><input type="file" id="barndo_m_plan" accept="image/*" /></div>
+        </div>
+        <div class="qbs-note" style="margin:6px 0;">The front rendering captures automatically from the 3D. Price + footprint come from the live quote.</div>
+        <button onclick="barndoSaveModel()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper);">Save model</button>
+        <button onclick="document.getElementById('barndo-save-form').style.display='none'">Cancel</button>
+        <span id="barndo-save-status" style="margin-left:10px; font-size:12px; color:var(--text-2);"></span>
+      </div>
+    </div>
+    <div id="barndo-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:14px;"></div>
+  </div>
+
   <div class="qbs-tab-content" id="tab-workspace" style="display:none">
     <div id="ws-totals" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;"></div>
     <style>
@@ -8388,7 +8416,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v221';
+const BB_VERSION = 'v222';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -9030,6 +9058,191 @@ schedLoad();
 // the same inputs and canvases are moved in on entry and moved back on
 // exit, so both modes stay perfectly in sync.
 // =============================================================
+// =============================================================
+// 🏠 BARNDO MODEL HOMES — catalog of dealer-ready configurations.
+// A model = full input snapshot + hero rendering + optional floor plan image.
+// Materials are NEVER stored — they regenerate live from the config on load,
+// so price updates and client tweaks always re-quote correctly.
+// =============================================================
+const BARNDO_LS_KEY = 'bb_barndo_models_v1';
+function barndoModels() { try { return JSON.parse(localStorage.getItem(BARNDO_LS_KEY) || '[]'); } catch (e) { return []; } }
+function barndoStore(list) {
+  try { localStorage.setItem(BARNDO_LS_KEY, JSON.stringify(list)); return true; }
+  catch (e) { return false; }   // usually: localStorage full (too many/large images)
+}
+
+// Full configuration snapshot — every Dimensions-tab input (wherever the cards
+// currently live, Dimensions or the 3D rail) + the button-driven globals + the
+// dynamic state arrays (openings, truss groups).
+function barndoSnapshot() {
+  const fields = {};
+  document.querySelectorAll(
+    '#tab-inputs input[id], #tab-inputs select[id], #tab-inputs textarea[id],' +
+    ' #ws-left input[id], #ws-left select[id], #ws-left textarea[id]'
+  ).forEach(el => {
+    if (el.type === 'file') return;
+    fields[el.id] = el.type === 'checkbox' ? !!el.checked : el.value;
+  });
+  return {
+    v: 1, fields,
+    tier: (typeof currentTier !== 'undefined') ? currentTier : 'shell',
+    construction: (typeof currentConstruction !== 'undefined') ? currentConstruction : 'stick',
+    porchConstruction: (typeof currentPorchConstruction !== 'undefined') ? currentPorchConstruction : 'stick',
+    cypressStyle: (typeof currentCypressStyle !== 'undefined') ? currentCypressStyle : 'shed',
+    openings: (typeof openingsState !== 'undefined') ? JSON.parse(JSON.stringify(openingsState)) : null,
+    trussGroups: (typeof trussGroups !== 'undefined') ? JSON.parse(JSON.stringify(trussGroups)) : null,
+  };
+}
+
+function barndoApply(cfg) {
+  try { setTier(cfg.tier || 'shell'); } catch (e) {}
+  try { setConstruction(cfg.construction || 'stick'); } catch (e) {}
+  Object.entries(cfg.fields || {}).forEach(([id, v]) => {
+    const el = document.getElementById(id);
+    if (!el || el.type === 'file') return;
+    if (el.type === 'checkbox') el.checked = !!v; else el.value = v;
+  });
+  try { setPorchConstruction(cfg.porchConstruction || 'stick'); } catch (e) {}
+  try { setCypressStyle(cfg.cypressStyle || 'shed'); } catch (e) {}
+  if (cfg.openings && typeof openingsState !== 'undefined') {
+    Object.keys(openingsState).forEach(k => { openingsState[k] = (cfg.openings[k] || []).map(r => Object.assign({}, r)); });
+    ['window', 'extdoor', 'intdoor', 'garage'].forEach(t => { try { renderOpeningsTable(t); } catch (e) {} });
+  }
+  if (cfg.trussGroups && typeof trussGroups !== 'undefined') {
+    trussGroups.length = 0;
+    cfg.trussGroups.forEach(g => trussGroups.push(Object.assign({}, g)));
+    try { renderTrussTable(); } catch (e) {}
+  }
+  ['onShedToggle', 'onShedRoofFramingChange', 'updateWallSystemUI', 'onPostFoundationChange',
+   'onRoofSystemChange', 'onRoofProductChange', 'updatePorchCardVisibility', 'updateAdditionsTabVisibility']
+    .forEach(fn => { try { if (typeof window[fn] === 'function') window[fn](); } catch (e) {} });
+  try { recalc(); } catch (e) {}
+}
+
+function barndoOpenSaveForm() {
+  const f = document.getElementById('barndo-save-form');
+  if (f) { f.style.display = ''; const st = document.getElementById('barndo-save-status'); if (st) st.textContent = ''; }
+}
+
+function barndoSaveModel() {
+  const st = document.getElementById('barndo-save-status');
+  const name = ((document.getElementById('barndo_m_name') || {}).value || '').trim();
+  if (!name) { if (st) st.textContent = '⚠ Give the model a name first.'; return; }
+  const finish = hero => {
+    const planFile = (document.getElementById('barndo_m_plan') || {}).files;
+    const buildModel = plan => {
+      const c = window._lastCalc || {};
+      const i = c.i || {};
+      const model = {
+        id: 'bm_' + Date.now().toString(36),
+        name,
+        beds: parseFloat((document.getElementById('barndo_m_beds') || {}).value) || 0,
+        baths: parseFloat((document.getElementById('barndo_m_baths') || {}).value) || 0,
+        footprint: (i.W && i.L) ? `${i.W}×${i.L}` : '',
+        sqft: Math.round(i.living || (i.W * i.L) || 0),
+        startingAt: Math.round(c.grand || 0),
+        hero: hero || null,
+        plan: plan || null,
+        cfg: barndoSnapshot(),
+        date: new Date().toISOString(),
+      };
+      const list = barndoModels();
+      list.push(model);
+      if (!barndoStore(list)) { if (st) st.textContent = '⚠ Storage full — use a smaller floor plan image or export + delete old models.'; return; }
+      if (st) st.textContent = '✓ Saved "' + name + '"';
+      const f = document.getElementById('barndo-save-form'); if (f) setTimeout(() => { f.style.display = 'none'; }, 900);
+      renderBarndoGrid();
+    };
+    if (planFile && planFile[0]) {
+      const rd = new FileReader();
+      rd.onload = () => buildModel(String(rd.result));
+      rd.readAsDataURL(planFile[0]);
+    } else buildModel(null);
+  };
+  let hero = null;
+  try {
+    const frames = (typeof window.bb3dCaptureTurntable === 'function') ? window.bb3dCaptureTurntable(1, 640, 360) : null;
+    hero = frames && frames[0] ? frames[0] : null;
+  } catch (e) {}
+  finish(hero);
+}
+
+function renderBarndoGrid() {
+  const grid = document.getElementById('barndo-grid');
+  if (!grid) return;
+  const list = barndoModels();
+  if (!list.length) {
+    grid.innerHTML = '<div class="qbs-card"><p class="qbs-sub" style="margin:0;">No model homes saved yet. Build one on the ⚡ 3D Buildout, come back, and hit "Save current build as model".</p></div>';
+    return;
+  }
+  const money = v => '$' + Math.round(v || 0).toLocaleString('en-US');
+  grid.innerHTML = list.map(m => `
+    <div class="qbs-card" style="margin:0; overflow:hidden;">
+      ${m.hero ? `<img src="${m.hero}" style="width:100%; height:170px; object-fit:cover; border-radius:6px; cursor:pointer;" onclick="barndoLoad('${m.id}')" alt="${m.name}" />`
+                : `<div style="height:170px; display:flex; align-items:center; justify-content:center; background:var(--surface-2); border-radius:6px; cursor:pointer; font-size:42px;" onclick="barndoLoad('${m.id}')">🏠</div>`}
+      <div style="margin-top:10px;">
+        <div style="font-family:var(--font-headline); font-size:16px;">${m.name}</div>
+        <div style="font-size:12px; color:var(--text-2); margin:2px 0 8px;">
+          ${m.beds} bed · ${m.baths} bath${m.footprint ? ' · ' + m.footprint : ''}${m.sqft ? ' · ' + m.sqft.toLocaleString() + ' sqft' : ''}
+          <span style="color:var(--copper); font-family:var(--font-mono);"> · from ${money(m.startingAt)}</span>
+        </div>
+        ${m.plan ? `<img src="${m.plan}" style="width:100%; max-height:120px; object-fit:contain; background:#fff; border-radius:4px; margin-bottom:8px;" alt="floor plan" />` : ''}
+        <div style="display:flex; gap:6px;">
+          <button onclick="barndoLoad('${m.id}')" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); flex:1;">Load into 3D tool</button>
+          <button onclick="barndoExportOne('${m.id}')" title="Export this model as a file">⬇</button>
+          <button onclick="barndoDelete('${m.id}')" title="Delete this model" class="opening-remove-btn">×</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function barndoLoad(id) {
+  const m = barndoModels().find(x => x.id === id);
+  if (!m) return;
+  barndoApply(m.cfg);
+  switchTab('workspace');
+}
+
+function barndoDelete(id) {
+  barndoStore(barndoModels().filter(x => x.id !== id));
+  renderBarndoGrid();
+}
+
+function _barndoDownload(obj, filename) {
+  const a = document.createElement('a');
+  a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(obj, null, 1));
+  a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+function barndoExportOne(id) {
+  const m = barndoModels().find(x => x.id === id);
+  if (m) _barndoDownload(m, m.name.replace(/[^\w\-]+/g, '_') + '.barndo.json');
+}
+function barndoExportCatalog() {
+  _barndoDownload(barndoModels(), 'barndo_catalog_' + new Date().toISOString().slice(0, 10) + '.json');
+}
+function barndoImportFile(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const data = JSON.parse(String(rd.result));
+      const incoming = Array.isArray(data) ? data : [data];
+      const list = barndoModels();
+      incoming.forEach(m => {
+        if (!m || !m.cfg) return;
+        const idx = list.findIndex(x => x.id === m.id);
+        if (idx >= 0) list[idx] = m; else list.push(m);
+      });
+      barndoStore(list);
+      renderBarndoGrid();
+    } catch (e) {}
+    input.value = '';
+  };
+  rd.readAsText(f);
+}
+
 let _wsAdopted = false;
 const _wsHomes = [];   // [{node, placeholder}]
 function _wsAdoptNode(node, slot) {
@@ -9416,6 +9629,7 @@ function switchTab(name) {
   if (name === 'quote') { try { renderDrawSchedule(); renderChangeOrders(); } catch (e) {} }
   if (name === 'vendors') { try { renderVendors(); } catch (e) {} }
   if (name === 'workspace') { try { wsEnter(); } catch (e) {} } else { try { wsLeave(); } catch (e) {} }
+  if (name === 'barndos') { try { renderBarndoGrid(); } catch (e) {} }
   if (name === 'calcs') { ['grCalc','gsCalc','shCalc','swCalc','stCalc','csCalc','phCalc','rfCalc','gpCalc','dwCalc','bfCalc','cbCalc','cfCalc','rsCalc','wsCalc'].forEach(f => { try { window[f] ? window[f]() : eval(f + '()'); } catch (e) {} }); }
   if (name === 'takeoff' && typeof takeoffInit === 'function') takeoffInit();
   if (name === 'subs') {
