@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v234</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v235</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2226,6 +2226,7 @@
     <div class="qbs-tab" data-tab="leads" onclick="switchTab('leads')">Leads</div>
     <div class="qbs-tab active" data-tab="takeoff" onclick="switchTab('takeoff')">1. Takeoff</div>
     <div class="qbs-tab" data-tab="barndos" onclick="switchTab('barndos')" style="color:var(--copper);">🏠 Barndos</div>
+    <div class="qbs-tab" data-tab="framing" onclick="switchTab('framing')">📐 Framing pages</div>
     <div class="qbs-tab" data-tab="workspace" onclick="switchTab('workspace')" style="color:var(--copper); font-weight:700;">⚡ 3D Buildout</div>
     <div class="qbs-tab" data-tab="inputs" onclick="switchTab('inputs')">2. Dimensions</div>
     <div class="qbs-tab" data-tab="foundation" onclick="switchTab('foundation')">3. Foundation</div>
@@ -3871,6 +3872,16 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
       <p class="qbs-sub" style="margin-bottom:10px;">Logged against the client / project named on the Dimensions tab. Approved change orders roll into the adjusted contract total below.</p>
       <div id="change-orders-body"></div>
     </div>
+  </div>
+
+  <!-- FRAMING PAGES — per-stage proof of takeoff: 3D of just that stage + dims + editable materials -->
+  <div class="qbs-tab-content" id="tab-framing" style="display:none">
+    <div class="qbs-card">
+      <h3>📐 Framing pages <span class="badge">Proof of takeoff · edits save to the whole quote</span></h3>
+      <p class="qbs-sub" style="margin-bottom: 12px;">Each page shows one stage of the build: a 3D rendering of just that stage's materials, the dimensions that drive it, and every material line figured for it. Change any quantity and it saves — the edited number flows through the quote, order sheets, and cut lists until you reset it (↺) or hit New/Clear.</p>
+      <div id="framing-pager" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:4px;"></div>
+    </div>
+    <div id="framing-page-body"></div>
   </div>
 
   <!-- CUSTOMER PROPOSAL — client-facing document. NO costs, NO quantities, NO line items. -->
@@ -7942,6 +7953,7 @@ function initRoofCalc() {
 // One-click blank quote: clears every manual entry (dimensions, areas, project info,
 // openings, truss rows, roof calculator). Saved leads/projects are untouched.
 function clearAllManual() {
+  try { bbClearQtyOverrides(); } catch (e) {}
   window._takeoffOnlyQuote = false;
   if (!confirm('Clear all manual entries and start a blank quote?\n\nThis wipes the current dimensions, areas, project info, openings, truss rows, and the roof calculator. Saved leads and saved projects are NOT affected.')) return;
   if (typeof newQuoteReset === 'function') newQuoteReset();
@@ -8566,7 +8578,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v234';
+const BB_VERSION = 'v235';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -9782,6 +9794,7 @@ function switchTab(name) {
   if (name === 'quote') { try { renderDrawSchedule(); renderChangeOrders(); } catch (e) {} }
   if (name === 'vendors') { try { renderVendors(); } catch (e) {} }
   if (name === 'workspace') { try { wsEnter(); } catch (e) {} } else { try { wsLeave(); } catch (e) {} }
+  if (name === 'framing') { try { renderFramingPages(); } catch (e) {} }
   if (name === 'barndos') { try { renderBarndoGrid(); } catch (e) {} }
   if (name === 'calcs') { ['grCalc','gsCalc','shCalc','swCalc','stCalc','csCalc','phCalc','rfCalc','gpCalc','dwCalc','bfCalc','cbCalc','cfCalc','rsCalc','wsCalc'].forEach(f => { try { window[f] ? window[f]() : eval(f + '()'); } catch (e) {} }); }
   if (name === 'takeoff' && typeof takeoffInit === 'function') takeoffInit();
@@ -13151,6 +13164,36 @@ function importFullBackup(event) {
 // =============================================================
 // CALCULATIONS
 // =============================================================
+// --- Saved takeoff qty overrides — the Framing pages "proof of takeoff" edits.
+// Keyed by material line id, stored on this device, applied to every quote/order/cut list.
+const BB_QTY_OVERRIDE_KEY = 'bb_qty_overrides_v1';
+function bbGetQtyOverrides() {
+  try { return JSON.parse(localStorage.getItem(BB_QTY_OVERRIDE_KEY) || '{}') || {}; } catch (e) { return {}; }
+}
+function bbSetQtyOverride(id, qty) {
+  const o = bbGetQtyOverrides();
+  if (qty === null || qty === '' || isNaN(parseFloat(qty))) delete o[id];
+  else o[id] = Math.max(0, parseFloat(qty));
+  try { localStorage.setItem(BB_QTY_OVERRIDE_KEY, JSON.stringify(o)); } catch (e) {}
+}
+function bbClearQtyOverrides() {
+  try { localStorage.removeItem(BB_QTY_OVERRIDE_KEY); } catch (e) {}
+}
+function bbApplyQtyOverrides(lines) {
+  const o = bbGetQtyOverrides();
+  lines.forEach(ln => {
+    if (o[ln.id] != null) {
+      ln.autoQty = ln.qty;
+      ln.qty = o[ln.id];
+      ln.cost = ln.qty * (ln.unitCost || 0);
+      ln.sell = ln.qty * (ln.unitSell || 0);
+      ln.retail = ln.qty * (ln.unitRetail || 0);
+      ln.overridden = true;
+    }
+  });
+  return lines;
+}
+
 function calcMaterials(i) {
   const lines = MATERIALS.map(m => {
     const qty = i.isEmpty ? 0 : Math.max(0, m.formula(i));
@@ -13303,7 +13346,7 @@ function calcMaterials(i) {
     });
   });
   
-  return lines;
+  return bbApplyQtyOverrides(lines);
 }
 
 function calcSubs(i) {
@@ -16270,6 +16313,233 @@ function drawPierSection() {
 }
 
 // End of detail diagrams
+
+// ============================================================
+// FRAMING PAGES — per-stage proof of takeoff
+// One page per build stage: stage-only 3D + dimensions + editable materials.
+// ============================================================
+const FRAMING_PAGES = [
+  { key: 'walls', num: 1, title: 'Walls',
+    sub: 'Wall framing — posts or studs, plates, girts, headers, sheathing',
+    cats: ['Wall framing', 'Post-frame wall', 'Wall sheathing'],
+    dims: i => [
+      ['Building', `${i.W}' × ${i.L}' · walls ${i.H}' tall`],
+      ['Wall perimeter', `${Math.round(2 * (i.L + i.W))} LF`],
+      ['Construction', (typeof currentConstruction !== 'undefined' && currentConstruction === 'post') ? 'Post frame' : 'Stud frame'],
+      ['Wall area', `${Math.round(i.wallArea || 0).toLocaleString()} sq ft`],
+      ['Openings', `${(openingsState.window || []).reduce((s, r) => s + (+r.qty || 0), 0)} windows · ${(openingsState.extdoor || []).reduce((s, r) => s + (+r.qty || 0), 0)} ext doors · ${(openingsState.garage || []).reduce((s, r) => s + (+r.qty || 0), 0)} garage doors`],
+    ],
+    svgs: ['buildStudSection', 'buildPlateSection', 'buildHeaderSection'] },
+  { key: 'trusses', num: 2, title: 'Trusses & roof structure',
+    sub: 'Trusses, rafters, ridge, purlins/lathing',
+    cats: ['Roof structure'],
+    dims: i => [
+      ['Truss span', `${i.W}'`],
+      ['Roof pitch', `${i.pitch}/12`],
+      ['Top chord', `${(i.topChord || 0).toFixed(2)}'`],
+      ['Truss spacing', `${((i.trussSpacing || 48) / 12)}' OC`],
+      ['Ridge', `${Math.round(i.ridgeLF || i.L)} LF`],
+    ],
+    svgs: ['buildTrussSection'] },
+  { key: 'gables', num: 3, title: 'Gable ends',
+    sub: 'Gable framing, siding and trim on both gable ends',
+    cats: [], labelRe: /gable/i,
+    dims: i => {
+      const rise = (i.W / 2) * (i.pitch / 12);
+      return [
+        ['Gable width', `${i.W}'`],
+        ['Gable rise', `${rise.toFixed(1)}'`],
+        ['Area per gable', `${Math.round(i.W * rise / 2)} sq ft`],
+        ['Both gables', `${Math.round(i.W * rise)} sq ft`],
+      ];
+    },
+    svgs: [] },
+  { key: 'floor', num: 4, title: 'Floor',
+    sub: 'Floor system — joists/trusses, rim, subfloor',
+    cats: ['Floor system'],
+    dims: i => [
+      ['Floor system', ((document.getElementById('floor_system') || {}).selectedOptions || [{ textContent: '—' }])[0].textContent],
+      ['Footprint', `${Math.round(i.footprint || i.L * i.W).toLocaleString()} sq ft`],
+    ],
+    svgs: [] },
+  { key: 'siding', num: 5, title: 'Siding',
+    sub: 'Wall skin — siding panels, wainscot, wall trim (gable ends on page 3)',
+    cats: ['Siding skin', 'Metal wall trim', 'LP trim'], excludeRe: /gable/i,
+    dims: i => [
+      ['Wall area', `${Math.round(i.wallArea || 0).toLocaleString()} sq ft`],
+      ['Siding', ((document.getElementById('siding_product') || {}).selectedOptions || [{ textContent: '—' }])[0].textContent],
+      ['Siding color', (document.getElementById('siding_color') || {}).value || '—'],
+      ['Wainscot', ((document.getElementById('wainscot_on') || {}).value === '36') ? '36" wainscot' : 'None'],
+    ],
+    svgs: ['buildWallSheathingSection'] },
+  { key: 'roof', num: 6, title: 'Roof',
+    sub: 'Roof skin — panels, ridge cap, rake/eave trim, soffit & fascia, moisture barrier',
+    cats: ['Roof skin', 'Soffit & fascia', 'Moisture barrier'], excludeRe: /gable/i,
+    dims: i => [
+      ['Roof area', `${Math.round(i.roofArea || 0).toLocaleString()} sq ft`],
+      ['Panel length (top chord)', `${(i.topChord || 0).toFixed(2)}'`],
+      ['Ridge', `${Math.round(i.ridgeLF || i.L)} LF`],
+      ['Roofing', ((document.getElementById('roof_product') || {}).selectedOptions || [{ textContent: '—' }])[0].textContent],
+      ['Roof color', (document.getElementById('roof_color') || {}).value || '—'],
+    ],
+    svgs: ['buildRoofSheathingSection', 'buildTrimSection'] },
+];
+let _framingPage = 'walls';
+
+function framingPageLines(pg) {
+  const c = window._lastCalc;
+  const mats = (c && c.mats) || [];
+  return mats.filter(l => {
+    if (pg.excludeRe && pg.excludeRe.test(l.label)) return false;
+    if (pg.cats && pg.cats.includes(l.cat)) return true;
+    if (pg.labelRe && pg.labelRe.test(l.label)) return true;
+    return false;
+  });
+}
+
+function renderFramingPager() {
+  const bar = document.getElementById('framing-pager');
+  if (!bar) return;
+  bar.innerHTML = FRAMING_PAGES.map(p =>
+    `<button class="qbs-tier-btn${p.key === _framingPage ? ' active' : ''}" onclick="framingGoto('${p.key}')">Page ${p.num} · ${p.title}</button>`
+  ).join('') + `<button onclick="printFramingPages()" style="margin-left:auto;">🖨 Print all pages</button>`;
+}
+
+function framingGoto(key) {
+  _framingPage = key;
+  renderFramingPages();
+}
+
+function framingQtyEdit(id, val) {
+  bbSetQtyOverride(id, val);
+  try { recalc(); } catch (e) {}
+  clearTimeout(window._framingT);
+  window._framingT = setTimeout(() => renderFramingPages(true), 600);
+}
+
+function framingQtyReset(id) {
+  bbSetQtyOverride(id, null);
+  try { recalc(); } catch (e) {}
+  renderFramingPages(true);
+}
+
+// skipSnapshot=true keeps the last 3D image (fast path while typing quantities)
+function renderFramingPages(skipSnapshot) {
+  const body = document.getElementById('framing-page-body');
+  if (!body) return;
+  renderFramingPager();
+  const pg = FRAMING_PAGES.find(p => p.key === _framingPage) || FRAMING_PAGES[0];
+  if (!window._lastCalc) { try { recalc(); } catch (e) {} }
+  const i = getInputs();
+  const lines = framingPageLines(pg);
+  const money = v => '$' + (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  let snap = skipSnapshot ? (window._framingSnaps || {})[pg.key] : null;
+  if (!snap) {
+    try { snap = window.bb3dCaptureStage(pg.key, 980, 560); } catch (e) { snap = null; }
+    window._framingSnaps = window._framingSnaps || {};
+    if (snap) window._framingSnaps[pg.key] = snap;
+  }
+
+  const dimRows = pg.dims(i).map(([k, v]) =>
+    `<tr><td style="color:var(--text-3);padding:5px 10px 5px 0;white-space:nowrap;">${k}</td><td style="font-weight:600;">${v}</td></tr>`).join('');
+
+  const matRows = lines.length ? lines.map(l => `
+    <tr style="border-bottom:1px solid var(--hairline);">
+      <td style="padding:6px 8px;font-size:12px;">${l.label}${l.overridden ? ' <span style="color:var(--warn);font-size:10px;">(edited — auto was ' + (l.autoQty ?? 0) + ')</span>' : ''}</td>
+      <td style="padding:6px 8px;font-family:var(--font-mono);font-size:11px;color:var(--text-3);white-space:nowrap;">${l.uom}</td>
+      <td style="padding:6px 4px;text-align:right;">
+        <input type="number" value="${l.qty}" min="0" step="any"
+          style="width:76px;text-align:right;font-family:var(--font-mono);${l.overridden ? 'border-color:var(--warn);color:var(--warn);' : ''}"
+          onchange="framingQtyEdit('${l.id}', this.value)" />
+      </td>
+      <td style="padding:6px 8px;text-align:right;font-family:var(--font-mono);font-size:12px;white-space:nowrap;">${money(l.unitCost)}</td>
+      <td style="padding:6px 8px;text-align:right;font-family:var(--font-mono);font-size:12px;white-space:nowrap;">${money(l.cost)}</td>
+      <td style="padding:6px 4px;">${l.overridden ? `<button title="Reset to auto quantity" onclick="framingQtyReset('${l.id}')" style="padding:2px 8px !important;font-size:11px !important;">↺</button>` : ''}</td>
+    </tr>`).join('') :
+    `<tr><td colspan="6" style="padding:14px;color:var(--text-3);">No materials figured for this stage with the current selections.</td></tr>`;
+
+  const stageTotal = lines.reduce((s, l) => s + (l.cost || 0), 0);
+
+  body.innerHTML = `
+    <div class="qbs-card" id="framing-card-${pg.key}">
+      <h3>Page ${pg.num} — ${pg.title} <span class="badge">${pg.sub}</span></h3>
+      <div style="display:grid;grid-template-columns:minmax(340px, 1fr) minmax(380px, 1.2fr);gap:20px;align-items:start;">
+        <div>
+          ${snap ? `<img src="${snap}" alt="${pg.title} 3D" style="width:100%;border-radius:10px;border:1px solid var(--hairline);background:#0d0f12;" />`
+                 : `<div class="qbs-note" style="padding:30px;border:1px dashed var(--hairline);border-radius:10px;">3D snapshot unavailable — enter building dimensions first.</div>`}
+          <h4 style="font-family:var(--font-headline);font-size:12px;color:var(--copper);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 6px;">Dimensions driving this stage</h4>
+          <table style="border-collapse:collapse;font-size:13px;">${dimRows}</table>
+        </div>
+        <div>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr style="border-bottom:2px solid var(--hairline-bright);font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);">
+              <th style="text-align:left;padding:6px 8px;">Material</th><th style="text-align:left;padding:6px 8px;">UOM</th>
+              <th style="text-align:right;padding:6px 8px;">Qty</th><th style="text-align:right;padding:6px 8px;">Unit</th>
+              <th style="text-align:right;padding:6px 8px;">Cost</th><th></th>
+            </tr></thead>
+            <tbody>${matRows}</tbody>
+            <tfoot><tr style="border-top:2px solid var(--hairline-bright);">
+              <td colspan="4" style="padding:8px;font-weight:600;">Stage total (cost)</td>
+              <td style="padding:8px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--copper);">${money(stageTotal)}</td><td></td>
+            </tr></tfoot>
+          </table>
+          <div class="qbs-note" style="margin-top:8px;">Type over any quantity to override it — the edit saves on this device and carries into the quote, order sheets, and cut lists. ↺ returns a line to its auto-figured number.</div>
+        </div>
+      </div>
+      <div id="framing-svg-extra"></div>
+    </div>`;
+
+  // Append the existing verification diagrams that belong to this stage
+  const extra = document.getElementById('framing-svg-extra');
+  if (extra && pg.svgs && pg.svgs.length) {
+    const mats = (window._lastCalc && window._lastCalc.mats) || [];
+    pg.svgs.forEach(fn => {
+      try { if (typeof window[fn] === 'function') extra.appendChild(window[fn](i, mats)); } catch (e) {}
+    });
+  }
+}
+
+// Print every page as its own sheet: capture all six stages, build a print doc.
+function printFramingPages() {
+  if (!window._lastCalc) { try { recalc(); } catch (e) {} }
+  const i = getInputs();
+  const money = v => '$' + (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const co = getCompany();
+  const pagesHtml = FRAMING_PAGES.map(pg => {
+    let snap = null;
+    try { snap = window.bb3dCaptureStage(pg.key, 980, 560); } catch (e) {}
+    const lines = framingPageLines(pg);
+    const dimRows = pg.dims(i).map(([k, v]) => `<tr><td class="k">${k}</td><td class="v">${v}</td></tr>`).join('');
+    const rows = lines.map(l =>
+      `<tr><td>${l.label}${l.overridden ? ' <b>(edited)</b>' : ''}</td><td>${l.uom}</td><td class="r">${l.qty}</td><td class="r">${money(l.unitCost)}</td><td class="r">${money(l.cost)}</td></tr>`).join('');
+    const tot = lines.reduce((s, l) => s + (l.cost || 0), 0);
+    return `<div class="page">
+      <h1>Page ${pg.num} — ${pg.title}</h1><div class="sub">${pg.sub} · ${i.W}' × ${i.L}' × ${i.H}' · ${co.name}</div>
+      ${snap ? `<img src="${snap}">` : ''}
+      <table class="dims">${dimRows}</table>
+      <table class="mats"><thead><tr><th>Material</th><th>UOM</th><th class="r">Qty</th><th class="r">Unit</th><th class="r">Cost</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5">No materials for this stage.</td></tr>'}</tbody>
+      <tfoot><tr><td colspan="4"><b>Stage total</b></td><td class="r"><b>${money(tot)}</b></td></tr></tfoot></table>
+    </div>`;
+  }).join('');
+  const doc = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Framing pages — proof of takeoff</title><style>
+    body{font-family:Arial,sans-serif;color:#111;margin:24px}
+    .page{page-break-after:always}
+    h1{font-size:20px;margin:0 0 2px}
+    .sub{color:#666;font-size:12px;margin-bottom:10px}
+    img{width:100%;max-height:380px;object-fit:contain;border:1px solid #ccc;border-radius:6px;margin-bottom:10px}
+    table{border-collapse:collapse;width:100%;font-size:12px}
+    .dims{width:auto;margin-bottom:10px}
+    .dims .k{color:#666;padding:3px 14px 3px 0}
+    .dims .v{font-weight:bold;padding:3px 0}
+    .mats th,.mats td{border-bottom:1px solid #ddd;padding:5px 6px;text-align:left}
+    .r{text-align:right !important;font-family:monospace}
+  </style></head><body>${pagesHtml}<script>window.onload=()=>setTimeout(()=>window.print(),400)<\\/script></body></html>`;
+  const win = window.open('', '_blank');
+  if (!win) { bbToast('Popup blocked — allow popups to print the framing pages.'); return; }
+  win.document.write(doc); win.document.close();
+}
 
 // ============================================================
 // TAKEOFF VERIFICATION PAGE
@@ -20218,6 +20488,76 @@ window.bb3dRefresh = function() {
 // Capture a turntable of the current model: orbit the camera a full circle,
 // explicitly rendering before each grab (no preserveDrawingBuffer needed).
 // Returns an array of JPEG data URLs; restores the camera/renderer after.
+// Capture a single frame showing ONLY one build stage's meshes (Framing pages).
+window.bb3dCaptureStage = function(stage, w, h) {
+  if (!initialized) init3D();
+  if (!renderer || !scene || !camera) return null;
+  generateModel();
+  w = w || 900; h = h || 520;
+  const T = {
+    walls: m => {
+      const u = m.userData || {}, l = u.label || '', k = u.categoryKey || '';
+      if (k === 'foundation') return true;
+      if (/truss|purlin|rafter|roof|ridge|lath/i.test(l)) return false;
+      return !!u.isFraming || /\bpost\b|stud|girt|plate|header|carrier/i.test(l);
+    },
+    trusses: m => {
+      const u = m.userData || {}, l = u.label || '', k = u.categoryKey || '';
+      if (k === 'foundation') return true;
+      if (k === 'roof_lath') return true;
+      return /truss|purlin|rafter|ridge board|top chord|web/i.test(l) && !/metal|cap|skin/i.test(l);
+    },
+    gables: m => {
+      const u = m.userData || {}, l = u.label || '';
+      if ((u.categoryKey || '') === 'foundation') return true;
+      return /gable/i.test(l);
+    },
+    floor: m => {
+      const u = m.userData || {}, l = u.label || '', k = u.categoryKey || '';
+      if (k === 'foundation') return true;
+      return /floor|joist|subfloor|rim board/i.test(l);
+    },
+    siding: m => {
+      const u = m.userData || {}, l = u.label || '', k = u.categoryKey || '';
+      if (k === 'foundation') return true;
+      if (/gable/i.test(l)) return false;
+      return k === 'siding' || /siding|wainscot|corner trim|wall metal|wall panel/i.test(l);
+    },
+    roof: m => {
+      const u = m.userData || {}, l = u.label || '', k = u.categoryKey || '';
+      if (k === 'foundation') return true;
+      return k === 'roof_skin' || k === 'roof_sheathing' ||
+        /roof metal|roof skin|ridge cap|rake|eave trim|fascia|soffit|Porch roof|Extension roof/i.test(l);
+    },
+  };
+  const test = T[stage];
+  if (!test) return null;
+  // Save current visibility, apply stage filter
+  const saved = allMeshes.map(m => [m, m.visible]);
+  allMeshes.forEach(m => { m.visible = test(m); });
+  // Camera: fixed 3/4 aerial scaled to the model
+  const d = getBuildingDims();
+  const r = Math.max(d.L, d.W) * 1.35 + 25;
+  const oldPos = camera.position.clone();
+  const oldTarget = controls ? controls.target.clone() : new THREE.Vector3(0, 5, 0);
+  const oldAspect = camera.aspect;
+  const oldSize = new THREE.Vector2(); renderer.getSize(oldSize);
+  const oldPR = renderer.getPixelRatio();
+  renderer.setPixelRatio(1); renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  camera.position.set(r * 0.78, r * 0.62, r * 0.78);
+  camera.lookAt(0, (d.H || 10) / 2, 0);
+  renderer.render(scene, camera);
+  const shot = renderer.domElement.toDataURL('image/jpeg', 0.82);
+  // Restore
+  renderer.setPixelRatio(oldPR); renderer.setSize(oldSize.x, oldSize.y, false);
+  camera.aspect = oldAspect; camera.updateProjectionMatrix();
+  camera.position.copy(oldPos); camera.lookAt(oldTarget);
+  saved.forEach(([m, v]) => { m.visible = v; });
+  renderer.render(scene, camera);
+  return shot;
+};
+
 window.bb3dCaptureTurntable = function(frames, w, h) {
   if (!initialized) init3D();
   if (!renderer || !scene || !camera) return null;
