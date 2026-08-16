@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v233</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v234</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2947,6 +2947,61 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
       <p class="qbs-sub" style="margin: 0;">Enter a <strong style="color: var(--copper);">Porch area (sqft)</strong> on the Dimensions tab to unlock porch construction options here.</p>
     </div>
     
+    <div class="qbs-card" id="building-extension-card">
+      <h3>Building extension <span class="badge">Continue the building off a gable end — its own framing, walls &amp; colors</span></h3>
+      <p class="qbs-sub" style="margin-bottom: 14px;">Extends the building past a gable end with a different outcome than the main building — e.g. an enclosed shop that continues as an open-sided equipment bay. The extension has its own size, height, framing, enclosure, and color selections; materials are added on top of the main takeoff.</p>
+      <div class="qbs-field">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;">
+          <input type="checkbox" id="ext_enabled" onchange="onExtToggle()" style="width: 18px; height: 18px;">
+          <span>Include a building extension on this build</span>
+        </label>
+      </div>
+      <div id="ext-details" style="display:none; margin-top: 16px;">
+        <div class="qbs-grid-4">
+          <div class="qbs-field">
+            <label>Extend off which end</label>
+            <select id="ext_end" onchange="recalc()">
+              <option value="right">Right gable end</option>
+              <option value="left">Left gable end</option>
+            </select>
+          </div>
+          <div class="qbs-field"><label>Extension length (ft)</label><input type="number" id="ext_length" value="0" step="1" oninput="recalc()" /><div class="qbs-note">Required — how far it extends</div></div>
+          <div class="qbs-field"><label>Extension width (ft)</label><input type="number" id="ext_width" value="0" step="1" oninput="recalc()" /><div class="qbs-note">0 = match main building</div></div>
+          <div class="qbs-field"><label>Wall height (ft)</label><input type="number" id="ext_wall_height" value="0" step="0.5" oninput="recalc()" /><div class="qbs-note">0 = match main building</div></div>
+        </div>
+        <div class="qbs-grid-4">
+          <div class="qbs-field"><label>Roof pitch (X/12)</label><input type="number" id="ext_pitch" value="0" step="0.5" oninput="recalc()" /><div class="qbs-note">0 = match main building</div></div>
+          <div class="qbs-field">
+            <label>Framing</label>
+            <select id="ext_construction" onchange="recalc()">
+              <option value="post">Post frame</option>
+              <option value="stud">Stud frame</option>
+            </select>
+            <div class="qbs-note">Open extensions always carry on posts</div>
+          </div>
+          <div class="qbs-field">
+            <label>Enclosure</label>
+            <select id="ext_enclosed" onchange="recalc()">
+              <option value="open">Open — roof only, no walls</option>
+              <option value="enclosed">Fully enclosed</option>
+            </select>
+          </div>
+          <div class="qbs-field">
+            <label>Concrete slab</label>
+            <select id="ext_slab" onchange="recalc()">
+              <option value="yes">4" slab under extension</option>
+              <option value="no">No slab (gravel/dirt)</option>
+            </select>
+          </div>
+        </div>
+        <div class="qbs-grid-4" style="margin-top: 4px;">
+          <div class="qbs-field"><label>Extension roof color</label><select id="ext_roof_color" onchange="recalc()"></select></div>
+          <div class="qbs-field"><label>Extension siding color</label><select id="ext_siding_color" onchange="recalc()"></select></div>
+          <div class="qbs-field"><label>Extension trim color</label><select id="ext_trim_color" onchange="recalc()"></select></div>
+        </div>
+      </div>
+    </div>
+
     <div class="qbs-card" id="side-shed-card">
       <h3>Side shed / lean-to <span class="badge">Porches & side sheds · any build · attaches to main building</span></h3>
       <p class="qbs-sub" style="margin-bottom: 14px;">Adds a single-slope addition along one side of the main building. Tool adds shed materials (rafters or trusses, panels, posts, girts, purlins, trim) on top of the main building takeoff.</p>
@@ -6217,6 +6272,58 @@ const MATERIALS = [
       return Math.ceil(Math.max(0, area) / 3 * 1.05);
     }},
 
+  // ---------------- BUILDING EXTENSION (gable-end continuation) ----------------
+  { id: "ext_slab_concrete", label: "Extension: concrete 4\" slab", cat: "Building extension", uom: "sqft", packSize: null,
+    priceCost: 6.00, priceSell: 7.50, priceRetail: 9.00,
+    formula: i => (i.extActive && i.ext.slab) ? Math.ceil(i.ext.slabSqft) : 0 },
+  { id: "ext_post_6x6", label: "Extension: 6×6 PT post (4' embed)", cat: "Building extension", uom: "LF", packSize: null,
+    priceCost: 3.90, priceSell: 4.90, priceRetail: 6.20,
+    labelFn: i => `Extension: 6×6 PT post × ${(i.ext || {}).postCount || 0} @ 8' OC (4' embed)`,
+    customUnitPrice: i => shedMemberCostLF('pt', '6x6'),
+    formula: i => (i.extActive && i.ext.usePosts) ? Math.ceil(i.ext.postLF * 1.05) : 0 },
+  { id: "ext_sakrete", label: "Extension: Sakrete bag (post backfill)", cat: "Building extension", uom: "bag", packSize: null,
+    priceCost: 6.98, priceSell: 9.00, priceRetail: 11.00,
+    formula: i => i.extActive ? (i.ext.sakreteBags || 0) : 0 },
+  { id: "ext_truss", label: "Extension: roof truss (gable, spans extension width)", cat: "Building extension", uom: "ea", packSize: null,
+    priceCost: 11.00, priceSell: 14.00, priceRetail: 17.50,
+    labelFn: i => {
+      const x = i.ext || {};
+      return `Extension: gable truss ${x.W || 0}' span @ ${x.trussSpacing || 4}' OC`;
+    },
+    customUnitPrice: i => ((i.ext || {}).W || 0) * 11,
+    formula: i => i.extActive ? i.ext.trussCount : 0 },
+  { id: "ext_purlin_2x4", label: "Extension: 2×4×20 SYP roof purlin", cat: "Building extension", uom: "ea (20')", packSize: null,
+    priceCost: 8.51, priceSell: 11, priceRetail: 14,
+    formula: i => i.extActive ? Math.ceil(i.ext.lathLF * 1.05 / 20) : 0 },
+  { id: "ext_girt_2x6", label: "Extension: 2×6×20 SYP wall girt", cat: "Building extension", uom: "ea (20')", packSize: null,
+    priceCost: 14.72, priceSell: 19, priceRetail: 24,
+    formula: i => i.extActive ? Math.ceil(i.ext.girtLF * 1.05 / 20) : 0 },
+  { id: "ext_pt_band", label: "Extension: 2×6 PT splash band", cat: "Building extension", uom: "LF", packSize: null,
+    priceCost: 1.25, priceSell: 1.60, priceRetail: 2.00,
+    customUnitPrice: i => shedMemberCostLF('pt', '2x6') || 1.25,
+    formula: i => i.extActive ? Math.ceil(i.ext.ptBandLF * 1.05) : 0 },
+  { id: "ext_stud_wall", label: "Extension: 2×6 SYP stud wall framing (studs @16\" + plates)", cat: "Building extension", uom: "LF", packSize: null,
+    priceCost: 1.25, priceSell: 1.60, priceRetail: 2.00,
+    customUnitPrice: i => shedMemberCostLF('lumber', '2x6'),
+    formula: i => i.extActive ? Math.ceil(i.ext.studLF * 1.05) : 0 },
+  { id: "ext_roof_panel_tr", label: "Extension: TR 29ga roof panel (cut to top chord)", cat: "Building extension", uom: "LF", packSize: null,
+    priceCost: 2.58, priceSell: 3.40, priceRetail: 4.25,
+    labelFn: i => {
+      const x = i.ext || {};
+      return `Extension: TR 29ga roof panel${x.roofColor ? ' — ' + x.roofColor : ''} (cut to top chord)`;
+    },
+    formula: i => i.extActive ? Math.ceil(i.ext.panelLF * 1.05) : 0 },
+  { id: "ext_wall_panel_tr", label: "Extension: TR 29ga wall panel (eaves + far gable)", cat: "Building extension", uom: "LF", packSize: null,
+    priceCost: 2.58, priceSell: 3.40, priceRetail: 4.25,
+    labelFn: i => {
+      const x = i.ext || {};
+      return `Extension: TR 29ga wall panel${x.sidingColor ? ' — ' + x.sidingColor : ''} (eaves + far gable)`;
+    },
+    formula: i => (i.extActive && i.ext.enclosed) ? Math.ceil(i.ext.wallArea / 3 * 1.05) : 0 },
+  { id: "ext_ridge_cap", label: "Extension: ridge cap", cat: "Building extension", uom: "LF", packSize: null,
+    priceCost: 2.00, priceSell: 2.60, priceRetail: 3.25,
+    formula: i => i.extActive ? Math.ceil(i.ext.L * 1.05) : 0 },
+
   // ---------------- MOISTURE BARRIER (UNDER METAL ROOF ONLY — SHELL BUILDS) ----------------
   // Pro Armor / Therma-Guard wrap — roof area only. Walls excluded for shell tier.
   // Coverage: 750 sqft per roll (6'2" × 125' roll, rounded down for usable coverage)
@@ -7625,11 +7732,13 @@ function populateColors(selectId, product) {
 
 function onRoofProductChange() {
   populateColors('roof_color', document.getElementById('roof_product').value);
+  try { bbPopulateExtColors(); } catch (e) {}
   populateColors('trim_color', document.getElementById('roof_product').value);
   populateColors('gutter_color', document.getElementById('roof_product').value);
 }
 function onSidingProductChange() {
   populateColors('siding_color', document.getElementById('siding_product').value);
+  try { bbPopulateExtColors(); } catch (e) {}
   populateColors('wainscot_color', document.getElementById('siding_product').value);
 }
 function onRoofSystemChange() {
@@ -7851,6 +7960,33 @@ function clearAllManual() {
 }
 
 // Toggle the side-shed detail card based on checkbox
+function onExtToggle() {
+  const on = document.getElementById('ext_enabled').checked;
+  const det = document.getElementById('ext-details');
+  if (det) det.style.display = on ? '' : 'none';
+  try { bbPopulateExtColors(); } catch (e) {}
+  recalc();
+}
+
+// Extension color selects — full palette from the same products as the main building,
+// with a "Match main building" default so the extension can differ or follow.
+function bbPopulateExtColors() {
+  const pairs = [
+    ['ext_roof_color', (document.getElementById('roof_product') || {}).value],
+    ['ext_siding_color', (document.getElementById('siding_product') || {}).value],
+    ['ext_trim_color', (document.getElementById('roof_product') || {}).value],
+  ];
+  pairs.forEach(([id, product]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const current = el.value;
+    let colors = [];
+    try { colors = colorsFor(product) || []; } catch (e) { colors = []; }
+    el.innerHTML = '<option value="">Match main building</option>' + colors.map(c => `<option value="${c}">${c}</option>`).join('');
+    if (colors.includes(current)) el.value = current;
+  });
+}
+
 function onShedToggle() {
   const cb = document.getElementById('shed_enabled');
   const det = document.getElementById('shed-details');
@@ -8430,7 +8566,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v233';
+const BB_VERSION = 'v234';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -9330,6 +9466,9 @@ function wsClearCard(card) {
   if (card.querySelector('#shed_enabled')) {
     try { onShedToggle(); } catch (e) {}
     try { onShedRoofFramingChange(); } catch (e) {}
+  }
+  if (card.querySelector('#ext_enabled')) {
+    try { onExtToggle(); } catch (e) {}
   }
   if (card.id === 'porch-construction-card') {
     try { setPorchConstruction('stick'); } catch (e) {}
@@ -12060,6 +12199,68 @@ function getInputs() {
     };
   }
   
+  // ============= BUILDING EXTENSION (gable-end continuation, own config) =============
+  const extActive = (document.getElementById('ext_enabled') && document.getElementById('ext_enabled').checked) && (num('ext_length') > 0);
+  let ext = null;
+  if (extActive) {
+    const xSel = (id, d) => { const el = document.getElementById(id); return (el && el.value) || d; };
+    const eL = num('ext_length');
+    const eW = num('ext_width') || W;
+    const eH = num('ext_wall_height') || H;
+    const ePitch = num('ext_pitch') || pitch || 4;
+    const eEnclosed = xSel('ext_enclosed', 'open') === 'enclosed';
+    const eCon = xSel('ext_construction', 'post');
+    const eRise = (eW / 2) * (ePitch / 12);
+    const eAngle = Math.atan(ePitch / 12);
+    const eTopChord = Math.sqrt((eW / 2) * (eW / 2) + eRise * eRise) + (num('eave_overhang') || 12) / 12 / Math.cos(eAngle);
+    const eRoofArea = 2 * eTopChord * eL;
+    const ePanelPieces = Math.ceil(eL / 3) * 2;
+    const ePanelLF = ePanelPieces * eTopChord;
+    // Enclosed walls: both eaves + far gable end (shared end with main building excluded)
+    const eWallLF = eEnclosed ? (2 * eL + eW) : 0;
+    const eWallArea = eEnclosed ? (2 * eL * eH + eW * eH + eW * eRise / 2) : 0;
+    // Roof structure: post frame carries trusses @4' OC, stud frame rafters/trusses @2' OC
+    const eTrussSpacing = eCon === 'post' ? 4 : 2;
+    const eTrussCount = Math.ceil(eL / eTrussSpacing) + 1;
+    // Posts: open extensions ALWAYS carry on posts regardless of framing selection.
+    const usePosts = eCon === 'post' || !eEnclosed;
+    let ePostCount = 0;
+    if (usePosts) {
+      const perEave = Math.ceil(eL / 8) + 1;
+      ePostCount = perEave * 2 + Math.max(0, Math.ceil(eW / 8) - 1);
+    }
+    const ePostLF = ePostCount * (eH + 4); // 4' embed
+    // Stud walls (stud frame + enclosed): studs @16" + 3 plates
+    let eStudLF = 0;
+    if (eCon === 'stud' && eEnclosed) {
+      const studCount = Math.ceil(eWallLF * 12 / 16) + 4;
+      eStudLF = studCount * eH + eWallLF * 3;
+    }
+    // Girts + PT band (post frame + enclosed)
+    let eGirtLF = 0, ePTBandLF = 0;
+    if (eCon === 'post' && eEnclosed) {
+      const rows = Math.max(0, Math.ceil(eH / (num('girt_spacing') || 2)) - 1);
+      eGirtLF = eWallLF * rows;
+      ePTBandLF = eWallLF;
+    }
+    const ePurlinRows = Math.ceil(eTopChord / 2) * 2;
+    const eLathLF = ePurlinRows * eL;
+    const eSlab = xSel('ext_slab', 'yes') === 'yes';
+    const eSakrete = usePosts ? Math.ceil(ePostCount * (num('bags_per_post') || 2)) : 0;
+    ext = {
+      end: xSel('ext_end', 'right'), L: eL, W: eW, H: eH, pitch: ePitch,
+      construction: eCon, enclosed: eEnclosed, usePosts,
+      rise: eRise, topChord: eTopChord, roofArea: eRoofArea,
+      panelPieces: ePanelPieces, panelLF: ePanelLF,
+      wallLF: eWallLF, wallArea: eWallArea,
+      trussCount: eTrussCount, trussSpacing: eTrussSpacing,
+      postCount: ePostCount, postLF: ePostLF, studLF: eStudLF,
+      girtLF: eGirtLF, ptBandLF: ePTBandLF, lathLF: eLathLF,
+      slab: eSlab, slabSqft: eSlab ? eL * eW : 0, sakreteBags: eSakrete,
+      roofColor: xSel('ext_roof_color', ''), sidingColor: xSel('ext_siding_color', ''), trimColor: xSel('ext_trim_color', ''),
+    };
+  }
+
   // Metal panel calcs (Shelby Weeks formulas)
   // PRECEDENCE: truss config > override_roof_area input > L×W math
   const panelCoverageRoof = 3; // ft, for TR/PBR — 14/12 for SS handled separately
@@ -12291,6 +12492,7 @@ function getInputs() {
     shedRafterSpacing: num('shed_rafter_spacing') || 16,
     shedAttachedSide: document.getElementById('shed_attached_side') ? document.getElementById('shed_attached_side').value : 'back',
     shedActive,
+    ext, extActive,
     shed,
     // Manual trim overrides (Additions tab)
     manual_sidewall_flashing: num('manual_sidewall_flashing'),
@@ -15000,6 +15202,7 @@ const ORDER_PKGS = [
   { name: 'Metal package', phase: 'Roof metal → Wall metal & trim → Gutters', cats: ['Roof skin', 'Siding skin', 'Metal wall trim', 'Soffit & fascia', 'Gutters'] },
   { name: 'Doors & windows package', phase: 'Doors & windows', cats: ['Openings', 'Doors — garage', 'Doors — exterior', 'Windows'] },
   { name: 'Side shed package', phase: 'Framing (shed)', cats: ['Side shed'] },
+  { name: 'Building extension package', phase: 'Framing (extension)', cats: ['Building extension'] },
   { name: 'Porch package', phase: 'Framing (porch)', cats: ['Cypress timber porch'] },
   { name: 'Exterior trim package', phase: 'Wall metal & trim', cats: ['LP trim', 'Custom trim'] },
   { name: 'Interior package', phase: 'Insulation → Drywall', cats: ['Interior'] },
@@ -16910,6 +17113,7 @@ const CATEGORY_COLORS = {
   cypress_beams:     { hex: 0xa08560, label: 'Cypress porch beams', textHex: '#a08560' },
   cypress_rafters:   { hex: 0xb8997a, label: 'Cypress porch rafters / T&G', textHex: '#b8997a' },
   side_shed:         { hex: 0x7a5a8a, label: 'Side shed', textHex: '#9a7aaa' },
+  building_extension:{ hex: 0x5a7a8a, label: 'Building extension', textHex: '#7a9aaa' },
   hurricane_clips:   { hex: 0xc0c0c0, label: 'Hurricane clips / hardware', textHex: '#c0c0c0' },
 };
 
@@ -17537,6 +17741,7 @@ function generateModel() {
   try { buildSideShed(dims, wallBase); } catch (e) { console.warn('3D side shed skipped:', e); }
   try { buildPorch3D(dims, wallBase); } catch (e) { console.warn('3D porch skipped:', e); }
   try { buildCrowsFoot3D(dims, wallBase); } catch (e) { console.warn('3D crows foot skipped:', e); }
+  try { buildExtension3D(dims, wallBase); } catch (e) { console.warn('3D extension skipped:', e); }
 
   // Trim color from the selector — ridge cap, rake/roof trim, corners, fascia
   try {
@@ -18140,6 +18345,148 @@ function buildPorch3D(dims, wallBase) {
       cap.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), cdir.clone().normalize());
       addB(cap, 'Porch hip/ridge cap — metal (covers the tie)');
     });
+}
+
+// === BUILDING EXTENSION — continues the building off a gable end with its own
+// size, height, framing (post/stud), enclosure (open/enclosed) and colors.
+function buildExtension3D(dims, wallBase) {
+  const en = document.getElementById('ext_enabled');
+  if (!en || !en.checked) return;
+  const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+  const sv = (id, d) => { const el = document.getElementById(id); return (el && el.value) || d; };
+  const eL = n('ext_length');
+  if (eL <= 0) return;
+  const { L, W, H, pitch } = dims;
+  const eW = n('ext_width') || W;
+  const eH = n('ext_wall_height') || H;
+  const ePitch = n('ext_pitch') || pitch || 4;
+  const enclosed = sv('ext_enclosed', 'open') === 'enclosed';
+  const eCon = sv('ext_construction', 'post');
+  const usePosts = eCon === 'post' || !enclosed;
+  const s = sv('ext_end', 'right') === 'right' ? 1 : -1;
+  const mainCol = bb3dSelectedColors();
+  const roofHex = bb3dMetalHex(sv('ext_roof_color', ''), mainCol.roof);
+  const sideHex = bb3dMetalHex(sv('ext_siding_color', ''), mainCol.siding);
+  const trimHex = bb3dMetalHex(sv('ext_trim_color', ''), mainCol.trim);
+  const rise = (eW / 2) * (ePitch / 12);
+  const eAngle = Math.atan(ePitch / 12);
+  const oh = 0.8;
+  const slopeLen = (eW / 2) / Math.cos(eAngle) + oh;
+  const cx = s * (L / 2 + eL / 2);
+  const farX = s * (L / 2 + eL);
+  const wallTop = wallBase + eH;
+  const ridgeY = wallTop + rise;
+
+  const grp = new THREE.Group();
+  const add = (m, label, opts) => {
+    m.castShadow = m.receiveShadow = true;
+    m.userData = Object.assign({ categoryKey: 'building_extension', label: label }, opts || {});
+    grp.add(m); allMeshes.push(m);
+    return m;
+  };
+  const skinMat = (hex, isRoof) => {
+    const tex = makeTuffRibTexture(!!isRoof, hex);
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map: tex, roughness: 0.38, metalness: 0.45 });
+  };
+
+  // Slab
+  if (sv('ext_slab', 'yes') === 'yes') {
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(eL, 0.5, eW),
+      new THREE.MeshStandardMaterial({ color: CATEGORY_COLORS.foundation.hex, roughness: 0.95 }));
+    slab.position.set(cx, 0.25, 0);
+    add(slab, 'Extension slab');
+  }
+
+  // Posts (post frame, or any open extension)
+  if (usePosts) {
+    const postMat = () => new THREE.MeshStandardMaterial({ color: 0x8b6f47, roughness: 0.9 });
+    const perEave = Math.max(2, Math.ceil(eL / 8) + 1);
+    for (let p = 0; p < perEave; p++) {
+      const px = s * (L / 2) + s * (eL / (perEave - 1)) * p;
+      [-1, 1].forEach(zs => {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.46, eH, 0.46), postMat());
+        post.position.set(px, wallBase + eH / 2, zs * (eW / 2 - 0.23));
+        add(post, 'Extension post — 6×6 PT');
+      });
+    }
+    const midN = Math.max(0, Math.ceil(eW / 8) - 1);
+    for (let m2 = 1; m2 <= midN; m2++) {
+      const pz = -eW / 2 + (eW / (midN + 1)) * m2;
+      const gy = eH + Math.max(0, rise - Math.abs(pz) * (ePitch / 12));
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.46, gy, 0.46), postMat());
+      post.position.set(farX - s * 0.23, wallBase + gy / 2, pz);
+      add(post, 'Extension post — 6×6 PT (far gable)');
+    }
+  }
+
+  // Roof structure — trusses across the width + purlin rows (visible in open bays / frame view)
+  const trussSp = eCon === 'post' ? 4 : 2;
+  const trussN = Math.max(2, Math.ceil(eL / trussSp) + 1);
+  const chordLen = (eW / 2) / Math.cos(eAngle);
+  for (let t = 0; t < trussN; t++) {
+    const tx = s * (L / 2) + s * (eL / (trussN - 1)) * t;
+    [-1, 1].forEach(zs => {
+      const chord = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.5, chordLen),
+        new THREE.MeshStandardMaterial({ color: 0xd6b482, roughness: 0.92 }));
+      chord.position.set(tx, wallTop + rise / 2, zs * eW / 4);
+      chord.rotation.x = zs * eAngle;
+      add(chord, 'Extension truss', enclosed ? { isFraming: true } : null);
+    });
+    const bottom = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.42, eW - 0.2),
+      new THREE.MeshStandardMaterial({ color: 0xd6b482, roughness: 0.92 }));
+    bottom.position.set(tx, wallTop + 0.21, 0);
+    add(bottom, 'Extension truss', enclosed ? { isFraming: true } : null);
+  }
+  const chordSlope = (eW / 2) / Math.cos(eAngle);
+  for (let d = 0.4; d <= chordSlope - 0.2; d += 2) {
+    [-1, 1].forEach(zs => {
+      const pz = zs * (eW / 2 - d * Math.cos(eAngle));
+      const py = wallTop + d * Math.sin(eAngle) + 0.32;
+      const pur = new THREE.Mesh(new THREE.BoxGeometry(eL, 0.29, 0.13),
+        new THREE.MeshStandardMaterial({ color: 0xcdaa76, roughness: 0.92 }));
+      pur.position.set(cx, py, pz);
+      pur.rotation.x = zs * eAngle;
+      add(pur, 'Extension purlin', enclosed ? { isFraming: true } : null);
+    });
+  }
+
+  // Roof skin — both slopes + ridge cap (extension roof color)
+  [-1, 1].forEach(zs => {
+    const slope = new THREE.Mesh(new THREE.BoxGeometry(eL + 0.4, 0.12, slopeLen), skinMat(roofHex, true));
+    const midD = slopeLen / 2;
+    slope.position.set(cx, ridgeY + 0.45 - midD * Math.sin(eAngle), zs * (midD * Math.cos(eAngle)));
+    slope.rotation.x = zs * eAngle;
+    const tex = slope.material.map; tex.repeat.set(eL / 3, 1); tex.rotation = Math.PI / 2; tex.center.set(0.5, 0.5);
+    add(slope, 'Extension roof metal');
+  });
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(eL + 0.4, 0.16, 0.9),
+    new THREE.MeshStandardMaterial({ color: trimHex, roughness: 0.4, metalness: 0.5 }));
+  cap.position.set(cx, ridgeY + 0.55, 0);
+  add(cap, 'Extension ridge cap');
+
+  // Walls (enclosed only) — extension siding color
+  if (enclosed) {
+    [-1, 1].forEach(zs => {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(eL, eH, 0.15), skinMat(sideHex, false));
+      wall.material.map.repeat.set(eL / 3, eH / 6);
+      wall.position.set(cx, wallBase + eH / 2, zs * eW / 2);
+      add(wall, 'Extension wall metal — eave');
+    });
+    const endWall = new THREE.Mesh(new THREE.BoxGeometry(0.15, eH, eW), skinMat(sideHex, false));
+    endWall.material.map.repeat.set(eW / 3, eH / 6);
+    endWall.position.set(farX - s * 0.075, wallBase + eH / 2, 0);
+    add(endWall, 'Extension wall metal — far gable');
+    // Far gable triangle
+    const shape = new THREE.Shape();
+    shape.moveTo(-eW / 2, 0); shape.lineTo(eW / 2, 0); shape.lineTo(0, rise); shape.closePath();
+    const tri = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.15, bevelEnabled: false }), skinMat(sideHex, false));
+    tri.material.map.repeat.set(eW / 3, rise / 6);
+    tri.rotation.y = Math.PI / 2;
+    tri.position.set(farX - s * 0.075, wallTop, 0);
+    add(tri, 'Extension gable siding');
+  }
+
+  buildingGroup.add(grp);
 }
 
 function buildSideShed(dims, wallBase) {
@@ -19749,7 +20096,7 @@ function applyVisibility() {
       // Porch / gable / shed metal and finish strips off too — frame view shows
       // ONLY the skeleton (posts, headers, rafters, braces, trusses, slab).
       const lbl = String(ud.label || '');
-      const finishLbl = /roof metal|Porch roof|ridge cap|Valley metal|hip\/ridge cap|backdrop|T&G ceiling|Shed wall|OPEN bay|wainscot|corner roof/i.test(lbl);
+      const finishLbl = /roof metal|Porch roof|ridge cap|Valley metal|hip\/ridge cap|backdrop|T&G ceiling|Shed wall|OPEN bay|wainscot|corner roof|Extension roof|Extension wall|Extension gable/i.test(lbl);
       if (skinCats[k] || ud.shedSkin || finishLbl) {
         visible = false;   // all metal + finish strips off, porches included
       } else {
