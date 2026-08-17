@@ -38,7 +38,17 @@ try {
         "Pediatrics", "Hand", "Neurorehabilitation", "Physical Rehabilitation",
         "Gerontology", "Mental Health", "Low Vision",
         "Driving and Community Mobility", "Environmental Modification",
-        "Ergonomics", "Human Factors", "Feeding, Eating & Swallowing"
+        "Ergonomics", "Human Factors", "Feeding, Eating & Swallowing",
+        "Occupational Therapist, Pediatrics", "Occupational Therapist, Hand",
+        "Occupational Therapist, Gerontology", "Occupational Therapist, Neurorehabilitation",
+        "Occupational Therapist, Physical Rehabilitation", "Occupational Therapist, Mental Health",
+        "Occupational Therapist, Low Vision", "Occupational Therapist, Driving and Community Mobility",
+        "Occupational Therapist, Environmental Modification", "Occupational Therapist, Ergonomics",
+        "Occupational Therapist, Human Factors", "Occupational Therapist, Feeding, Eating & Swallowing",
+        "Occupational Therapy Assistant, Driving and Community Mobility",
+        "Occupational Therapy Assistant, Environmental Modification",
+        "Occupational Therapy Assistant, Feeding, Eating & Swallowing",
+        "Occupational Therapy Assistant, Low Vision"
     )
     $zipPrefixes = 370..385 | ForEach-Object { "$_*" }
     $pool = @{}
