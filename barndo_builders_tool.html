@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v235</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v236</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2247,6 +2247,34 @@
 
   <!-- TAB 1: PROJECT -->
   <div class="qbs-tab-content" id="tab-inputs">
+    <div class="qbs-card" id="enclosure-card">
+      <h3>Enclosure <span class="badge">First selection — how much of the building gets wall metal</span></h3>
+      <div class="qbs-grid-4">
+        <div class="qbs-field" style="grid-column: span 2;">
+          <label>Building enclosure</label>
+          <select id="bldg_enclosure" onchange="onEnclosureChange()">
+            <option value="full">Fully enclosed</option>
+            <option value="roof_only">Metal roof only — open walls</option>
+            <option value="partial">Partial wall metal — skirt and/or gables</option>
+          </select>
+        </div>
+        <div class="qbs-field" id="skirt-height-field" style="display:none;">
+          <label>Wall metal height (ft)</label>
+          <input type="number" id="wall_skirt_height" value="4" step="0.5" min="0" oninput="recalc()" />
+          <div class="qbs-note">Side skirt from grade — e.g. 4' · 0 = no skirt</div>
+        </div>
+        <div class="qbs-field" id="gable-metal-field" style="display:none;">
+          <label>Gable metal</label>
+          <select id="gable_metal" onchange="recalc()">
+            <option value="follow">Follow the truss — metal covers the gable triangles</option>
+            <option value="straight">Straight across — same height as the walls, truss open</option>
+            <option value="none">None — open gables</option>
+          </select>
+          <div class="qbs-note">Straight across works on steel or wood trusses</div>
+        </div>
+      </div>
+      <div class="qbs-note" style="margin-top:8px;">Wall framing is always figured — this controls the wall METAL only. Fine-tune any line on the 📐 Framing pages.</div>
+    </div>
     <div class="qbs-card">
       <h3>Build tier</h3>
       <div class="qbs-grid-2">
@@ -7972,6 +8000,15 @@ function clearAllManual() {
 }
 
 // Toggle the side-shed detail card based on checkbox
+function onEnclosureChange() {
+  const m = (document.getElementById('bldg_enclosure') || {}).value || 'full';
+  const sk = document.getElementById('skirt-height-field');
+  const gb = document.getElementById('gable-metal-field');
+  if (sk) sk.style.display = m === 'partial' ? '' : 'none';
+  if (gb) gb.style.display = m === 'partial' ? '' : 'none';
+  recalc();
+}
+
 function onExtToggle() {
   const on = document.getElementById('ext_enabled').checked;
   const det = document.getElementById('ext-details');
@@ -8578,7 +8615,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v235';
+const BB_VERSION = 'v236';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -9481,6 +9518,9 @@ function wsClearCard(card) {
   }
   if (card.querySelector('#ext_enabled')) {
     try { onExtToggle(); } catch (e) {}
+  }
+  if (card.querySelector('#bldg_enclosure')) {
+    try { onEnclosureChange(); } catch (e) {}
   }
   if (card.id === 'porch-construction-card') {
     try { setPorchConstruction('stick'); } catch (e) {}
@@ -12103,7 +12143,24 @@ function getInputs() {
   const wallGross = extWallLF * H;
   const openings = area_windows + area_extdoors + area_garage;
   const wallRectArea = Math.max(0, wallGross - openings);
-  const wallArea = wallRectArea + totalGableSidingArea; // include gable triangles in siding takeoff
+  // Enclosure (first selection): full / metal roof only / partial (skirt + gables).
+  // Controls wall METAL area only — framing stays figured either way.
+  const enclosureMode = (document.getElementById('bldg_enclosure') || {}).value || 'full';
+  const wallSkirtH = Math.max(0, Math.min(H, num('wall_skirt_height') || 0));
+  // Gable metal style (partial mode): 'follow' the truss (triangles covered),
+  // 'straight' across at wall height (gable ends full-height rect, truss open), or 'none'.
+  const gableMetalStyle = (document.getElementById('gable_metal') || {}).value || 'follow';
+  let wallArea = wallRectArea + totalGableSidingArea; // include gable triangles in siding takeoff
+  if (enclosureMode === 'roof_only') wallArea = 0;
+  else if (enclosureMode === 'partial') {
+    let a = 2 * L * wallSkirtH;                          // eave-side skirts
+    if (gableMetalStyle === 'straight') a += 2 * W * H;  // gable ends straight across at wall height
+    else {
+      a += 2 * W * wallSkirtH;                           // skirt continues around gable ends
+      if (gableMetalStyle === 'follow') a += totalGableSidingArea;  // + the truss triangles
+    }
+    wallArea = a;
+  }
   
   // Corner & roof feature counts (always read from measured-values inputs)
   const outsideCorners = num('outside_corners') || (_hasGeom ? 4 : 0);
@@ -12506,6 +12563,7 @@ function getInputs() {
     shedAttachedSide: document.getElementById('shed_attached_side') ? document.getElementById('shed_attached_side').value : 'back',
     shedActive,
     ext, extActive,
+    enclosureMode, wallSkirtH, gableMetalStyle,
     shed,
     // Manual trim overrides (Additions tab)
     manual_sidewall_flashing: num('manual_sidewall_flashing'),
@@ -17451,6 +17509,14 @@ const WINDOW_PALETTE = [
 // Per-wall "open wall" flags — strips skin/girts, leaves the posts. For barns
 // with open bays. Persisted locally so it survives a reload.
 let openWalls = { front: false, back: false, left: false, right: false };
+// Enclosure selection (first card): drives how much wall metal renders on the main building.
+function bbEnclosure() {
+  return {
+    mode: (document.getElementById('bldg_enclosure') || {}).value || 'full',
+    skirtH: Math.max(0, parseFloat((document.getElementById('wall_skirt_height') || {}).value) || 0),
+    gableStyle: (document.getElementById('gable_metal') || {}).value || 'follow',
+  };
+}
 try { const _ow = localStorage.getItem('bb_open_walls'); if (_ow) Object.assign(openWalls, JSON.parse(_ow)); } catch (_) {}
 function _saveOpenWalls() { try { localStorage.setItem('bb_open_walls', JSON.stringify(openWalls)); } catch (_) {} }
 function toggleOpenWall(side) {
@@ -17847,7 +17913,7 @@ function generateModel() {
     return mesh;
   }
   ['front', 'back', 'left', 'right'].forEach(side => {
-    if (openWalls[side]) return;        // open wall — no sheathing
+    if (openWalls[side] || bbEnclosure().mode !== 'full') return;  // open/partial — no sheathing skin
     const m = makeWallSheathing(side);
     buildingGroup.add(m); allMeshes.push(m);
   });
@@ -17856,6 +17922,13 @@ function generateModel() {
   const sidingThick = 0.04;
   function makeSiding(side) {
     let geom, mesh;
+    const _enc = bbEnclosure();
+    let skinH = H;
+    if (_enc.mode === 'partial') {
+      const isGableEnd = side === 'left' || side === 'right';
+      skinH = (isGableEnd && _enc.gableStyle === 'straight') ? H : Math.min(H, _enc.skirtH || 0);
+      skinH = Math.max(0.1, skinH);
+    }
     const tex = makeTuffRibTexture(false, bb3dSelectedColors().siding); // selected siding color
     let wallWidth;
     if (side === 'front' || side === 'back') wallWidth = L;
@@ -17869,20 +17942,26 @@ function generateModel() {
       metalness: 0.45,
     });
     if (side === 'front' || side === 'back') {
-      geom = new THREE.BoxGeometry(L, H, sidingThick);
+      geom = new THREE.BoxGeometry(L, skinH, sidingThick);
       mesh = new THREE.Mesh(geom, mat);
-      mesh.position.set(0, wallBase + H / 2, (side === 'front' ? 1 : -1) * (W / 2 + sheathThick + sidingThick / 2));
+      mesh.position.set(0, wallBase + skinH / 2, (side === 'front' ? 1 : -1) * (W / 2 + sheathThick + sidingThick / 2));
     } else {
-      geom = new THREE.BoxGeometry(sidingThick, H, W - 2 * sheathThick);
+      geom = new THREE.BoxGeometry(sidingThick, skinH, W - 2 * sheathThick);
       mesh = new THREE.Mesh(geom, mat);
-      mesh.position.set((side === 'left' ? -1 : 1) * (L / 2 + sheathThick + sidingThick / 2), wallBase + H / 2, 0);
+      mesh.position.set((side === 'left' ? -1 : 1) * (L / 2 + sheathThick + sidingThick / 2), wallBase + skinH / 2, 0);
     }
     mesh.castShadow = mesh.receiveShadow = true;
     mesh.userData = { categoryKey: 'siding', label: 'Siding — ' + side, wallSide: side };
     return mesh;
   }
   ['front', 'back', 'left', 'right'].forEach(side => {
-    if (openWalls[side]) return;        // open wall — no metal skin
+    const _e = bbEnclosure();
+    if (openWalls[side] || _e.mode === 'roof_only') return;   // open wall — no metal skin
+    if (_e.mode === 'partial') {
+      const isGableEnd = side === 'left' || side === 'right';
+      const h = (isGableEnd && _e.gableStyle === 'straight') ? H : (_e.skirtH || 0);
+      if (!(h > 0)) return;                                   // nothing to skin on this side
+    }
     const m = makeSiding(side);
     buildingGroup.add(m); allMeshes.push(m);
   });
@@ -17890,7 +17969,7 @@ function generateModel() {
   // === WAINSCOT — 36" band in its own color + Z bar line on top ===
   (function buildWainscot() {
     const cw = bb3dSelectedColors();
-    if (!cw.wainscotOn) return;
+    if (!cw.wainscotOn || bbEnclosure().mode === 'roof_only') return;
     const bandH = 3, zH = 0.07;
     ['front', 'back', 'left', 'right'].forEach(side => {
       if (openWalls[side]) return;
@@ -17991,8 +18070,10 @@ function generateModel() {
       mesh.userData = { categoryKey: key, label: label };
       return mesh;
     }
-    if (!openWalls.left) { const gL = makeGable('left', 'siding', 'Gable siding — left'); buildingGroup.add(gL); allMeshes.push(gL); }
-    if (!openWalls.right) { const gR = makeGable('right', 'siding', 'Gable siding — right'); buildingGroup.add(gR); allMeshes.push(gR); }
+    const _encG = bbEnclosure();
+    const gablesOn = _encG.mode === 'full' || (_encG.mode === 'partial' && _encG.gableStyle === 'follow');
+    if (!openWalls.left && gablesOn) { const gL = makeGable('left', 'siding', 'Gable siding — left'); buildingGroup.add(gL); allMeshes.push(gL); }
+    if (!openWalls.right && gablesOn) { const gR = makeGable('right', 'siding', 'Gable siding — right'); buildingGroup.add(gR); allMeshes.push(gR); }
   }
   
   // === ROOF — varies by shape ===
@@ -20375,7 +20456,9 @@ function applyVisibility() {
     } else {
       // Default (finish) mode
       if (ud.isFraming && !ud.alwaysVisible) {
-        visible = false;  // hide framing, except exposed open-wall posts/carrier
+        // Open / partial enclosure exposes the skeleton — wall framing, trusses and
+        // purlins are visible through the open walls, so keep them rendered.
+        visible = bbEnclosure().mode !== 'full';
       }
       opacity = 1.0;
     }
