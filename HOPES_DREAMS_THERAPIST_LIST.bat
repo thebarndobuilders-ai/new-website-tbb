@@ -6,7 +6,18 @@ echo  =============================================
 echo  Runs 5-10 minutes. Leave this window alone until it says DONE.
 echo  A report is saved to RUN_ME_log.txt on your Desktop either way.
 echo.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=Get-Content -LiteralPath '%~f0' -Raw; $i=$s.IndexOf('### POWERSHELL PAYLOAD ###'); Invoke-Expression $s.Substring($i+26)"
+rem Find the line number of the payload marker (last match wins), copy
+rem everything after it to a temp .ps1, and run that file directly.
+set "LN="
+for /f "delims=:" %%N in ('findstr /n /c:"### POWERSHELL PAYLOAD ###" "%~f0"') do set "LN=%%N"
+if not defined LN (
+    echo  This file looks damaged - please re-download it from the chat.
+    pause
+    exit /b 1
+)
+set "ENG=%TEMP%\hopes_dreams_engine.ps1"
+more +%LN% "%~f0" > "%ENG%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ENG%"
 echo.
 pause
 goto :eof
