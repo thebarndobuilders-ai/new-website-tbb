@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v245</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v246</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8626,7 +8626,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v245';
+const BB_VERSION = 'v246';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -13270,10 +13270,12 @@ function bbApplyEnclosureGate(lines, i) {
   const wallCats = ['Wall framing', 'Post-frame wall', 'Wall sheathing'];
   const dropGablePosts = i.gablePostsMode === 'remove' || (i.gablePostsMode === 'auto' &&
     (i.enclosureMode === 'roof_only' || (i.enclosureMode === 'partial' && i.gableMetalStyle !== 'straight')));
+  const skinCats = ['Siding skin', 'Metal wall trim', 'LP trim'];
   if (i.enclosureMode === 'roof_only') {
     return lines.filter(ln => {
       const tag = (ln.id || '') + ' ' + (ln.label || '');
       if (/gable post/i.test(tag)) return !dropGablePosts;   // manual Add keeps them
+      if (skinCats.includes(ln.cat)) return false;           // open walls — no wall metal or trim
       if (!wallCats.includes(ln.cat)) return true;
       return keepRe.test(tag);
     });
@@ -13282,18 +13284,56 @@ function bbApplyEnclosureGate(lines, i) {
   if (dropGablePosts) {
     lines = lines.filter(ln => !/gable post/i.test((ln.id || '') + ' ' + (ln.label || '')));
   }
-  // Partial: wall framing scales to the fraction of wall actually covered by metal.
+  // Partial: everything wall-related scales to what the metal actually covers.
+  const covH = Math.max(0, Math.min(i.H || 0, i.wallSkirtH || 0));
+  // Gable metal area per the selected style (matches the 3D band exactly)
+  let gableArea = 0;
+  if (i.gableMetalStyle === 'straight') gableArea = 2 * i.W * i.H;
+  else if (i.gableMetalStyle === 'follow') {
+    const bandD = covH > 0 ? covH : 3;
+    const riseG = (i.W / 2) * (i.pitch / 12);
+    const angG = Math.atan(i.pitch / 12);
+    const slopeLenG = (i.W / 2) / Math.cos(angG);
+    const zKG = 0.75 * (i.W / 2);
+    gableArea = 2 * (2 * bandD * 0.25 * slopeLenG +
+      (2 * (zKG * (0.75 * riseG + bandD)) - (riseG / (i.W / 2)) * zKG * zKG));
+  }
+  const fullGable = Math.max(1, 2 * i.W * i.H + (i.totalGableSidingArea || 0));
   const fullRect = Math.max(1, 2 * ((i.L || 0) + (i.W || 0)) * (i.H || 1));
   const f = Math.max(0, Math.min(1, (i.wallArea || 0) / fullRect));
-  lines.forEach(ln => {
-    if (!wallCats.includes(ln.cat)) return;
-    if (keepRe.test((ln.id || '') + ' ' + (ln.label || ''))) return;
-    ln.qty = Math.ceil(ln.qty * f);
+  const rescale = (ln, q) => {
+    ln.qty = Math.max(0, q);
     ln.cost = ln.qty * (ln.unitCost || 0);
     ln.sell = ln.qty * (ln.unitSell || 0);
     ln.retail = ln.qty * (ln.unitRetail || 0);
+  };
+  lines.forEach(ln => {
+    const tag = (ln.id || '') + ' ' + (ln.label || '');
+    if (ln.cat === 'Siding skin') {
+      // Gable-end panels: cut pieces for just the band / straight-across area
+      if (/gable/i.test(tag)) {
+        ln.label = String(ln.label || '').replace(/floor-to-peak.*$/i, '') +
+          (i.gableMetalStyle === 'follow' ? 'CUT panels — band covering the trusses'
+            : i.gableMetalStyle === 'straight' ? 'cut at wall height, straight across' : '');
+        if (ln.id === 'tuffrib_29_gable_lf') rescale(ln, Math.ceil(gableArea / 3 * 1.05));
+        else if (ln.id === 'mbb_26_gable_lf') rescale(ln, Math.ceil(gableArea * 1.05));
+        else if (ln.id === 'lp_bb_gable_panel') rescale(ln, Math.ceil(gableArea / 36 * 1.15));
+        else rescale(ln, Math.ceil(ln.qty * gableArea / fullGable));
+      } else {
+        // Eave-wall panels cut to the skirt height instead of full wall height
+        rescale(ln, Math.ceil(ln.qty * covH / Math.max(1, i.H)));
+      }
+      return;
+    }
+    if (ln.cat === 'Metal wall trim' || ln.cat === 'LP trim') {
+      rescale(ln, Math.ceil(ln.qty * f));
+      return;
+    }
+    if (!wallCats.includes(ln.cat)) return;
+    if (keepRe.test(tag)) return;
+    rescale(ln, Math.ceil(ln.qty * f));
   });
-  return lines.filter(ln => !(wallCats.includes(ln.cat) && ln.qty <= 0));
+  return lines.filter(ln => !((wallCats.includes(ln.cat) || skinCats.includes(ln.cat)) && ln.qty <= 0));
 }
 
 function bbApplyQtyOverrides(lines) {
