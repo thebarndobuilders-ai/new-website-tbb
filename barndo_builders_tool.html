@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v236</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v237</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2261,7 +2261,7 @@
         <div class="qbs-field" id="skirt-height-field" style="display:none;">
           <label>Wall metal height (ft)</label>
           <input type="number" id="wall_skirt_height" value="4" step="0.5" min="0" oninput="recalc()" />
-          <div class="qbs-note">Side skirt from grade — e.g. 4' · 0 = no skirt</div>
+          <div class="qbs-note">Hangs from the top of the wall DOWN (eave band — not a wainscot) · 0 = none</div>
         </div>
         <div class="qbs-field" id="gable-metal-field" style="display:none;">
           <label>Gable metal</label>
@@ -8615,7 +8615,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v236';
+const BB_VERSION = 'v237';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -12153,12 +12153,15 @@ function getInputs() {
   let wallArea = wallRectArea + totalGableSidingArea; // include gable triangles in siding takeoff
   if (enclosureMode === 'roof_only') wallArea = 0;
   else if (enclosureMode === 'partial') {
-    let a = 2 * L * wallSkirtH;                          // eave-side skirts
+    let a = 2 * L * wallSkirtH;                          // eave-side skirts (hang from the top)
     if (gableMetalStyle === 'straight') a += 2 * W * H;  // gable ends straight across at wall height
-    else {
-      a += 2 * W * wallSkirtH;                           // skirt continues around gable ends
-      if (gableMetalStyle === 'follow') a += totalGableSidingArea;  // + the truss triangles
-    }
+    else if (gableMetalStyle === 'follow') {
+      // Band that follows the roofline on each gable end, covering the truss.
+      // Depth = wall metal height (or 3' when no side skirt is run).
+      const bandD = wallSkirtH > 0 ? wallSkirtH : 3;
+      const angF = Math.atan(pitch / 12);
+      a += 2 * (W / Math.cos(angF)) * bandD;             // both ends × both slopes
+    } else a += 2 * W * wallSkirtH;                      // skirt wraps the gable ends
     wallArea = a;
   }
   
@@ -17941,14 +17944,16 @@ function generateModel() {
       roughness: 0.38,
       metalness: 0.45,
     });
+    // Partial skirt hangs from the TOP of the wall down (eave band, not a wainscot).
+    const skinY = wallBase + H - skinH / 2;
     if (side === 'front' || side === 'back') {
       geom = new THREE.BoxGeometry(L, skinH, sidingThick);
       mesh = new THREE.Mesh(geom, mat);
-      mesh.position.set(0, wallBase + skinH / 2, (side === 'front' ? 1 : -1) * (W / 2 + sheathThick + sidingThick / 2));
+      mesh.position.set(0, skinY, (side === 'front' ? 1 : -1) * (W / 2 + sheathThick + sidingThick / 2));
     } else {
       geom = new THREE.BoxGeometry(sidingThick, skinH, W - 2 * sheathThick);
       mesh = new THREE.Mesh(geom, mat);
-      mesh.position.set((side === 'left' ? -1 : 1) * (L / 2 + sheathThick + sidingThick / 2), wallBase + skinH / 2, 0);
+      mesh.position.set((side === 'left' ? -1 : 1) * (L / 2 + sheathThick + sidingThick / 2), skinY, 0);
     }
     mesh.castShadow = mesh.receiveShadow = true;
     mesh.userData = { categoryKey: 'siding', label: 'Siding — ' + side, wallSide: side };
@@ -17959,6 +17964,7 @@ function generateModel() {
     if (openWalls[side] || _e.mode === 'roof_only') return;   // open wall — no metal skin
     if (_e.mode === 'partial') {
       const isGableEnd = side === 'left' || side === 'right';
+      if (isGableEnd && _e.gableStyle === 'follow') return;   // roofline band covers this end instead
       const h = (isGableEnd && _e.gableStyle === 'straight') ? H : (_e.skirtH || 0);
       if (!(h > 0)) return;                                   // nothing to skin on this side
     }
@@ -18071,9 +18077,34 @@ function generateModel() {
       return mesh;
     }
     const _encG = bbEnclosure();
-    const gablesOn = _encG.mode === 'full' || (_encG.mode === 'partial' && _encG.gableStyle === 'follow');
-    if (!openWalls.left && gablesOn) { const gL = makeGable('left', 'siding', 'Gable siding — left'); buildingGroup.add(gL); allMeshes.push(gL); }
-    if (!openWalls.right && gablesOn) { const gR = makeGable('right', 'siding', 'Gable siding — right'); buildingGroup.add(gR); allMeshes.push(gR); }
+    if (_encG.mode === 'full') {
+      if (!openWalls.left) { const gL = makeGable('left', 'siding', 'Gable siding — left'); buildingGroup.add(gL); allMeshes.push(gL); }
+      if (!openWalls.right) { const gR = makeGable('right', 'siding', 'Gable siding — right'); buildingGroup.add(gR); allMeshes.push(gR); }
+    } else if (_encG.mode === 'partial' && _encG.gableStyle === 'follow') {
+      // Band following the roofline on each gable end — covers the truss, open below
+      // (the photo look: metal parallel to the roof slopes, daylight underneath).
+      const bandD = _encG.skirtH > 0 ? _encG.skirtH : 3;
+      const angB = Math.atan((dims.pitch || 6) / 12);
+      const slopeLenB = (W / 2) / Math.cos(angB);
+      const perpD = bandD * Math.cos(angB);
+      ['left', 'right'].forEach(end => {
+        if (openWalls[end]) return;
+        const xg = (end === 'left' ? -1 : 1) * (L / 2 + sheathThick);
+        [-1, 1].forEach(zs => {
+          const texB = makeTuffRibTexture(false, bb3dSelectedColors().siding);
+          texB.repeat.set(slopeLenB / 3, 1);
+          const band = new THREE.Mesh(new THREE.BoxGeometry(0.1, perpD, slopeLenB),
+            new THREE.MeshStandardMaterial({ color: 0xffffff, map: texB, roughness: 0.38, metalness: 0.45 }));
+          band.position.set(xg, (wallTop + rise + wallTop) / 2 - bandD / 2 + rise / 2 - rise / 2, 0);
+          band.position.y = wallTop + rise / 2 - bandD / 2 + 0.1;
+          band.position.z = zs * W / 4;
+          band.rotation.x = zs * angB;
+          band.castShadow = band.receiveShadow = true;
+          band.userData = { categoryKey: 'siding', label: 'Gable siding — roofline band (' + end + ')' };
+          buildingGroup.add(band); allMeshes.push(band);
+        });
+      });
+    }
   }
   
   // === ROOF — varies by shape ===
@@ -19234,11 +19265,11 @@ function buildTrusses(dims, wallTop, rise) {
   const webD = 0.34;
 
   // Places one member in the Y-Z plane at constant x, between (z1,y1) and (z2,y2).
-  function memberYZ(x, z1, y1, z2, y2, thick, depth, label) {
+  function memberYZ(x, z1, y1, z2, y2, thick, depth, label, mat) {
     const dz = z2 - z1, dy = y2 - y1;
     const len = Math.sqrt(dz * dz + dy * dy);
     if (len < 0.001) return;
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(thick, len, depth), lumberMat('truss'));
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(thick, len, depth), mat || lumberMat('truss'));
     mesh.position.set(x, (y1 + y2) / 2, (z1 + z2) / 2);
     mesh.rotation.x = Math.atan2(dz, dy);   // local +Y → world (0, dy, dz)
     mesh.castShadow = mesh.receiveShadow = true;
@@ -19252,19 +19283,61 @@ function buildTrusses(dims, wallTop, rise) {
     if (i === trussCount) x = L / 2;          // force a clean end truss on the gable
     if (x > L / 2 + 0.01) break;
 
-    // Top chords: heel (eave) up to peak, both slopes
-    memberYZ(x, -W / 2, wallTop, 0, peakY, chordX, chordD, 'Truss top chord — back');
-    memberYZ(x,  W / 2, wallTop, 0, peakY, chordX, chordD, 'Truss top chord — front');
-    // Bottom chord
-    memberYZ(x, -W / 2, bcY, W / 2, bcY, chordX, chordD, 'Truss bottom chord');
-    // Fink "W" webs + king post
-    const t3 = W / 6;          // bottom-chord panel (third) points
-    const qY = wallTop + rise / 2;   // top-chord mid (quarter point of span)
-    memberYZ(x, 0, bcY, 0, peakY, webX, webD, 'Truss king post');          // center post
-    memberYZ(x, -t3, bcY, 0, peakY, webX, webD, 'Truss web');              // L third → peak
-    memberYZ(x,  t3, bcY, 0, peakY, webX, webD, 'Truss web');              // R third → peak
-    memberYZ(x, -t3, bcY, -W / 4, qY, webX, webD, 'Truss web');            // L third → L slope mid
-    memberYZ(x,  t3, bcY,  W / 4, qY, webX, webD, 'Truss web');            // R third → R slope mid
+    const trussType = (document.getElementById('truss_type') || {}).value || 'wood';
+    if (trussType === 'steel') {
+      // STEEL TRUSS — the barn look: black angle-iron double chords that BOTH follow
+      // the gable slope, zigzag web between them, purlin clips every 2' + soffit clip.
+      const steelMat = () => new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.45, metalness: 0.65 });
+      const heelDrop = Math.min(2.0, Math.max(1.3, rise * 0.25));  // truss depth
+      const sx = 0.12, sd = 0.24, wx = 0.08, wd = 0.16;
+      const slopeK = rise / (W / 2);
+      const yTop = z => peakY - Math.abs(z) * slopeK;
+      [-1, 1].forEach(zs => {
+        const zHeel = zs * W / 2;
+        // chords (top + parallel bottom)
+        memberYZ(x, zHeel, wallTop, 0, peakY, sx, sd, 'Steel truss top chord', steelMat());
+        memberYZ(x, zHeel, wallTop - heelDrop, 0, peakY - heelDrop, sx, sd, 'Steel truss bottom chord', steelMat());
+        // heel vertical (bears on the post)
+        memberYZ(x, zHeel, wallTop, zHeel, wallTop - heelDrop, wx, wd, 'Steel truss heel', steelMat());
+        // zigzag web along the slope
+        const panels = Math.max(3, Math.round((W / 2) / 3));
+        const dzP = (W / 2) / panels;
+        for (let p = 0; p < panels; p++) {
+          const zA = zs * (W / 2 - p * dzP);
+          const zB = zs * (W / 2 - (p + 0.5) * dzP);
+          const zC = zs * (W / 2 - (p + 1) * dzP);
+          memberYZ(x, zA, yTop(zA) - heelDrop, zB, yTop(zB), wx, wd, 'Steel truss web', steelMat());
+          memberYZ(x, zB, yTop(zB), zC, yTop(zC) - heelDrop, wx, wd, 'Steel truss web', steelMat());
+        }
+        // purlin clips every 2' up the slope + soffit clip at the heel
+        const slopeLenC = Math.sqrt((W / 2) * (W / 2) + rise * rise);
+        for (let d = 0; d <= slopeLenC + 0.01; d += 2) {
+          const frac = Math.min(1, d / slopeLenC);
+          const zC2 = zs * (W / 2) * (1 - frac);
+          const clip = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 0.1), steelMat());
+          clip.position.set(x, yTop(zC2) + 0.09, zC2);
+          clip.castShadow = clip.receiveShadow = true;
+          clip.userData = { categoryKey: 'trusses', label: d < 0.01 ? 'Steel truss soffit clip' : 'Steel truss purlin clip (2\' OC)', isFraming: true };
+          buildingGroup.add(clip); allMeshes.push(clip);
+        }
+      });
+      // peak tie between the two bottom chords
+      memberYZ(x, 0, peakY - heelDrop, 0, peakY, wx, wd, 'Steel truss peak tie', steelMat());
+    } else {
+      // Top chords: heel (eave) up to peak, both slopes
+      memberYZ(x, -W / 2, wallTop, 0, peakY, chordX, chordD, 'Truss top chord — back');
+      memberYZ(x,  W / 2, wallTop, 0, peakY, chordX, chordD, 'Truss top chord — front');
+      // Bottom chord
+      memberYZ(x, -W / 2, bcY, W / 2, bcY, chordX, chordD, 'Truss bottom chord');
+      // Fink "W" webs + king post
+      const t3 = W / 6;          // bottom-chord panel (third) points
+      const qY = wallTop + rise / 2;   // top-chord mid (quarter point of span)
+      memberYZ(x, 0, bcY, 0, peakY, webX, webD, 'Truss king post');          // center post
+      memberYZ(x, -t3, bcY, 0, peakY, webX, webD, 'Truss web');              // L third → peak
+      memberYZ(x,  t3, bcY, 0, peakY, webX, webD, 'Truss web');              // R third → peak
+      memberYZ(x, -t3, bcY, -W / 4, qY, webX, webD, 'Truss web');            // L third → L slope mid
+      memberYZ(x,  t3, bcY,  W / 4, qY, webX, webD, 'Truss web');            // R third → R slope mid
+    }
   }
 }
 
