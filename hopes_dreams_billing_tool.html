@@ -303,6 +303,7 @@
     <div class="toolbar" style="margin-top:12px">
       <input type="text" class="search" id="recSearch" placeholder="Search name, city, or zip…">
       <select id="recDisc" style="max-width:190px"><option value="">Everyone</option><option value="ST">Speech therapists</option><option value="OT">OTs</option><option value="STA">Speech assistants</option><option value="OTA">OT assistants (COTA)</option></select>
+      <select id="recSpec" style="max-width:230px"><option value="">Any specialization</option><option value="peds">🧒 Pediatrics-specialized only</option><option value="feeding">Feeding/eating/swallowing</option><option value="neuro">Neurorehabilitation</option><option value="hand">Hand therapy</option></select>
       <select id="recCity" style="max-width:190px"><option value="">All cities</option></select>
       <select id="recSince" style="max-width:210px"><option value="">Registered any time</option><option value="1">Last 1 year (new grads)</option><option value="3">Last 3 years</option><option value="5">Last 5 years</option></select>
       <select id="recStatus" style="max-width:170px"><option value="">All statuses</option><option>New</option><option>Called</option><option>Voicemail</option><option>Interested</option><option>Not interested</option><option>Hired</option></select>
@@ -1354,9 +1355,12 @@ document.getElementById("recFile").addEventListener("change",e=>{
       const npi=iNpi>=0?String(row[iNpi]).trim():"";
       const key=npi||((row[iFn]||"")+"|"+(row[iLn]||"")+"|"+(row[iPhone]||""));
       if(byNpi[key]){ kept++; return; }  // keep existing status/notes
+      const taxFull=iTax>=0?String(row[iTax]).trim():"";
+      const dash=taxFull.indexOf(" - ");
       byNpi[key]={ npi:key,
         fn:iFn>=0?String(row[iFn]).trim():"", ln:iLn>=0?String(row[iLn]).trim():"",
-        cred:iCred>=0?String(row[iCred]).trim():"", tax:iTax>=0?String(row[iTax]).trim():"",
+        cred:iCred>=0?String(row[iCred]).trim():"", tax:taxFull,
+        spec:dash>0?taxFull.slice(dash+3).trim():"",
         city:iCity>=0?String(row[iCity]).trim():"", zip:iZip>=0?String(row[iZip]).trim().slice(0,5):"",
         phone:iPhone>=0?String(row[iPhone]).trim():"", enum:iEnum>=0?String(row[iEnum]).trim():"",
         status:"New", notes:"" };
@@ -1377,8 +1381,11 @@ function recFiltered(){
   const since=document.getElementById("recSince").value;
   const st=document.getElementById("recStatus").value;
   const cutoff=since?new Date(Date.now()-parseFloat(since)*365.25*86400000):null;
+  const specSel=document.getElementById("recSpec").value;
+  const SPEC_TESTS={peds:/pediatric/i, feeding:/feeding|eating|swallow/i, neuro:/neuro/i, hand:/hand/i};
   return recruits.filter(x=>{
     if(disc && recDiscOf(x)!==disc) return false;
+    if(specSel && !SPEC_TESTS[specSel].test(recSpecOf(x))) return false;
     if(city && x.city.toUpperCase()!==city) return false;
     if(st && x.status!==st) return false;
     if(cutoff){ const d=new Date(x.enum); if(isNaN(d)||d<cutoff) return false; }
@@ -1392,6 +1399,11 @@ function recDiscOf(x){
   if(t.includes("speech")) return isAsst?"STA":"ST";
   if(t.includes("occupational")) return isAsst?"OTA":"OT";
   return "";
+}
+function recSpecOf(x){
+  if(x.spec) return x.spec;
+  const t=x.tax||""; const i=t.indexOf(" - ");
+  return i>0 ? t.slice(i+3).trim() : "";
 }
 function recDiscBadge(x){
   const d=recDiscOf(x);
@@ -1411,7 +1423,7 @@ function renderRecruits(){
   const CAP=400;
   document.querySelector("#recTable tbody").innerHTML = rows.slice(0,CAP).map(x=>`<tr>
     <td><b>${esc(x.ln)}, ${esc(x.fn)}</b>${x.cred?`<br><span class="note">${esc(x.cred)}</span>`:""}</td>
-    <td>${recDiscBadge(x)}</td>
+    <td>${recDiscBadge(x)}${(()=>{const s=recSpecOf(x); return s?`<br><span class="note" style="font-size:11px">${/pediatric/i.test(s)?"🧒 ":""}${esc(s)}</span>`:"";})()}</td>
     <td>${esc(x.city)}</td><td>${esc(x.zip)}</td>
     <td style="white-space:nowrap">${esc(x.phone)}</td>
     <td>${esc(String(x.enum).slice(0,10))}</td>
@@ -1433,14 +1445,14 @@ document.querySelector("#recTable tbody").addEventListener("change",e=>{
   if(st){ const x=recruits.find(r=>r.npi===st.dataset.recst); if(x){ x.status=st.value; save(LS.recruits,recruits); renderRecruits(); } }
   else if(nt){ const x=recruits.find(r=>r.npi===nt.dataset.recnote); if(x){ x.notes=nt.value; save(LS.recruits,recruits); } }
 });
-["recSearch","recDisc","recCity","recSince","recStatus"].forEach(id=>{
+["recSearch","recDisc","recSpec","recCity","recSince","recStatus"].forEach(id=>{
   const el=document.getElementById(id);
   el.addEventListener(id==="recSearch"?"input":"change",renderRecruits);
 });
 document.getElementById("btnRecExport").onclick=()=>{
   const rows=recFiltered();
-  const csv="LastName,FirstName,Credential,Discipline,City,Zip,Phone,Registered,Status,Notes\n"+
-    rows.map(x=>[x.ln,x.fn,x.cred,x.tax,x.city,x.zip,x.phone,x.enum,x.status,x.notes]
+  const csv="LastName,FirstName,Credential,Discipline,Specialization,City,Zip,Phone,Registered,Status,Notes\n"+
+    rows.map(x=>[x.ln,x.fn,x.cred,x.tax,recSpecOf(x),x.city,x.zip,x.phone,x.enum,x.status,x.notes]
       .map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
   const blob=new Blob([csv],{type:"text/csv"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
