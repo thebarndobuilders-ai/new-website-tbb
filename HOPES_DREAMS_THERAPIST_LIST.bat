@@ -66,7 +66,8 @@ try {
                 foreach ($t in @($r.taxonomies)) { if ([string]$t.code -notin $codes) { $codes += [string]$t.code } }
                 $codeStr = $codes -join "|"
                 if (-not (Test-Match $codeStr)) { continue }
-                $loc = $r.addresses | Where-Object { $_.address_purpose -eq "LOCATION" } | Select-Object -First 1
+                $loc  = $r.addresses | Where-Object { $_.address_purpose -eq "LOCATION" } | Select-Object -First 1
+                $mail = $r.addresses | Where-Object { $_.address_purpose -eq "MAILING"  } | Select-Object -First 1
                 $script:pool[$r.number] = [pscustomobject]@{
                     NPI        = $r.number
                     FirstName  = $r.basic.first_name
@@ -80,6 +81,7 @@ try {
                     State      = $loc.state
                     Zip        = $loc.postal_code
                     Phone      = $loc.telephone_number
+                    DirectPhone = $mail.telephone_number
                     Enumerated = $r.basic.enumeration_date
                 }
             }

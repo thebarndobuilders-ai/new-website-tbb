@@ -319,7 +319,7 @@
       <select id="recStatus" style="max-width:170px"><option value="">All statuses</option><option>New</option><option>Called</option><option>Voicemail</option><option>Interested</option><option>Not interested</option><option>Hired</option></select>
     </div>
     <div class="scrollwrap" style="max-height:620px;overflow-y:auto"><table id="recTable">
-      <thead><tr><th>Name</th><th>Disc.</th><th>City</th><th>Zip</th><th>Phone</th><th>Registered</th><th>Status</th><th>Notes</th></tr></thead>
+      <thead><tr><th>Name</th><th>Disc.</th><th>City</th><th>Zip</th><th>☎ Practice</th><th>📱 Direct</th><th>Registered</th><th>Status</th><th>Notes</th></tr></thead>
       <tbody></tbody>
     </table></div>
     <p class="note" id="recCount" style="margin-top:8px"></p>
@@ -1368,7 +1368,7 @@ document.getElementById("recFile").addEventListener("change",e=>{
     const col=(...kws)=>heads.findIndex(h=>kws.some(k=>h.includes(k)));
     const iNpi=col("npi"), iFn=col("first"), iLn=col("last"), iCred=col("credential","cred"),
           iTax=col("taxonomy","discipline","type"), iCity=col("city"), iZip=col("zip","postal"),
-          iPhone=col("phone","telephone"), iEnum=col("enumerat","registered","date");
+          iPhone=col("phone","telephone"), iPhone2=col("direct","mailing","personal"), iEnum=col("enumerat","registered","date");
     if(iLn<0&&iFn<0){ alert("Couldn't find name columns — is this the CSV from the therapist-list script?"); return; }
     const byNpi={}; recruits.forEach(x=>byNpi[x.npi]=x);
     let added=0, kept=0;
@@ -1383,7 +1383,8 @@ document.getElementById("recFile").addEventListener("change",e=>{
         cred:iCred>=0?String(row[iCred]).trim():"", tax:taxFull,
         spec:dash>0?taxFull.slice(dash+3).trim():"",
         city:iCity>=0?String(row[iCity]).trim():"", zip:iZip>=0?String(row[iZip]).trim().slice(0,5):"",
-        phone:iPhone>=0?String(row[iPhone]).trim():"", enum:iEnum>=0?String(row[iEnum]).trim():"",
+        phone:iPhone>=0?String(row[iPhone]).trim():"", phone2:iPhone2>=0?String(row[iPhone2]).trim():"",
+        enum:iEnum>=0?String(row[iEnum]).trim():"",
         status:"New", notes:"" };
       added++;
     });
@@ -1447,10 +1448,11 @@ function renderRecruits(){
     <td>${recDiscBadge(x)}${(()=>{const s=recSpecOf(x); return s?`<br><span class="note" style="font-size:11px">${/pediatric/i.test(s)?"🧒 ":""}${esc(s)}</span>`:"";})()}</td>
     <td>${esc(x.city)}</td><td>${esc(x.zip)}</td>
     <td style="white-space:nowrap">${esc(x.phone)}</td>
+    <td style="white-space:nowrap">${x.phone2&&x.phone2!==x.phone?esc(x.phone2):'<span class="note">—</span>'}</td>
     <td>${esc(String(x.enum).slice(0,10))}</td>
     <td><select data-recst="${esc(x.npi)}" style="padding:4px 5px;font-size:12px">${REC_STATUSES.map(s=>`<option ${s===x.status?"selected":""}>${s}</option>`).join("")}</select></td>
     <td><input type="text" data-recnote="${esc(x.npi)}" value="${esc(x.notes)}" placeholder="notes…" style="padding:4px 6px;font-size:12px;min-width:140px"></td>
-  </tr>`).join("") || `<tr><td colspan="8" class="note">${recruits.length?"No matches for these filters.":"No therapists loaded yet — click “Load therapist CSV”."}</td></tr>`;
+  </tr>`).join("") || `<tr><td colspan="9" class="note">${recruits.length?"No matches for these filters.":"No therapists loaded yet — click “Load therapist CSV”."}</td></tr>`;
   document.getElementById("recCount").textContent = rows.length>CAP
     ? `Showing first ${CAP} of ${rows.length} matches — narrow the filters (or search) to see the rest.`
     : `${rows.length} of ${recruits.length} therapists shown.`;
@@ -1486,8 +1488,8 @@ document.getElementById("btnAddManual").onclick=()=>{
 };
 document.getElementById("btnRecExport").onclick=()=>{
   const rows=recFiltered();
-  const csv="LastName,FirstName,Credential,Discipline,Specialization,City,Zip,Phone,Registered,Status,Notes\n"+
-    rows.map(x=>[x.ln,x.fn,x.cred,x.tax,recSpecOf(x),x.city,x.zip,x.phone,x.enum,x.status,x.notes]
+  const csv="LastName,FirstName,Credential,Discipline,Specialization,City,Zip,PracticePhone,DirectPhone,Registered,Status,Notes\n"+
+    rows.map(x=>[x.ln,x.fn,x.cred,x.tax,recSpecOf(x),x.city,x.zip,x.phone,x.phone2||"",x.enum,x.status,x.notes]
       .map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
   const blob=new Blob([csv],{type:"text/csv"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
