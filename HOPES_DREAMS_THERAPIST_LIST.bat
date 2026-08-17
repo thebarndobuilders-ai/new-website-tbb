@@ -29,11 +29,12 @@ try { Start-Transcript -Path (Join-Path $desktop "RUN_ME_log.txt") -Force | Out-
 
 try {
     $api = "https://npiregistry.cms.hhs.gov/api/"
+    # Trailing * catches specializations too (e.g. "Occupational Therapist - Pediatrics")
     $professions = @(
-        @{ Name = "Speech-Language Pathologist";    File = "TN_Speech_Therapists.csv" },
-        @{ Name = "Occupational Therapist";         File = "TN_Occupational_Therapists.csv" },
-        @{ Name = "Occupational Therapy Assistant"; File = "TN_OT_Assistants.csv" },
-        @{ Name = "Speech-Language Assistant";      File = "TN_Speech_Assistants.csv" }
+        @{ Name = "Speech-Language Pathologist*";    File = "TN_Speech_Therapists.csv" },
+        @{ Name = "Occupational Therapist*";         File = "TN_Occupational_Therapists.csv" },
+        @{ Name = "Occupational Therapy Assistant*"; File = "TN_OT_Assistants.csv" },
+        @{ Name = "Speech-Language Assistant*";      File = "TN_Speech_Assistants.csv" }
     )
     $zipPrefixes = 370..385 | ForEach-Object { "$_*" }
 
