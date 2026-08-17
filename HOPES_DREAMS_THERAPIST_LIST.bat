@@ -84,7 +84,16 @@ try {
         }
 
         $dest = Join-Path $desktop $prof.File
-        $out | Sort-Object LastName, FirstName | Export-Csv -Path $dest -NoTypeInformation -Encoding UTF8
+        $sorted = $out | Sort-Object LastName, FirstName
+        try {
+            $sorted | Export-Csv -Path $dest -NoTypeInformation -Encoding UTF8
+        } catch {
+            # File locked (open in Excel?) — save under a numbered name instead
+            $alt = Join-Path $desktop ($prof.File -replace "\.csv$", "_NEW.csv")
+            Write-Warning "$($prof.File) is open in another program - saving as $(Split-Path $alt -Leaf) instead. Close Excel next time."
+            $sorted | Export-Csv -Path $alt -NoTypeInformation -Encoding UTF8
+            $dest = $alt
+        }
         Write-Host ""
         Write-Host ">>> $($seen.Count) $($prof.Name)s saved to: $dest" -ForegroundColor Green
     }
