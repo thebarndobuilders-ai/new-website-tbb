@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v243</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v244</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2262,6 +2262,14 @@
           <label>Wall metal height (ft)</label>
           <input type="number" id="wall_skirt_height" value="4" step="0.5" min="0" oninput="recalc()" />
           <div class="qbs-note">Hangs from the top of the wall DOWN (eave band — not a wainscot) · 0 = none</div>
+        </div>
+        <div class="qbs-field">
+          <label>Gable posts (mid-section)</label>
+          <select id="gable_posts_mode" onchange="recalc()">
+            <option value="auto">Auto — remove when trusses span an open/band gable</option>
+            <option value="remove">Remove — trusses span, no mid gable posts</option>
+            <option value="add">Add — always keep mid gable posts</option>
+          </select>
         </div>
         <div class="qbs-field" id="gable-metal-field" style="display:none;">
           <label>Gable metal</label>
@@ -2361,6 +2369,8 @@
       <div class="qbs-grid-4">
         <div class="qbs-field"><label>Stud length (auto)</label><input type="text" id="stud_length" value="104-5/8" readonly style="background: var(--bg-deep); color: var(--text-3);" /></div>
       </div>
+      <!-- AREAS section hidden per builder request (v244) — inputs stay live for the quote math -->
+      <div id="areas-section" style="display:none">
       <div style="font-family: var(--font-mono); font-size: 10px; color: var(--copper); text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 10px; font-weight: 500;">Areas <span style="color: var(--text-4); font-weight: 400; text-transform: none; letter-spacing: 0;">· footprint auto-updates from L × W</span></div>
       <div class="qbs-grid-4">
         <div class="qbs-field">
@@ -2382,6 +2392,7 @@
           <div class="qbs-note">Only for Shop/Barn tier or as add-on</div>
         </div>
         <div class="qbs-field"><label>Interior wall LF</label><input type="number" id="int_wall_lf" value="0" oninput="recalc()" /><div class="qbs-note">Rough estimate: living × 0.09</div></div>
+      </div>
       </div>
     </div>
     <div class="qbs-card">
@@ -8615,7 +8626,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v243';
+const BB_VERSION = 'v244';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -12150,6 +12161,7 @@ function getInputs() {
   // Gable metal style (partial mode): 'follow' the truss (triangles covered),
   // 'straight' across at wall height (gable ends full-height rect, truss open), or 'none'.
   const gableMetalStyle = (document.getElementById('gable_metal') || {}).value || 'follow';
+  const gablePostsMode = (document.getElementById('gable_posts_mode') || {}).value || 'auto';
   let wallArea = wallRectArea + totalGableSidingArea; // include gable triangles in siding takeoff
   if (enclosureMode === 'roof_only') wallArea = 0;
   else if (enclosureMode === 'partial') {
@@ -12570,7 +12582,7 @@ function getInputs() {
     shedAttachedSide: document.getElementById('shed_attached_side') ? document.getElementById('shed_attached_side').value : 'back',
     shedActive,
     ext, extActive,
-    enclosureMode, wallSkirtH, gableMetalStyle,
+    enclosureMode, wallSkirtH, gableMetalStyle, gablePostsMode,
     shed,
     // Manual trim overrides (Additions tab)
     manual_sidewall_flashing: num('manual_sidewall_flashing'),
@@ -13247,19 +13259,27 @@ function bbClearQtyOverrides() {
 // Open (metal roof only) builds carry on posts alone — no wall girts, studs,
 // plates or sheathing. Framing is only figured where areas are enclosed.
 function bbApplyEnclosureGate(lines, i) {
-  if (!i || i.enclosureMode === 'full') return lines;
+  if (!i) return lines;
+  if (i.enclosureMode === 'full') {
+    if (i.gablePostsMode === 'remove') {
+      return lines.filter(ln => !/gable post/i.test((ln.id || '') + ' ' + (ln.label || '')));
+    }
+    return lines;
+  }
   const keepRe = /\bposts?\b|sakrete|column|embed|jamb/i;
   const wallCats = ['Wall framing', 'Post-frame wall', 'Wall sheathing'];
+  const dropGablePosts = i.gablePostsMode === 'remove' || (i.gablePostsMode === 'auto' &&
+    (i.enclosureMode === 'roof_only' || (i.enclosureMode === 'partial' && i.gableMetalStyle !== 'straight')));
   if (i.enclosureMode === 'roof_only') {
     return lines.filter(ln => {
       const tag = (ln.id || '') + ' ' + (ln.label || '');
-      if (/gable post/i.test(tag)) return false;   // trusses span the gable — no mid posts
+      if (/gable post/i.test(tag)) return !dropGablePosts;   // manual Add keeps them
       if (!wallCats.includes(ln.cat)) return true;
       return keepRe.test(tag);
     });
   }
-  // Partial: trusses span open/band gables — no mid-section gable posts there.
-  if (i.gableMetalStyle !== 'straight') {
+  // Partial: manual setting wins; auto drops gable posts on open/band gables.
+  if (dropGablePosts) {
     lines = lines.filter(ln => !/gable post/i.test((ln.id || '') + ' ' + (ln.label || '')));
   }
   // Partial: wall framing scales to the fraction of wall actually covered by metal.
@@ -17554,6 +17574,7 @@ function bbEnclosure() {
     mode: (document.getElementById('bldg_enclosure') || {}).value || 'full',
     skirtH: Math.max(0, parseFloat((document.getElementById('wall_skirt_height') || {}).value) || 0),
     gableStyle: (document.getElementById('gable_metal') || {}).value || 'follow',
+    gablePosts: (document.getElementById('gable_posts_mode') || {}).value || 'auto',
   };
 }
 try { const _ow = localStorage.getItem('bb_open_walls'); if (_ow) Object.assign(openWalls, JSON.parse(_ow)); } catch (_) {}
@@ -20586,8 +20607,9 @@ function applyVisibility() {
       }
     } else if (showStructure) {
       const encPS = bbEnclosure();
-      if ((encPS.mode === 'roof_only' || (encPS.mode === 'partial' && encPS.gableStyle !== 'straight')) &&
-          /post/i.test(String(ud.label || '')) &&
+      const dropGPS = encPS.gablePosts === 'remove' || (encPS.gablePosts === 'auto' &&
+        (encPS.mode === 'roof_only' || (encPS.mode === 'partial' && encPS.gableStyle !== 'straight')));
+      if (dropGPS && /post/i.test(String(ud.label || '')) &&
           !/porch|shed|extension|cypress|king/i.test(String(ud.label || ''))) {
         const pG2 = new THREE.Vector3(); obj.getWorldPosition(pG2);
         const dG2 = getBuildingDims();
@@ -20628,8 +20650,9 @@ function applyVisibility() {
     } else {
       // Default (finish) mode
       const encPG = bbEnclosure();
-      if ((encPG.mode === 'roof_only' || (encPG.mode === 'partial' && encPG.gableStyle !== 'straight')) &&
-          /post/i.test(String(ud.label || '')) &&
+      const dropGPG = encPG.gablePosts === 'remove' || (encPG.gablePosts === 'auto' &&
+        (encPG.mode === 'roof_only' || (encPG.mode === 'partial' && encPG.gableStyle !== 'straight')));
+      if (dropGPG && /post/i.test(String(ud.label || '')) &&
           !/porch|shed|extension|cypress|king/i.test(String(ud.label || ''))) {
         // Trusses span an open/band gable — no mid-section gable posts
         const pG = new THREE.Vector3(); obj.getWorldPosition(pG);
