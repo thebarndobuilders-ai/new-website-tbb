@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v241</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v242</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8615,7 +8615,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v241';
+const BB_VERSION = 'v242';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -19359,14 +19359,15 @@ function buildTrusses(dims, wallTop, rise) {
       const heelDrop = Math.min(2.0, Math.max(1.3, rise * 0.25));  // truss depth
       const sx = 0.12, sd = 0.24, wx = 0.08, wd = 0.16;
       const slopeK = rise / (W / 2);
-      const yTop = z => peakY - Math.abs(z) * slopeK;
+      const tDrop = 0.3;   // whole truss sits below the roof plane — purlins carry the metal
+      const yTop = z => peakY - tDrop - Math.abs(z) * slopeK;
       [-1, 1].forEach(zs => {
         const zHeel = zs * W / 2;
         // chords (top + parallel bottom)
-        memberYZ(x, zHeel, wallTop, 0, peakY, sx, sd, 'Steel truss top chord', steelMat());
-        memberYZ(x, zHeel, wallTop - heelDrop, 0, peakY - heelDrop, sx, sd, 'Steel truss bottom chord', steelMat());
+        memberYZ(x, zHeel, wallTop - tDrop, 0, peakY - tDrop, sx, sd, 'Steel truss top chord', steelMat());
+        memberYZ(x, zHeel, wallTop - tDrop - heelDrop, 0, peakY - tDrop - heelDrop, sx, sd, 'Steel truss bottom chord', steelMat());
         // heel vertical (bears on the post)
-        memberYZ(x, zHeel, wallTop, zHeel, wallTop - heelDrop, wx, wd, 'Steel truss heel', steelMat());
+        memberYZ(x, zHeel, wallTop - tDrop, zHeel, wallTop - tDrop - heelDrop, wx, wd, 'Steel truss heel', steelMat());
         // zigzag web along the slope
         const panels = Math.max(3, Math.round((W / 2) / 3));
         const dzP = (W / 2) / panels;
@@ -19391,7 +19392,7 @@ function buildTrusses(dims, wallTop, rise) {
         }
       });
       // peak tie between the two bottom chords
-      memberYZ(x, 0, peakY - heelDrop, 0, peakY - 0.18, wx, wd, 'Steel truss peak tie', steelMat());
+      memberYZ(x, 0, peakY - tDrop - heelDrop, 0, peakY - tDrop - 0.1, wx, wd, 'Steel truss peak tie', steelMat());
     } else {
       // Top chords: heel (eave) up to peak, both slopes
       memberYZ(x, -W / 2, wallTop, 0, peakY, chordX, chordD, 'Truss top chord — back');
