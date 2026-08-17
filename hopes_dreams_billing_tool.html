@@ -300,6 +300,16 @@
       <button class="btn secondary" id="btnRecExport">⬇ Export current view (CSV)</button>
       <button class="btn danger small" id="btnRecClear">Clear all recruiting data</button>
     </div>
+    <h3>Add a person manually</h3>
+    <div class="grid g3" style="margin-bottom:6px">
+      <div><label class="fld">First name</label><input type="text" id="mFn"></div>
+      <div><label class="fld">Last name</label><input type="text" id="mLn"></div>
+      <div><label class="fld">Position</label><select id="mDisc"><option value="Speech">Speech therapist</option><option value="Occupational">OT</option><option value="Speech Assistant">Speech assistant</option><option value="Occupational Assistant">OT assistant</option></select></div>
+      <div><label class="fld">Specialization (optional)</label><input type="text" id="mSpec" placeholder="e.g. Pediatrics"></div>
+      <div><label class="fld">City</label><input type="text" id="mCity"></div>
+      <div><label class="fld">Phone</label><input type="text" id="mPhone"></div>
+      <div style="align-self:end"><button class="btn small" id="btnAddManual">+ Add person</button></div>
+    </div>
     <div class="toolbar" style="margin-top:12px">
       <input type="text" class="search" id="recSearch" placeholder="Search name, city, or zip…">
       <select id="recDisc" style="max-width:190px"><option value="">Everyone</option><option value="ST">Speech therapists</option><option value="OT">OTs</option><option value="STA">Speech assistants</option><option value="OTA">OT assistants (COTA)</option></select>
@@ -516,7 +526,7 @@ const SEED_VERSION=3; // bump when the built-in list is replaced — browsers re
   if(savedV!==SEED_VERSION){
     const kept={}; recruits.forEach(r=>{ if(r.status!=="New"||r.notes) kept[r.npi]={status:r.status,notes:r.notes}; });
     const seedNpis=new Set(SEED_RECRUITS.map(s=>s.npi));
-    const extras=recruits.filter(r=>!seedNpis.has(r.npi)&&(r.status!=="New"||r.notes));
+    const extras=recruits.filter(r=>!seedNpis.has(r.npi)&&(r.manual||r.status!=="New"||r.notes));
     recruits=SEED_RECRUITS.map(x=>Object.assign({status:"New",notes:""},x,kept[x.npi]||{})).concat(extras);
     try{ save(LS.recruits,recruits); localStorage.setItem("hd_recruits_seedv",String(SEED_VERSION)); }
     catch(e){ console.warn("Recruit list kept in memory only (storage full)"); }
@@ -1460,6 +1470,20 @@ document.querySelector("#recTable tbody").addEventListener("change",e=>{
   const el=document.getElementById(id);
   el.addEventListener(id==="recSearch"?"input":"change",renderRecruits);
 });
+document.getElementById("btnAddManual").onclick=()=>{
+  const fn=document.getElementById("mFn").value.trim(), ln=document.getElementById("mLn").value.trim();
+  if(!fn&&!ln) return alert("Enter at least a name.");
+  recruits.push({ npi:"manual_"+Date.now(), manual:true,
+    fn:fn.toUpperCase(), ln:ln.toUpperCase(), cred:"",
+    tax:document.getElementById("mDisc").value,
+    spec:document.getElementById("mSpec").value.trim(),
+    city:document.getElementById("mCity").value.trim().toUpperCase(),
+    zip:"", phone:document.getElementById("mPhone").value.trim(),
+    enum:"", status:"New", notes:"added manually" });
+  save(LS.recruits,recruits);
+  ["mFn","mLn","mSpec","mCity","mPhone"].forEach(id=>document.getElementById(id).value="");
+  renderRecruits();
+};
 document.getElementById("btnRecExport").onclick=()=>{
   const rows=recFiltered();
   const csv="LastName,FirstName,Credential,Discipline,Specialization,City,Zip,Phone,Registered,Status,Notes\n"+
