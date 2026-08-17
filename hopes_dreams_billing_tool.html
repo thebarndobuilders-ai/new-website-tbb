@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hopes and Dreams — Billing Code Advisor</title>
+<title>Hopes and Dreams</title>
 <style>
   :root{
     --teal:#0e7c7b; --teal-dark:#0a5c5b; --teal-light:#e6f4f4;
@@ -96,7 +96,7 @@
 <body>
 <header>
   <h1 id="hdrName">Hopes and Dreams Speech Therapy</h1>
-  <div class="sub">Billing Code Advisor — Pediatric Speech &amp; Occupational Therapy · companion to Fusion</div>
+  <div class="sub">Hopes and Dreams — pediatric speech &amp; OT practice tool · billing · auths · recruiting · companion to Fusion</div>
 </header>
 <nav id="nav">
   <button data-tab="advisor" class="active">Session Advisor</button>
@@ -105,6 +105,7 @@
   <button data-tab="payers">Payer Matrix</button>
   <button data-tab="combos">Combo Checker</button>
   <button data-tab="audit">Self-Audit</button>
+  <button data-tab="recruit">Recruiting</button>
   <button data-tab="denials">Denial Log</button>
   <button data-tab="settings">Settings</button>
 </nav>
@@ -287,6 +288,33 @@
   </div>
 </section>
 
+<!-- ═══════════════ RECRUITING ═══════════════ -->
+<section class="tab" id="tab-recruit">
+  <div class="card">
+    <h2>Recruiting — TN therapist call list</h2>
+    <p class="note">Load the CSV files made by the therapist-list script (<b>TN_Speech_Therapists.csv</b> / <b>TN_Occupational_Therapists.csv</b>) — or any CSV with name/city/phone columns. Then filter to your area, work the list, and track every call. Statuses and notes save in this browser and ride along in your JSON backup.</p>
+    <div class="kpi" id="recKpi"></div>
+    <div class="flexrow">
+      <button class="btn" id="btnRecFile">📂 Load therapist CSV</button>
+      <input type="file" id="recFile" accept=".csv" style="display:none">
+      <button class="btn secondary" id="btnRecExport">⬇ Export current view (CSV)</button>
+      <button class="btn danger small" id="btnRecClear">Clear all recruiting data</button>
+    </div>
+    <div class="toolbar" style="margin-top:12px">
+      <input type="text" class="search" id="recSearch" placeholder="Search name, city, or zip…">
+      <select id="recDisc" style="max-width:150px"><option value="">ST + OT</option><option value="Speech">Speech</option><option value="Occupational">OT</option></select>
+      <select id="recCity" style="max-width:190px"><option value="">All cities</option></select>
+      <select id="recSince" style="max-width:210px"><option value="">Registered any time</option><option value="1">Last 1 year (new grads)</option><option value="3">Last 3 years</option><option value="5">Last 5 years</option></select>
+      <select id="recStatus" style="max-width:170px"><option value="">All statuses</option><option>New</option><option>Called</option><option>Voicemail</option><option>Interested</option><option>Not interested</option><option>Hired</option></select>
+    </div>
+    <div class="scrollwrap" style="max-height:620px;overflow-y:auto"><table id="recTable">
+      <thead><tr><th>Name</th><th>Disc.</th><th>City</th><th>Zip</th><th>Phone</th><th>Registered</th><th>Status</th><th>Notes</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <p class="note" id="recCount" style="margin-top:8px"></p>
+  </div>
+</section>
+
 <!-- ═══════════════ SETTINGS ═══════════════ -->
 <section class="tab" id="tab-settings">
   <div class="card">
@@ -464,7 +492,7 @@ function comboFor(a,b){ return COMBOS.find(c=>(c.a===a&&c.b===b)||(c.a===b&&c.b=
 
 /* ══════════════════ STORAGE ══════════════════ */
 const LS = {
-  settings:"hd_settings", payers:"hd_payers", matrix:"hd_matrix", denials:"hd_denials", auths:"hd_auths"
+  settings:"hd_settings", payers:"hd_payers", matrix:"hd_matrix", denials:"hd_denials", auths:"hd_auths", recruits:"hd_recruits"
 };
 function load(k, fb){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):fb; }catch(e){ return fb; } }
 function save(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
@@ -479,6 +507,7 @@ let payers   = load(LS.payers, [
 let matrix   = load(LS.matrix, {});   // matrix[payerId][code] = {s:"cov|pa|no|unk", rate:"", note:""}
 let denials  = load(LS.denials, []);  // {id,date,loc,payer,client,codes,outcome,reason}
 let auths    = load(LS.auths, []);    // {id,client,loc,payer,disc,codes,num,visits,used,start,end,notes}
+let recruits = load(LS.recruits, []); // {npi,fn,ln,cred,tax,city,zip,phone,enum,status,notes}
 
 function cell(pid, code){ return (matrix[pid]&&matrix[pid][code]) || {s:"unk", rate:"", note:""}; }
 function setCell(pid, code, patch){
@@ -1298,6 +1327,109 @@ document.getElementById("btnAddAuth").onclick=()=>{
 document.getElementById("aFilterLoc").addEventListener("change",renderAuths);
 document.getElementById("aFilterUrg").addEventListener("change",renderAuths);
 
+/* ══════════════════ RECRUITING ══════════════════ */
+const REC_STATUSES=["New","Called","Voicemail","Interested","Not interested","Hired"];
+document.getElementById("btnRecFile").onclick=()=>document.getElementById("recFile").click();
+document.getElementById("recFile").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    const rows=parseCSV(r.result);
+    if(rows.length<2){ alert("No data rows in that file."); return; }
+    const heads=rows[0].map(h=>h.toLowerCase().trim());
+    const col=(...kws)=>heads.findIndex(h=>kws.some(k=>h.includes(k)));
+    const iNpi=col("npi"), iFn=col("first"), iLn=col("last"), iCred=col("credential","cred"),
+          iTax=col("taxonomy","discipline","type"), iCity=col("city"), iZip=col("zip","postal"),
+          iPhone=col("phone","telephone"), iEnum=col("enumerat","registered","date");
+    if(iLn<0&&iFn<0){ alert("Couldn't find name columns — is this the CSV from the therapist-list script?"); return; }
+    const byNpi={}; recruits.forEach(x=>byNpi[x.npi]=x);
+    let added=0, kept=0;
+    rows.slice(1).forEach(row=>{
+      const npi=iNpi>=0?String(row[iNpi]).trim():"";
+      const key=npi||((row[iFn]||"")+"|"+(row[iLn]||"")+"|"+(row[iPhone]||""));
+      if(byNpi[key]){ kept++; return; }  // keep existing status/notes
+      byNpi[key]={ npi:key,
+        fn:iFn>=0?String(row[iFn]).trim():"", ln:iLn>=0?String(row[iLn]).trim():"",
+        cred:iCred>=0?String(row[iCred]).trim():"", tax:iTax>=0?String(row[iTax]).trim():"",
+        city:iCity>=0?String(row[iCity]).trim():"", zip:iZip>=0?String(row[iZip]).trim().slice(0,5):"",
+        phone:iPhone>=0?String(row[iPhone]).trim():"", enum:iEnum>=0?String(row[iEnum]).trim():"",
+        status:"New", notes:"" };
+      added++;
+    });
+    recruits=Object.values(byNpi);
+    save(LS.recruits,recruits);
+    renderRecruits();
+    alert(`${added} therapists added${kept?", "+kept+" already in your list (statuses kept)":""}. Total: ${recruits.length}.`);
+  };
+  r.readAsText(f); e.target.value="";
+});
+
+function recFiltered(){
+  const q=(document.getElementById("recSearch").value||"").toLowerCase();
+  const disc=document.getElementById("recDisc").value;
+  const city=document.getElementById("recCity").value;
+  const since=document.getElementById("recSince").value;
+  const st=document.getElementById("recStatus").value;
+  const cutoff=since?new Date(Date.now()-parseFloat(since)*365.25*86400000):null;
+  return recruits.filter(x=>{
+    if(disc && !x.tax.toLowerCase().includes(disc.toLowerCase())) return false;
+    if(city && x.city.toUpperCase()!==city) return false;
+    if(st && x.status!==st) return false;
+    if(cutoff){ const d=new Date(x.enum); if(isNaN(d)||d<cutoff) return false; }
+    if(q && !((x.fn+" "+x.ln).toLowerCase().includes(q)||x.city.toLowerCase().includes(q)||x.zip.includes(q))) return false;
+    return true;
+  });
+}
+function renderRecruits(){
+  // city dropdown (top cities by count, preserve selection)
+  const citySel=document.getElementById("recCity"); const cur=citySel.value;
+  const counts={}; recruits.forEach(x=>{ const c=x.city.toUpperCase(); if(c) counts[c]=(counts[c]||0)+1; });
+  const cities=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,80);
+  citySel.innerHTML='<option value="">All cities</option>'+cities.map(([c,n])=>`<option value="${esc(c)}" ${c===cur?"selected":""}>${esc(c)} (${n})</option>`).join("");
+  const rows=recFiltered().sort((a,b)=>(a.ln+a.fn).localeCompare(b.ln+b.fn));
+  const CAP=400;
+  document.querySelector("#recTable tbody").innerHTML = rows.slice(0,CAP).map(x=>`<tr>
+    <td><b>${esc(x.ln)}, ${esc(x.fn)}</b>${x.cred?`<br><span class="note">${esc(x.cred)}</span>`:""}</td>
+    <td>${x.tax.toLowerCase().includes("speech")?'<span class="badge b-st">ST</span>':x.tax.toLowerCase().includes("occupational")?'<span class="badge b-ot">OT</span>':esc(x.tax.slice(0,12))}</td>
+    <td>${esc(x.city)}</td><td>${esc(x.zip)}</td>
+    <td style="white-space:nowrap">${esc(x.phone)}</td>
+    <td>${esc(String(x.enum).slice(0,10))}</td>
+    <td><select data-recst="${esc(x.npi)}" style="padding:4px 5px;font-size:12px">${REC_STATUSES.map(s=>`<option ${s===x.status?"selected":""}>${s}</option>`).join("")}</select></td>
+    <td><input type="text" data-recnote="${esc(x.npi)}" value="${esc(x.notes)}" placeholder="notes…" style="padding:4px 6px;font-size:12px;min-width:140px"></td>
+  </tr>`).join("") || `<tr><td colspan="8" class="note">${recruits.length?"No matches for these filters.":"No therapists loaded yet — click “Load therapist CSV”."}</td></tr>`;
+  document.getElementById("recCount").textContent = rows.length>CAP
+    ? `Showing first ${CAP} of ${rows.length} matches — narrow the filters (or search) to see the rest.`
+    : `${rows.length} of ${recruits.length} therapists shown.`;
+  const kn=s=>recruits.filter(x=>x.status===s).length;
+  document.getElementById("recKpi").innerHTML=`
+    <div class="k"><div class="n">${recruits.length}</div><div class="l">Therapists loaded</div></div>
+    <div class="k"><div class="n">${kn("Called")+kn("Voicemail")}</div><div class="l">Contacted</div></div>
+    <div class="k"><div class="n" style="color:var(--good)">${kn("Interested")}</div><div class="l">Interested</div></div>
+    <div class="k"><div class="n" style="color:var(--purple)">${kn("Hired")}</div><div class="l">Hired 🎉</div></div>`;
+}
+document.querySelector("#recTable tbody").addEventListener("change",e=>{
+  const st=e.target.closest("[data-recst]"), nt=e.target.closest("[data-recnote]");
+  if(st){ const x=recruits.find(r=>r.npi===st.dataset.recst); if(x){ x.status=st.value; save(LS.recruits,recruits); renderRecruits(); } }
+  else if(nt){ const x=recruits.find(r=>r.npi===nt.dataset.recnote); if(x){ x.notes=nt.value; save(LS.recruits,recruits); } }
+});
+["recSearch","recDisc","recCity","recSince","recStatus"].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener(id==="recSearch"?"input":"change",renderRecruits);
+});
+document.getElementById("btnRecExport").onclick=()=>{
+  const rows=recFiltered();
+  const csv="LastName,FirstName,Credential,Discipline,City,Zip,Phone,Registered,Status,Notes\n"+
+    rows.map(x=>[x.ln,x.fn,x.cred,x.tax,x.city,x.zip,x.phone,x.enum,x.status,x.notes]
+      .map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob=new Blob([csv],{type:"text/csv"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="call_list.csv"; a.click();
+};
+document.getElementById("btnRecClear").onclick=()=>{
+  if(!confirm("Erase the whole recruiting list including statuses and notes?")) return;
+  recruits=[]; save(LS.recruits,recruits); renderRecruits();
+};
+
 /* ══════════════════ SETTINGS / BACKUP ══════════════════ */
 function renderSettings(){
   document.getElementById("setName").value=settings.name;
@@ -1307,7 +1439,7 @@ function renderSettings(){
   document.getElementById("setLoc2").value=settings.loc2;
   document.getElementById("hdrName").textContent=settings.name;
   document.querySelector("header .sub").textContent=
-    "Billing Code Advisor — Pediatric Speech & Occupational Therapy · companion to Fusion"+(settings.state?" · "+settings.state:"");
+    "Hopes and Dreams — pediatric speech & OT practice tool · billing · auths · recruiting · companion to Fusion"+(settings.state?" · "+settings.state:"");
 }
 document.getElementById("btnSaveSettings").onclick=()=>{
   const newState=document.getElementById("setState").value;
@@ -1325,7 +1457,7 @@ document.getElementById("btnSaveSettings").onclick=()=>{
   refreshAll();
 };
 document.getElementById("btnExport").onclick=()=>{
-  const blob=new Blob([JSON.stringify({settings,payers,matrix,denials,auths,exported:new Date().toISOString(),app:"hd_billing_tool"},null,2)],{type:"application/json"});
+  const blob=new Blob([JSON.stringify({settings,payers,matrix,denials,auths,recruits,exported:new Date().toISOString(),app:"hd_billing_tool"},null,2)],{type:"application/json"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
   a.download="hopes_dreams_billing_backup_"+new Date().toISOString().slice(0,10)+".json"; a.click();
 };
@@ -1337,8 +1469,8 @@ document.getElementById("importFile").addEventListener("change",e=>{
     const d=JSON.parse(r.result);
     if(d.app!=="hd_billing_tool") throw new Error("Not a Hopes and Dreams backup file.");
     if(!confirm("Import will REPLACE all current data in this browser. Continue?")) return;
-    settings=d.settings; payers=d.payers; matrix=d.matrix; denials=d.denials; auths=d.auths||[];
-    save(LS.settings,settings); save(LS.payers,payers); save(LS.matrix,matrix); save(LS.denials,denials); save(LS.auths,auths);
+    settings=d.settings; payers=d.payers; matrix=d.matrix; denials=d.denials; auths=d.auths||[]; recruits=d.recruits||[];
+    save(LS.settings,settings); save(LS.payers,payers); save(LS.matrix,matrix); save(LS.denials,denials); save(LS.auths,auths); save(LS.recruits,recruits);
     refreshAll(); alert("Backup imported.");
   }catch(err){ alert("Import failed: "+err.message); } };
   r.readAsText(f); e.target.value="";
@@ -1362,7 +1494,7 @@ function refreshAll(){
   payerOptions(document.getElementById("dPayer"));
   payerOptions(document.getElementById("aPayer"));
   payerOptions(document.getElementById("dFilterPayer"),true);
-  renderCodes(); renderMatrix(); renderComboTools(); renderDenials(); renderAuths();
+  renderCodes(); renderMatrix(); renderComboTools(); renderDenials(); renderAuths(); renderRecruits();
 }
 renderServices();
 refreshAll();
