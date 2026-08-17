@@ -302,7 +302,7 @@
     </div>
     <div class="toolbar" style="margin-top:12px">
       <input type="text" class="search" id="recSearch" placeholder="Search name, city, or zip…">
-      <select id="recDisc" style="max-width:150px"><option value="">ST + OT</option><option value="Speech">Speech</option><option value="Occupational">OT</option></select>
+      <select id="recDisc" style="max-width:190px"><option value="">Everyone</option><option value="ST">Speech therapists</option><option value="OT">OTs</option><option value="STA">Speech assistants</option><option value="OTA">OT assistants (COTA)</option></select>
       <select id="recCity" style="max-width:190px"><option value="">All cities</option></select>
       <select id="recSince" style="max-width:210px"><option value="">Registered any time</option><option value="1">Last 1 year (new grads)</option><option value="3">Last 3 years</option><option value="5">Last 5 years</option></select>
       <select id="recStatus" style="max-width:170px"><option value="">All statuses</option><option>New</option><option>Called</option><option>Voicemail</option><option>Interested</option><option>Not interested</option><option>Hired</option></select>
@@ -1374,13 +1374,28 @@ function recFiltered(){
   const st=document.getElementById("recStatus").value;
   const cutoff=since?new Date(Date.now()-parseFloat(since)*365.25*86400000):null;
   return recruits.filter(x=>{
-    if(disc && !x.tax.toLowerCase().includes(disc.toLowerCase())) return false;
+    if(disc && recDiscOf(x)!==disc) return false;
     if(city && x.city.toUpperCase()!==city) return false;
     if(st && x.status!==st) return false;
     if(cutoff){ const d=new Date(x.enum); if(isNaN(d)||d<cutoff) return false; }
     if(q && !((x.fn+" "+x.ln).toLowerCase().includes(q)||x.city.toLowerCase().includes(q)||x.zip.includes(q))) return false;
     return true;
   });
+}
+function recDiscOf(x){
+  const t=(x.tax||"").toLowerCase();
+  const isAsst=t.includes("assistant");
+  if(t.includes("speech")) return isAsst?"STA":"ST";
+  if(t.includes("occupational")) return isAsst?"OTA":"OT";
+  return "";
+}
+function recDiscBadge(x){
+  const d=recDiscOf(x);
+  return d==="ST" ?'<span class="badge b-st">ST</span>'
+       : d==="OT" ?'<span class="badge b-ot">OT</span>'
+       : d==="STA"?'<span class="badge b-st">ST-A</span>'
+       : d==="OTA"?'<span class="badge b-ot">OTA</span>'
+       : esc((x.tax||"").slice(0,12));
 }
 function renderRecruits(){
   // city dropdown (top cities by count, preserve selection)
@@ -1392,7 +1407,7 @@ function renderRecruits(){
   const CAP=400;
   document.querySelector("#recTable tbody").innerHTML = rows.slice(0,CAP).map(x=>`<tr>
     <td><b>${esc(x.ln)}, ${esc(x.fn)}</b>${x.cred?`<br><span class="note">${esc(x.cred)}</span>`:""}</td>
-    <td>${x.tax.toLowerCase().includes("speech")?'<span class="badge b-st">ST</span>':x.tax.toLowerCase().includes("occupational")?'<span class="badge b-ot">OT</span>':esc(x.tax.slice(0,12))}</td>
+    <td>${recDiscBadge(x)}</td>
     <td>${esc(x.city)}</td><td>${esc(x.zip)}</td>
     <td style="white-space:nowrap">${esc(x.phone)}</td>
     <td>${esc(String(x.enum).slice(0,10))}</td>
