@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>How to Build Your TN Therapist List</title>
+<style>
+  body{font-family:"Segoe UI",system-ui,sans-serif;background:#f5f8f9;color:#1f2933;margin:0;line-height:1.55}
+  header{background:linear-gradient(120deg,#0a5c5b,#0e7c7b 55%,#6b5b95);color:#fff;padding:22px 28px}
+  header h1{margin:0;font-size:22px}
+  main{max-width:760px;margin:0 auto;padding:24px 20px 60px;font-size:16px}
+  .step{background:#fff;border:1px solid #d9e2e8;border-radius:12px;padding:18px 22px;margin:14px 0;display:flex;gap:16px;align-items:flex-start}
+  .n{background:#0e7c7b;color:#fff;font-weight:700;font-size:18px;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .step b{color:#0a5c5b}
+  .file{background:#e6f4f4;border-radius:6px;padding:2px 8px;font-weight:600;color:#0a5c5b;white-space:nowrap}
+  .note{background:#fff8e1;border:1px solid #eeda9b;border-radius:10px;padding:12px 16px;font-size:14.5px;margin:14px 0}
+  .good{background:#e6f4ea;border:1px solid #bfe3c9;border-radius:10px;padding:12px 16px;font-size:14.5px;margin:14px 0}
+  h2{color:#6b5b95;font-size:18px;margin-top:28px}
+</style>
+</head>
+<body>
+<header><h1>Your Tennessee Therapist List — 3 Steps, No Tech Skills Needed</h1></header>
+<main>
+  <p>This builds two Excel files: <b>every speech therapist</b> and <b>every occupational therapist</b> in Tennessee — names, credentials, practice addresses, and <b>phone numbers</b> — from the government's public provider registry.</p>
+
+  <div class="step"><div class="n">1</div><div>
+    Put the two files <span class="file">RUN_ME_Therapist_List.bat</span> and <span class="file">tn_therapist_list.ps1</span> in the <b>same folder</b> (your Desktop is fine).
+  </div></div>
+
+  <div class="step"><div class="n">2</div><div>
+    <b>Double-click</b> <span class="file">RUN_ME_Therapist_List.bat</span>. A black window opens and starts counting through zip codes — that's it working. <b>Leave it alone for 5–10 minutes.</b>
+    <div class="note" style="margin-bottom:0">If Windows shows a blue "protected your PC" box: click <b>More info</b>, then <b>Run anyway</b>. (It's your own file — Windows just doesn't recognize it.)</div>
+  </div></div>
+
+  <div class="step"><div class="n">3</div><div>
+    When it says <b>Done</b>, look on your Desktop for:<br>
+    📄 <span class="file">TN_Speech_Therapists.csv</span><br>
+    📄 <span class="file">TN_Occupational_Therapists.csv</span><br>
+    Double-click either one — it opens in Excel, sorted by last name.
+  </div></div>
+
+  <h2>What to do with it (recruiting tips)</h2>
+  <div class="good">
+    <b>Filter to your cities first</b> — in Excel, use the City column filter to show just the towns around your two locations.<br><br>
+    <b>Sort by the "Enumerated" column, newest first</b> — recently-registered therapists are new grads and new arrivals to TN: the most recruitable people on the list.<br><br>
+    <b>Call, don't mass-email.</b> The registry has phones, not emails (no public source has therapist emails — that's by design). For email reach, TAASLP and TNOTA rent their member lists for job posts.
+  </div>
+
+  <h2>If something goes wrong</h2>
+  <p style="font-size:14.5px">The black window closing instantly, an error in red, or empty files — take a photo of the screen and send it to Claude. Nothing this runs can harm your computer; it only reads a public government website and writes two spreadsheets.</p>
+</main>
+</body>
+</html>
