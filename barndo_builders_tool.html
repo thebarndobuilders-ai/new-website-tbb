@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v237</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v238</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2266,14 +2266,14 @@
         <div class="qbs-field" id="gable-metal-field" style="display:none;">
           <label>Gable metal</label>
           <select id="gable_metal" onchange="recalc()">
-            <option value="follow">Follow the truss — metal covers the gable triangles</option>
+            <option value="follow">Follow the truss — 25% up each side, then straight across</option>
             <option value="straight">Straight across — same height as the walls, truss open</option>
             <option value="none">None — open gables</option>
           </select>
           <div class="qbs-note">Straight across works on steel or wood trusses</div>
         </div>
       </div>
-      <div class="qbs-note" style="margin-top:8px;">Wall framing is always figured — this controls the wall METAL only. Fine-tune any line on the 📐 Framing pages.</div>
+      <div class="qbs-note" style="margin-top:8px;">Open builds carry on posts alone — wall girts/studs are only figured where areas are enclosed. Fine-tune any line on the 📐 Framing pages.</div>
     </div>
     <div class="qbs-card">
       <h3>Build tier</h3>
@@ -8615,7 +8615,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v237';
+const BB_VERSION = 'v238';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -12156,11 +12156,15 @@ function getInputs() {
     let a = 2 * L * wallSkirtH;                          // eave-side skirts (hang from the top)
     if (gableMetalStyle === 'straight') a += 2 * W * H;  // gable ends straight across at wall height
     else if (gableMetalStyle === 'follow') {
-      // Band that follows the roofline on each gable end, covering the truss.
-      // Depth = wall metal height (or 3' when no side skirt is run).
+      // Band follows the truss 25% up each side then runs straight across under the peak.
       const bandD = wallSkirtH > 0 ? wallSkirtH : 3;
       const angF = Math.atan(pitch / 12);
-      a += 2 * (W / Math.cos(angF)) * bandD;             // both ends × both slopes
+      const riseF = (W / 2) * (pitch / 12);
+      const slopeLenF = (W / 2) / Math.cos(angF);
+      const zKF = 0.75 * (W / 2);
+      const sideBands = 2 * bandD * 0.25 * slopeLenF;                     // two truss-parallel legs
+      const centerArea = 2 * (zKF * (0.75 * riseF + bandD)) - (riseF / (W / 2)) * zKF * zKF;  // under the peak
+      a += 2 * (sideBands + centerArea);                                  // both gable ends
     } else a += 2 * W * wallSkirtH;                      // skirt wraps the gable ends
     wallArea = a;
   }
@@ -13240,6 +13244,17 @@ function bbSetQtyOverride(id, qty) {
 function bbClearQtyOverrides() {
   try { localStorage.removeItem(BB_QTY_OVERRIDE_KEY); } catch (e) {}
 }
+// Open (metal roof only) builds carry on posts alone — no wall girts, studs,
+// plates or sheathing. Framing is only figured where areas are enclosed.
+function bbApplyEnclosureGate(lines, i) {
+  if (!i || i.enclosureMode !== 'roof_only') return lines;
+  const keepRe = /\bposts?\b|sakrete|column|embed|jamb/i;
+  return lines.filter(ln => {
+    if (!['Wall framing', 'Post-frame wall', 'Wall sheathing'].includes(ln.cat)) return true;
+    return keepRe.test((ln.id || '') + ' ' + (ln.label || ''));
+  });
+}
+
 function bbApplyQtyOverrides(lines) {
   const o = bbGetQtyOverrides();
   lines.forEach(ln => {
@@ -13407,7 +13422,7 @@ function calcMaterials(i) {
     });
   });
   
-  return bbApplyQtyOverrides(lines);
+  return bbApplyQtyOverrides(bbApplyEnclosureGate(lines, i));
 }
 
 function calcSubs(i) {
@@ -18081,28 +18096,64 @@ function generateModel() {
       if (!openWalls.left) { const gL = makeGable('left', 'siding', 'Gable siding — left'); buildingGroup.add(gL); allMeshes.push(gL); }
       if (!openWalls.right) { const gR = makeGable('right', 'siding', 'Gable siding — right'); buildingGroup.add(gR); allMeshes.push(gR); }
     } else if (_encG.mode === 'partial' && _encG.gableStyle === 'follow') {
-      // Band following the roofline on each gable end — covers the truss, open below
-      // (the photo look: metal parallel to the roof slopes, daylight underneath).
+      // Band following the roofline on each gable end — covers the truss, open below.
+      // Built as a chevron quad per slope so the two sides meet clean at the peak,
+      // with panel ribs running PLUMB (wall panels cut on the angle, like the photos)
+      // and a trim edge along the bottom of the band.
       const bandD = _encG.skirtH > 0 ? _encG.skirtH : 3;
       const angB = Math.atan((dims.pitch || 6) / 12);
-      const slopeLenB = (W / 2) / Math.cos(angB);
-      const perpD = bandD * Math.cos(angB);
+      const peakYb = wallTop + rise;
+      const colsB = bb3dSelectedColors();
+      // Bottom edge follows the truss 25% of the way up each side, then runs straight across.
+      const slopeK = rise / (W / 2);
+      const zK = 0.75 * (W / 2);                    // kick point (25% of the run in from each eave)
+      const yKB = wallTop + 0.25 * rise - bandD;    // straight-across bottom elevation
+      const yTopAt = z => peakYb - Math.abs(z) * slopeK;
       ['left', 'right'].forEach(end => {
         if (openWalls[end]) return;
-        const xg = (end === 'left' ? -1 : 1) * (L / 2 + sheathThick);
-        [-1, 1].forEach(zs => {
-          const texB = makeTuffRibTexture(false, bb3dSelectedColors().siding);
-          texB.repeat.set(slopeLenB / 3, 1);
-          const band = new THREE.Mesh(new THREE.BoxGeometry(0.1, perpD, slopeLenB),
-            new THREE.MeshStandardMaterial({ color: 0xffffff, map: texB, roughness: 0.38, metalness: 0.45 }));
-          band.position.set(xg, (wallTop + rise + wallTop) / 2 - bandD / 2 + rise / 2 - rise / 2, 0);
-          band.position.y = wallTop + rise / 2 - bandD / 2 + 0.1;
-          band.position.z = zs * W / 4;
-          band.rotation.x = zs * angB;
-          band.castShadow = band.receiveShadow = true;
-          band.userData = { categoryKey: 'siding', label: 'Gable siding — roofline band (' + end + ')' };
-          buildingGroup.add(band); allMeshes.push(band);
+        const xs = end === 'left' ? -1 : 1;
+        const xg = xs * (L / 2 + sheathThick + 0.02);
+        const tris = [];
+        const uvs = [];
+        const quad = (a, b, c, d) => {   // a,b,c,d = [z,y] counter-order; two tris
+          [[a, b, c], [a, c, d]].forEach(t => t.forEach(p => {
+            tris.push(xg, p[1], p[0]);
+            uvs.push(p[0] / 3, p[1] / 3);   // u tracks z → ribs stay plumb
+          }));
+        };
+        [-1, 1].forEach(zs => {   // side pieces: eave → kick, parallel to the truss
+          quad([zs * W / 2, wallTop], [zs * zK, yTopAt(zK)], [zs * zK, yTopAt(zK) - bandD], [zs * W / 2, wallTop - bandD]);
         });
+        // center piece: kick to kick, straight across the bottom, roofline on top
+        quad([-zK, yTopAt(zK)], [0, peakYb], [zK, yTopAt(zK)], [zK, yKB]);
+        quad([-zK, yTopAt(zK)], [zK, yKB], [-zK, yKB], [-zK, yTopAt(zK)]);
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(tris), 3));
+        geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
+        geo.computeVertexNormals();
+        const texB = makeTuffRibTexture(false, colsB.siding);
+        const band = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+          color: 0xffffff, map: texB, roughness: 0.38, metalness: 0.45, side: THREE.DoubleSide,
+        }));
+        band.castShadow = band.receiveShadow = true;
+        band.userData = { categoryKey: 'siding', label: 'Gable siding — roofline band (' + end + ')' };
+        buildingGroup.add(band); allMeshes.push(band);
+        // Trim along the bottom edge: two truss-parallel legs + the straight-across run
+        const trimMatB = () => new THREE.MeshStandardMaterial({ color: colsB.trim, roughness: 0.4, metalness: 0.5 });
+        [-1, 1].forEach(zs => {
+          const legLen = (0.25 * (W / 2)) / Math.cos(angB);
+          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, legLen), trimMatB());
+          leg.position.set(xg, (wallTop - bandD + yTopAt(zK) - bandD) / 2, zs * (W / 2 + zK) / 2);
+          leg.rotation.x = zs * angB;
+          leg.castShadow = leg.receiveShadow = true;
+          leg.userData = { categoryKey: 'siding', label: 'Gable band trim (' + end + ')' };
+          buildingGroup.add(leg); allMeshes.push(leg);
+        });
+        const flat = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 2 * zK), trimMatB());
+        flat.position.set(xg, yKB, 0);
+        flat.castShadow = flat.receiveShadow = true;
+        flat.userData = { categoryKey: 'siding', label: 'Gable band trim (' + end + ')' };
+        buildingGroup.add(flat); allMeshes.push(flat);
       });
     }
   }
@@ -20523,15 +20574,22 @@ function applyVisibility() {
       const finishLbl = /roof metal|Porch roof|ridge cap|Valley metal|hip\/ridge cap|backdrop|T&G ceiling|Shed wall|OPEN bay|wainscot|corner roof|Extension roof|Extension wall|Extension gable/i.test(lbl);
       if (skinCats[k] || ud.shedSkin || finishLbl) {
         visible = false;   // all metal + finish strips off, porches included
+      } else if (bbEnclosure().mode === 'roof_only' && /girt|stud|plate|nailer|splash/i.test(lbl)) {
+        visible = false;   // open build: posts only — no wall framing to show
       } else {
         opacity = 1.0;    // framing, trusses, purlins, girts, slab all solid
       }
     } else {
       // Default (finish) mode
       if (ud.isFraming && !ud.alwaysVisible) {
-        // Open / partial enclosure exposes the skeleton — wall framing, trusses and
-        // purlins are visible through the open walls, so keep them rendered.
-        visible = bbEnclosure().mode !== 'full';
+        // Open / partial enclosure exposes the skeleton — trusses, purlins and posts
+        // show through the open walls. A fully OPEN build has no wall framing at all
+        // (posts only), so girts/studs/plates stay hidden there.
+        const encM = bbEnclosure().mode;
+        const lblF = String(ud.label || '');
+        if (encM === 'full') visible = false;
+        else if (encM === 'roof_only') visible = !/girt|stud|plate|nailer|splash/i.test(lblF);
+        else visible = true;
       }
       opacity = 1.0;
     }
