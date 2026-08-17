@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v240</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v241</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8615,7 +8615,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v240';
+const BB_VERSION = 'v241';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -13252,8 +13252,10 @@ function bbApplyEnclosureGate(lines, i) {
   const wallCats = ['Wall framing', 'Post-frame wall', 'Wall sheathing'];
   if (i.enclosureMode === 'roof_only') {
     return lines.filter(ln => {
+      const tag = (ln.id || '') + ' ' + (ln.label || '');
+      if (/gable post/i.test(tag)) return false;   // trusses span the gable — no mid posts
       if (!wallCats.includes(ln.cat)) return true;
-      return keepRe.test((ln.id || '') + ' ' + (ln.label || ''));
+      return keepRe.test(tag);
     });
   }
   // Partial: wall framing scales to the fraction of wall actually covered by metal.
@@ -19379,16 +19381,17 @@ function buildTrusses(dims, wallTop, rise) {
         const slopeLenC = Math.sqrt((W / 2) * (W / 2) + rise * rise);
         for (let d = 0; d <= slopeLenC + 0.01; d += 2) {
           const frac = Math.min(1, d / slopeLenC);
+          if (frac > 0.9) continue;   // stay clear of the ridge — metal plane converges there
           const zC2 = zs * (W / 2) * (1 - frac);
-          const clip = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 0.1), steelMat());
-          clip.position.set(x, yTop(zC2) + 0.09, zC2);
+          const clip = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.12, 0.1), steelMat());
+          clip.position.set(x, yTop(zC2) + 0.02, zC2);
           clip.castShadow = clip.receiveShadow = true;
           clip.userData = { categoryKey: 'trusses', label: d < 0.01 ? 'Steel truss soffit clip' : 'Steel truss purlin clip (2\' OC)', isFraming: true };
           buildingGroup.add(clip); allMeshes.push(clip);
         }
       });
       // peak tie between the two bottom chords
-      memberYZ(x, 0, peakY - heelDrop, 0, peakY, wx, wd, 'Steel truss peak tie', steelMat());
+      memberYZ(x, 0, peakY - heelDrop, 0, peakY - 0.18, wx, wd, 'Steel truss peak tie', steelMat());
     } else {
       // Top chords: heel (eave) up to peak, both slopes
       memberYZ(x, -W / 2, wallTop, 0, peakY, chordX, chordD, 'Truss top chord — back');
@@ -20577,6 +20580,16 @@ function applyVisibility() {
         opacity = 0.06;
       }
     } else if (showStructure) {
+      if (bbEnclosure().mode === 'roof_only' && /post/i.test(String(ud.label || '')) &&
+          !/porch|shed|extension|cypress|king/i.test(String(ud.label || ''))) {
+        const pG2 = new THREE.Vector3(); obj.getWorldPosition(pG2);
+        const dG2 = getBuildingDims();
+        if (Math.abs(pG2.x) > dG2.L / 2 - 1.5 && Math.abs(pG2.z) < dG2.W / 2 - 1.5) {
+          obj.visible = false;
+          obj.material.transparent = false; obj.material.opacity = 1;
+          return;
+        }
+      }
       // FRAME view — hide all exterior skin/finish, show the bare lumber skeleton + slab.
       const skinCats = {
         siding: 1, wall_sheathing: 1, roof_skin: 1, roof_sheathing: 1,
@@ -20607,6 +20620,17 @@ function applyVisibility() {
       }
     } else {
       // Default (finish) mode
+      if (bbEnclosure().mode === 'roof_only' && /post/i.test(String(ud.label || '')) &&
+          !/porch|shed|extension|cypress|king/i.test(String(ud.label || ''))) {
+        // Open barn: steel/wood trusses span the gable — no mid-section gable posts
+        const pG = new THREE.Vector3(); obj.getWorldPosition(pG);
+        const dG = getBuildingDims();
+        if (Math.abs(pG.x) > dG.L / 2 - 1.5 && Math.abs(pG.z) < dG.W / 2 - 1.5) {
+          obj.visible = false;
+          obj.material.transparent = false; obj.material.opacity = 1;
+          return;
+        }
+      }
       if (ud.isFraming && !ud.alwaysVisible) {
         // Open / partial enclosure exposes the skeleton — trusses, purlins and posts
         // show through the open walls. Wall framing (girts/studs/plates) only exists
@@ -20617,14 +20641,7 @@ function applyVisibility() {
         const isWallFrm = /girt|stud|plate|nailer|splash/i.test(lblF);
         if (encF.mode === 'full') visible = false;
         else if (!isWallFrm) visible = true;
-        else if (encF.mode === 'roof_only') visible = false;
-        else {
-          const pW = new THREE.Vector3(); obj.getWorldPosition(pW);
-          const dW = getBuildingDims();
-          const onGableWall = Math.abs(pW.x) > dW.L / 2 - 1.5;
-          if (onGableWall) visible = encF.gableStyle === 'straight';  // no wall framing on band/none gables
-          else visible = encF.skirtH > 0 && pW.y >= 0.5 + dW.H - encF.skirtH - 0.4;
-        }
+        else visible = false;   // outside finish view: framing is either covered by metal or doesn't exist
       }
       opacity = 1.0;
     }
