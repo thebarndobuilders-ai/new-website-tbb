@@ -1,13 +1,15 @@
 @echo off
-title Hopes and Dreams - TN Therapist List
+title Hopes and Dreams - TN Therapist List (v5 DEEP SCAN)
 echo.
-echo  Hopes and Dreams - TN Therapist List Builder  (v3 - specialty sweep)
-echo  ====================================================================
-echo  Runs 15-25 minutes. Leave this window alone until it says DONE.
+echo  Hopes and Dreams - TN Therapist List  (v5 DEEP SCAN by name)
+echo  =============================================================
+echo  This sweeps EVERY individual provider in Tennessee by name
+echo  (A to Z, 2005 to today) and keeps the SLPs, OTs, OTAs, and
+echo  SLP-Assistants by their official taxonomy codes.
+echo.
+echo  Takes 30-60 MINUTES. Start it and go do something else.
 echo  A report is saved to RUN_ME_log.txt on your Desktop either way.
 echo.
-rem Find the line number of the payload marker (last match wins), copy
-rem everything after it to a temp .ps1, and run that file directly.
 set "LN="
 for /f "delims=:" %%N in ('findstr /n /c:"### POWERSHELL PAYLOAD ###" "%~f0"') do set "LN=%%N"
 if not defined LN (
@@ -28,79 +30,97 @@ $desktop = [Environment]::GetFolderPath("Desktop")
 try { Start-Transcript -Path (Join-Path $desktop "RUN_ME_log.txt") -Force | Out-Null } catch {}
 
 try {
-    $api = "https://npiregistry.cms.hhs.gov/api/"
-    # The registry indexes specializations by their SHORT names ("Pediatrics"),
-    # so we sweep base professions AND every specialty name, then sort matches
-    # by official taxonomy code: 235Z=SLP, 225X=OT, 224Z=OTA, 2355S=SLP-Assistant.
-    $queries = @(
-        "Speech-Language Pathologist", "Occupational Therapist",
-        "Occupational Therapy Assistant", "Speech-Language Assistant",
-        "Pediatrics", "Hand", "Neurorehabilitation", "Physical Rehabilitation",
-        "Gerontology", "Mental Health", "Low Vision",
-        "Driving and Community Mobility", "Environmental Modification",
-        "Ergonomics", "Human Factors", "Feeding, Eating & Swallowing",
-        "Occupational Therapist, Pediatrics", "Occupational Therapist, Hand",
-        "Occupational Therapist, Gerontology", "Occupational Therapist, Neurorehabilitation",
-        "Occupational Therapist, Physical Rehabilitation", "Occupational Therapist, Mental Health",
-        "Occupational Therapist, Low Vision", "Occupational Therapist, Driving and Community Mobility",
-        "Occupational Therapist, Environmental Modification", "Occupational Therapist, Ergonomics",
-        "Occupational Therapist, Human Factors", "Occupational Therapist, Feeding, Eating & Swallowing",
-        "Occupational Therapy Assistant, Driving and Community Mobility",
-        "Occupational Therapy Assistant, Environmental Modification",
-        "Occupational Therapy Assistant, Feeding, Eating & Swallowing",
-        "Occupational Therapy Assistant, Low Vision"
-    )
-    $zipPrefixes = 370..385 | ForEach-Object { "$_*" }
-    $pool = @{}
+    $api  = "https://npiregistry.cms.hhs.gov/api/"
+    $seen = @{}   # every NPI already processed
+    $pool = @{}   # NPIs that match our professions
+    $letters = [char[]]([char]'A'..[char]'Z')
+    $extraChars = @("'", "-", " ")
 
-    foreach ($q in $queries) {
-        Write-Host ""
-        Write-Host "== Sweep: '$q' in TN ==" -ForegroundColor Cyan
-        $before = $pool.Count
-        foreach ($zip in $zipPrefixes) {
-            $skip = 0
-            while ($true) {
-                $qs = "version=2.1&enumeration_type=NPI-1&state=TN&postal_code=$([uri]::EscapeDataString($zip))&taxonomy_description=$([uri]::EscapeDataString($q))&limit=200&skip=$skip"
-                try   { $resp = Invoke-RestMethod -Uri ($api + "?" + $qs) -TimeoutSec 60 }
-                catch { Write-Warning "Retrying zip $zip : $_"; Start-Sleep 3
-                        $resp = Invoke-RestMethod -Uri ($api + "?" + $qs) -TimeoutSec 60 }
-                $count = 0
-                if ($resp.results) { $count = @($resp.results).Count }
-                if ($count -eq 0) { break }
-                foreach ($r in $resp.results) {
-                    if ($pool.ContainsKey($r.number)) { continue }
-                    $loc = $r.addresses  | Where-Object { $_.address_purpose -eq "LOCATION" } | Select-Object -First 1
-                    $tax = $r.taxonomies | Where-Object { $_.primary } | Select-Object -First 1
-                    if (-not $tax) { $tax = $r.taxonomies | Select-Object -First 1 }
-                    $codes = @()
-                    if ($tax) { $codes += [string]$tax.code }
-                    foreach ($t in @($r.taxonomies)) { if ([string]$t.code -notin $codes) { $codes += [string]$t.code } }
-                    $pool[$r.number] = [pscustomobject]@{
-                        NPI        = $r.number
-                        FirstName  = $r.basic.first_name
-                        LastName   = $r.basic.last_name
-                        Credential = $r.basic.credential
-                        Taxonomy   = $tax.desc
-                        TaxCodes   = ($codes -join "|")
-                        LicenseNum = $tax.license
-                        Address    = ("{0} {1}" -f $loc.address_1, $loc.address_2).Trim()
-                        City       = $loc.city
-                        State      = $loc.state
-                        Zip        = $loc.postal_code
-                        Phone      = $loc.telephone_number
-                        Enumerated = $r.basic.enumeration_date
-                    }
-                }
-                if ($skip -ge 1000 -and $count -eq 200) { Write-Warning "zip $zip for '$q' may have hit the result cap" }
-                if ($count -lt 200 -or $skip -ge 1000) { break }
-                $skip += 200
-                Start-Sleep -Milliseconds 400
-            }
+    function Test-Match([string]$codes) {
+        foreach ($c in ($codes -split "\|")) {
+            if ($c -like "235Z*" -or $c -like "225X*" -or $c -like "224Z*" -or $c -like "2355S*") { return $true }
         }
-        Write-Host ("  '{0}' added {1} new (pool now {2})" -f $q, ($pool.Count - $before), $pool.Count)
+        return $false
     }
 
-    # Sort every pooled provider into a profession by taxonomy code
+    # Fetch one name bucket; returns $true if it hit the 1,200-result cap
+    function Get-Bucket([string]$lnPrefix, [string]$fnPrefix) {
+        $skip = 0
+        $lastCount = 0
+        while ($true) {
+            $qs = "version=2.1&enumeration_type=NPI-1&state=TN&last_name=$([uri]::EscapeDataString($lnPrefix))*&limit=200&skip=$skip"
+            if ($fnPrefix) { $qs += "&first_name=$([uri]::EscapeDataString($fnPrefix))*" }
+            try   { $resp = Invoke-RestMethod -Uri ($api + "?" + $qs) -TimeoutSec 60 }
+            catch { Start-Sleep 3; $resp = Invoke-RestMethod -Uri ($api + "?" + $qs) -TimeoutSec 60 }
+            $count = 0
+            if ($resp.results) { $count = @($resp.results).Count }
+            $lastCount = $count
+            if ($count -eq 0) { break }
+            foreach ($r in $resp.results) {
+                if ($script:seen.ContainsKey($r.number)) { continue }
+                $script:seen[$r.number] = $true
+                $codes = @()
+                $tax = $r.taxonomies | Where-Object { $_.primary } | Select-Object -First 1
+                if (-not $tax) { $tax = $r.taxonomies | Select-Object -First 1 }
+                if ($tax) { $codes += [string]$tax.code }
+                foreach ($t in @($r.taxonomies)) { if ([string]$t.code -notin $codes) { $codes += [string]$t.code } }
+                $codeStr = $codes -join "|"
+                if (-not (Test-Match $codeStr)) { continue }
+                $loc = $r.addresses | Where-Object { $_.address_purpose -eq "LOCATION" } | Select-Object -First 1
+                $script:pool[$r.number] = [pscustomobject]@{
+                    NPI        = $r.number
+                    FirstName  = $r.basic.first_name
+                    LastName   = $r.basic.last_name
+                    Credential = $r.basic.credential
+                    Taxonomy   = $tax.desc
+                    TaxCodes   = $codeStr
+                    LicenseNum = $tax.license
+                    Address    = ("{0} {1}" -f $loc.address_1, $loc.address_2).Trim()
+                    City       = $loc.city
+                    State      = $loc.state
+                    Zip        = $loc.postal_code
+                    Phone      = $loc.telephone_number
+                    Enumerated = $r.basic.enumeration_date
+                }
+            }
+            if ($skip -ge 1000) { break }
+            if ($count -lt 200) { break }
+            $skip += 200
+            Start-Sleep -Milliseconds 250
+        }
+        return ($skip -ge 1000 -and $lastCount -eq 200)
+    }
+
+    # Work through name space: 2-letter prefixes, drilling deeper when a bucket caps
+    $stack = New-Object System.Collections.Stack
+    foreach ($a in $letters) {
+        foreach ($b in ($letters + $extraChars)) { $stack.Push(@{ ln = "$a$b"; fn = $null }) }
+    }
+    $done = 0
+    $total = $stack.Count
+    while ($stack.Count -gt 0) {
+        $item = $stack.Pop()
+        $capped = Get-Bucket $item.ln $item.fn
+        if ($capped) {
+            if (-not $item.fn) {
+                if ($item.ln.Length -lt 5) {
+                    foreach ($c in ($letters + $extraChars)) { $stack.Push(@{ ln = "$($item.ln)$c"; fn = $null }) }
+                } else {
+                    foreach ($c in $letters) { $stack.Push(@{ ln = $item.ln; fn = "$c" }) }
+                }
+            } elseif ($item.fn.Length -lt 3) {
+                foreach ($c in $letters) { $stack.Push(@{ ln = $item.ln; fn = "$($item.fn)$c" }) }
+            } else {
+                Write-Warning "Bucket $($item.ln)/$($item.fn) still capped - a handful of records there may be missed"
+            }
+        }
+        $done++
+        if ($item.ln.Length -eq 2 -and -not $item.fn) {
+            Write-Host ("  {0}* scanned - {1} therapists found so far ({2} providers checked)" -f $item.ln, $pool.Count, $seen.Count)
+        }
+    }
+
+    # Classify into the four professions
     $buckets = @{ SLP = @(); OT = @(); OTA = @(); SA = @() }
     foreach ($p in $pool.Values) {
         $class = $null
@@ -133,8 +153,8 @@ try {
     }
 
     Write-Host ""
-    Write-Host "DONE. Four spreadsheets are on your Desktop." -ForegroundColor Green
-    Write-Host "Upload all four to Claude WITHOUT opening them in Excel first."
+    Write-Host ("DONE. Checked {0} TN providers by name, kept {1} therapy professionals." -f $seen.Count, $pool.Count) -ForegroundColor Green
+    Write-Host "Four spreadsheets are on your Desktop. Upload all four to Claude WITHOUT opening them in Excel."
 }
 catch {
     Write-Host ""
