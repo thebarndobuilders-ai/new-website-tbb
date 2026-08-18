@@ -1411,7 +1411,7 @@ function recFiltered(){
     if(city && x.city.toUpperCase()!==city) return false;
     if(st && x.status!==st) return false;
     if(cutoff){ const d=new Date(x.enum); if(isNaN(d)||d<cutoff) return false; }
-    if(q && !((x.fn+" "+x.ln).toLowerCase().includes(q)||x.city.toLowerCase().includes(q)||x.zip.includes(q))) return false;
+    if(q && !((x.fn+" "+x.ln).toLowerCase().includes(q)||x.city.toLowerCase().includes(q)||x.zip.includes(q)||(x.cred||"").toLowerCase().includes(q))) return false;
     return true;
   });
 }
