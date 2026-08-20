@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v247</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v248</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -5654,6 +5654,18 @@ function postCutText(i) {
 // wall: roof height at its position + embed, ordered in 2' increments.
 // Returns lengths for ONE gable wall's interior posts (corners belong to the eave
 // walls) — multiply by 2 walls for totals.
+// 6×6 PT cost by STOCK LENGTH — longer sticks cost more per foot, so each length
+// prices from its own catalog entry (post_6x6_pt_16/18/20/22/24/28, Pricing-master editable).
+function bbPost6x6StockCost(lenFt) {
+  const L = Math.max(10, Math.ceil((lenFt || 0) / 2) * 2);
+  const tbl = {};
+  [16, 18, 20, 22, 24, 28].forEach(n => { tbl[n] = getPrice('post_6x6_pt_' + n).cost || 0; });
+  if (L <= 16) return L >= 16 ? tbl[16] : tbl[16] * L / 16;   // short cuts come off a 16'
+  if (tbl[L]) return tbl[L];
+  if (L === 26) return (tbl[24] + tbl[28]) / 2;
+  return tbl[28] * L / 28;                                     // beyond 28' — long-length rate
+}
+
 function gablePostLengths(i) {
   const spacing = i.gableBaySpacingFt || 10;
   const bays = i.gableBays || 0;
@@ -5970,6 +5982,21 @@ const MATERIALS = [
     priceCost: 35, priceSell: 46,
     formula: i => (i.floorSystem === 'none' || i.floorArea <= 0) ? 0 : Math.ceil(i.floorArea / 500) },
 
+  // 6×6 PT .60 stock-length price references (from supplier quotes Aug 2026 — 16'/18'/24'
+  // are quoted, the rest interpolated). qty always 0 — these exist so each stock length
+  // is editable on the Pricing master; the post lines below price from this table.
+  { id: "post_6x6_pt_16", label: "6×6×16 PT .60 stock post (price per stick)", cat: "Post-frame wall", uom: "ea", packSize: null,
+    priceCost: 56.70, priceSell: 71, priceRetail: 87, formula: () => 0 },
+  { id: "post_6x6_pt_18", label: "6×6×18 PT .60 stock post (price per stick)", cat: "Post-frame wall", uom: "ea", packSize: null,
+    priceCost: 59.85, priceSell: 75, priceRetail: 92, formula: () => 0 },
+  { id: "post_6x6_pt_20", label: "6×6×20 PT .60 stock post (price per stick)", cat: "Post-frame wall", uom: "ea", packSize: null,
+    priceCost: 72.00, priceSell: 91, priceRetail: 111, formula: () => 0 },
+  { id: "post_6x6_pt_22", label: "6×6×22 PT .60 stock post (price per stick)", cat: "Post-frame wall", uom: "ea", packSize: null,
+    priceCost: 82.50, priceSell: 104, priceRetail: 127, formula: () => 0 },
+  { id: "post_6x6_pt_24", label: "6×6×24 PT .60 stock post (price per stick)", cat: "Post-frame wall", uom: "ea", packSize: null,
+    priceCost: 93.22, priceSell: 117, priceRetail: 143, formula: () => 0 },
+  { id: "post_6x6_pt_28", label: "6×6×28 PT .60 stock post (price per stick)", cat: "Post-frame wall", uom: "ea", packSize: null,
+    priceCost: 110.60, priceSell: 139, priceRetail: 170, formula: () => 0 },
   { id: "post_4x6_pt", label: "4×6 PT post [cut to wall ht + 4'] (eave walls when 4×6 + man door jambs)", cat: "Post-frame wall", uom: "ea", packSize: null,
     priceCost: 25.79, priceSell: 33, priceRetail: 42,
     formula: i => {
@@ -5981,6 +6008,7 @@ const MATERIALS = [
     labelFn: i => `4×6 PT post [${postCutText(i)}] (eave walls when 4×6 + man door jambs)`},
   { id: "post_6x6_pt", label: "6×6 PT post [cut to wall ht + 4'] (eave walls when 6×6 + garage door jambs)", cat: "Post-frame wall", uom: "ea", packSize: null,
     priceCost: 59.85, priceSell: 75.33, priceRetail: 91.75,
+    customUnitPrice: i => bbPost6x6StockCost((i.postFoundation === 'on_slab') ? (i.H || 10) : (i.H || 10) + (i.postDepth || 4)),
     formula: i => {
       if (i.constructionType !== 'post') return 0;
       const wallPosts = (i.postSize === '6x6') ? (2 * ((i.eaveBays || 0) + 1)) : 0;   // eave walls only — gable posts have their own stepped line
@@ -6023,7 +6051,12 @@ const MATERIALS = [
     },
     customUnitPrice: i => {
       const lens = gablePostLengths(i);
-      const base = getPrice('post_' + (i.postSize || '6x6').replace('x', 'x') + '_pt').cost || 59.85;
+      if ((i.postSize || '6x6') === '6x6') {
+        // Priced per STOCK LENGTH — a 24' stick costs more per foot than an 18'
+        if (!lens.length) return bbPost6x6StockCost(18);
+        return lens.reduce((a, b) => a + bbPost6x6StockCost(b), 0) / lens.length;
+      }
+      const base = getPrice('post_' + (i.postSize || '6x6') + '_pt').cost || 59.85;
       const baseLen = (i.postFoundation === 'on_slab') ? (i.H || 10) : (i.H || 10) + (i.postDepth || 4);
       const perFt = baseLen > 0 ? base / baseLen : base / 18;
       if (!lens.length) return base;
@@ -8627,7 +8660,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v247';
+const BB_VERSION = 'v248';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
