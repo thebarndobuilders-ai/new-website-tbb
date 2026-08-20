@@ -2195,7 +2195,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v246</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v247</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -5707,10 +5707,11 @@ function postPlateCount(i, size) {
 // Cypress derived from the Cypress timber porch catalog (8×8 ≈ $19/LF, 4×6 ≈ $6.50/LF).
 // Adjust on Pricing master via the line's price override once real supplier numbers land.
 const SHED_LF_COST = {
-  lumber:  { '1x4': 0.30, '2x4': 0.55, '2x6': 1.25, '2x8': 1.65, '2x10': 2.45, '2x12': 3.30 },
-  pt:      { '2x6': 1.55, '2x8': 2.10, '2x10': 3.00, '2x12': 4.00,
-             '4x4': 1.05, '4x6': 2.60, '6x6': 3.90, '6x8': 5.60, '8x8': 8.60 },
-  cypress: { '4x4': 3.30, '4x6': 6.50, '6x6': 9.80, '6x8': 13.00, '8x8': 19.00, '8x10': 23.50, '10x10': 29.00 },
+  // Per-LF costs pulled from supplier quotes QO-0028265 / QO-0016469 / QO-0028263 (Aug 2026)
+  lumber:  { '1x4': 0.30, '2x4': 0.53, '2x6': 0.63, '2x8': 0.92, '2x10': 1.25, '2x12': 1.53 },
+  pt:      { '2x4': 0.53, '2x6': 0.82, '2x8': 2.10, '2x10': 3.00, '2x12': 4.00,
+             '4x4': 1.05, '4x6': 2.15, '6x6': 3.55, '6x8': 5.60, '8x8': 8.60 },
+  cypress: { '4x4': 3.30, '4x6': 6.50, '6x6': 9.80, '6x8': 13.00, '8x8': 18.75, '8x10': 23.50, '10x10': 29.00 },
   // Yellow pine (YP) rough timbers — placeholders until real supplier numbers land
   yp:      { '4x6': 3.20, '6x6': 4.50, '6x8': 6.50, '8x8': 9.50, '8x10': 12.00, '10x10': 15.00 },
 };
@@ -5824,19 +5825,19 @@ const MATERIALS = [
   // ---------------- WALL FRAMING (STICK FRAME ONLY) ----------------
   // All stick-frame items are skipped when constructionType === 'post'
   { id: "pt_2x6_plate_lf", label: "PT 2×6×16 bottom plate (exterior · 16' sticks)", cat: "Wall framing", uom: "LF", packSize: null,
-    priceCost: 1.85, priceSell: 2.25, priceRetail: 2.75,
+    priceCost: 0.86, priceSell: 1.05, priceRetail: 1.28,
     formula: i => i.constructionType === 'post' ? 0 : Math.ceil(i.extWallLF * 1.05) },
   { id: "pt_2x4_plate_lf", label: "PT 2×4×16 bottom plate (interior · 16' sticks)", cat: "Wall framing", uom: "LF", packSize: null,
     priceCost: 1.25, priceSell: 1.55, priceRetail: 2,
     formula: i => Math.ceil(i.intWallLF * 1.05) },  // Interior walls still stick-frame even on post-frame builds
   { id: "2x6_top_plate_lf", label: "2×6×16 double top plate (exterior · 16' sticks)", cat: "Wall framing", uom: "LF", packSize: null,
-    priceCost: 1.45, priceSell: 1.85, priceRetail: 2.4,
+    priceCost: 0.63, priceSell: 0.8, priceRetail: 1.04,
     formula: i => i.constructionType === 'post' ? 0 : Math.ceil(i.extWallLF * 2 * 1.05) },
   { id: "2x4_top_plate_lf", label: "2×4×16 double top plate (interior · 16' sticks)", cat: "Wall framing", uom: "LF", packSize: null,
     priceCost: 0.95, priceSell: 1.25, priceRetail: 1.5,
     formula: i => Math.ceil(i.intWallLF * 2 * 1.05) },
   { id: "stud_2x6_104pc", label: "2×6 pre-cut studs (auto-sized to wall height)", cat: "Wall framing", uom: "ea", packSize: null,
-    priceCost: 9.42, priceSell: 9.50, priceRetail: 14,
+    priceCost: 8, priceSell: 8.07, priceRetail: 11.89,
     labelFn: i => `2×6×${wallStudStock(i.H)}' pre-cut studs (exterior walls · sized to wall height)`,
     formula: i => {
       if (i.constructionType === 'post') return 0;
@@ -5846,7 +5847,7 @@ const MATERIALS = [
       return Math.ceil((fieldStuds + cornerExtras) * 1.10);   // shop standard: ×1.1 waste on stud counts
     }},
   { id: "stud_2x4_104pc", label: "2×4 pre-cut studs (auto-sized to wall height)", cat: "Wall framing", uom: "ea", packSize: null,
-    priceCost: 5.75, priceSell: 6.25, priceRetail: 8,
+    priceCost: 6, priceSell: 6.52, priceRetail: 8.35,
     labelFn: i => `2×4×${wallStudStock(i.H)}' pre-cut studs (interior walls)`,
     formula: i => {
       const fieldStuds = Math.ceil(i.intWallLF / (16/12));
@@ -5854,7 +5855,7 @@ const MATERIALS = [
       return Math.ceil((fieldStuds + teeBlocking) * 1.10);   // ×1.1 stud waste
     }},
   { id: "king_jack_2x6", label: "2×6 king & jack studs (exterior openings)", cat: "Wall framing", uom: "ea", packSize: null,
-    priceCost: 9.42, priceSell: 9.50, priceRetail: 14,
+    priceCost: 8, priceSell: 8.07, priceRetail: 11.89,
     // Stick frame only — post frame openings get jamb posts + 2×6 frame lumber instead.
     // 2 kings + 2 jacks per window and man door; garage doors get doubled jacks
     // under the wide header: 2 kings + 4 jacks.
@@ -5866,7 +5867,7 @@ const MATERIALS = [
     },
     labelFn: i => `2×6×${wallStudStock(i.H)}' king & jack studs (2K+2J per window/door · 2K+4J per garage door)`},
   { id: "king_jack_2x4", label: "2×4 king & jack studs (interior door openings)", cat: "Wall framing", uom: "ea", packSize: null,
-    priceCost: 5.75, priceSell: 6.25, priceRetail: 8,
+    priceCost: 6, priceSell: 6.52, priceRetail: 8.35,
     labelFn: i => `2×4×${wallStudStock(i.H)}' king & jack studs (interior doors)`,
     // Interior walls stay stick-framed even on post-frame builds: 2 kings + 2 jacks per door.
     formula: i => Math.ceil((i.intDoors || 0) * 4 * 1.10) },   // ×1.1 stud waste
@@ -5874,7 +5875,7 @@ const MATERIALS = [
     priceCost: 7.06, priceSell: 9.50, priceRetail: 12,
     // Plain count + one buy length (no cut-to-slope callout): 16" OC across each gable,
     // sticks bought at the stock length that covers the peak rise. Priced by that length.
-    customUnitPrice: i => 0.706 * gableStudSpec(i).stock,
+    customUnitPrice: i => 0.63 * gableStudSpec(i).stock,
     formula: i => {
       if (i.constructionType === 'post') return 0;   // post frame gets gable posts + lathing instead
       if ((i.pitch || 0) <= 0) return 0;
@@ -5955,7 +5956,7 @@ const MATERIALS = [
       return `${kind} — ${rimLF} LF (16' pcs)`;
     }},
   { id: "subfloor_sheets", label: "Subfloor sheathing 4×8 T&G", cat: "Floor system", uom: "sheets", packSize: null,
-    priceCost: 42, priceSell: 55,
+    priceCost: 20.42, priceSell: 26.74,
     formula: i => (i.floorSystem === 'none' || i.floorArea <= 0) ? 0 : Math.ceil(i.floorArea / 32 * 1.07),
     labelFn: i => (i.subfloorProduct === 'advantech' ? '3/4\" AdvanTech T&G 4×8' : '3/4\" T&G OSB 4×8') + ' (+7% waste)',
     customUnitPrice: i => {
@@ -5979,7 +5980,7 @@ const MATERIALS = [
     },
     labelFn: i => `4×6 PT post [${postCutText(i)}] (eave walls when 4×6 + man door jambs)`},
   { id: "post_6x6_pt", label: "6×6 PT post [cut to wall ht + 4'] (eave walls when 6×6 + garage door jambs)", cat: "Post-frame wall", uom: "ea", packSize: null,
-    priceCost: 61.97, priceSell: 78, priceRetail: 95,
+    priceCost: 59.85, priceSell: 75.33, priceRetail: 91.75,
     formula: i => {
       if (i.constructionType !== 'post') return 0;
       const wallPosts = (i.postSize === '6x6') ? (2 * ((i.eaveBays || 0) + 1)) : 0;   // eave walls only — gable posts have their own stepped line
@@ -6022,7 +6023,7 @@ const MATERIALS = [
     },
     customUnitPrice: i => {
       const lens = gablePostLengths(i);
-      const base = getPrice('post_' + (i.postSize || '6x6').replace('x', 'x') + '_pt').cost || 61.97;
+      const base = getPrice('post_' + (i.postSize || '6x6').replace('x', 'x') + '_pt').cost || 59.85;
       const baseLen = (i.postFoundation === 'on_slab') ? (i.H || 10) : (i.H || 10) + (i.postDepth || 4);
       const perFt = baseLen > 0 ? base / baseLen : base / 18;
       if (!lens.length) return base;
@@ -6067,8 +6068,8 @@ const MATERIALS = [
     priceCost: 7.06, priceSell: 9.50, priceRetail: 12,
     labelFn: i => `Wall lathing — eave walls, SYP ${i.lathSize === '1x4' ? '1×4' : '2×6'} [cut to truss spacing] (pieces)`,
     // Eave girts span post-to-post = truss/eave-post spacing; priced by that length.
-    // 2×6 SYP ≈ $0.706/LF · 1×4 SYP lath/strapping ≈ $0.30/LF.
-    customUnitPrice: i => (i.lathSize === '1x4' ? 0.30 : 0.706) * i.eaveBaySpacingFt,
+    // 2×6 SYP ≈ $0.63/LF · 1×4 SYP lath/strapping ≈ $0.30/LF.
+    customUnitPrice: i => (i.lathSize === '1x4' ? 0.30 : 0.63) * i.eaveBaySpacingFt,
     formula: i => {
       if (i.constructionType !== 'post' || i.wallSystem !== 'purlin') return 0;
       const rows = Math.max(0, Math.ceil(i.H / i.girtSpacing) - 1);   // upper rows (PT band is the bottom row)
@@ -6080,7 +6081,7 @@ const MATERIALS = [
     // Gable girts span the 10' OC gable posts. Includes the TRIANGLE rows above eave
     // height — rows keep climbing at girt spacing, each row shorter as the roof closes in,
     // so the gable metal always has lathing to fasten to.
-    customUnitPrice: i => (i.lathSize === '1x4' ? 0.30 : 0.706) * i.gableBaySpacingFt,
+    customUnitPrice: i => (i.lathSize === '1x4' ? 0.30 : 0.63) * i.gableBaySpacingFt,
     formula: i => {
       if (i.constructionType !== 'post' || i.wallSystem !== 'purlin') return 0;
       const rows = Math.max(0, Math.ceil(i.H / i.girtSpacing) - 1);
@@ -6099,8 +6100,8 @@ const MATERIALS = [
     }},
   { id: "roof_purlin_2x4_lf", label: "2×6 roof purlin [cut to truss spacing] — pieces", cat: "Post-frame wall", uom: "pieces", packSize: null,
     priceCost: 7.06, priceSell: 9.50, priceRetail: 12,
-    // Priced by length: 2×6 SYP at ~$0.706/ft × the truss-bay length (10' → $7.06, 12' → $8.47).
-    customUnitPrice: i => 0.706 * i.eaveBaySpacingFt,
+    // Priced by length: 2×6 SYP at ~$0.63/ft × the truss-bay length (10' → $6.30, 12' → $7.56).
+    customUnitPrice: i => 0.63 * i.eaveBaySpacingFt,
     formula: i => {
       // Post-frame only, and only when "2×6 roof lathing" is the selected roof system.
       // (Gating on roof system keeps this mutually exclusive with the 2×4 purlin line —
@@ -6163,10 +6164,10 @@ const MATERIALS = [
     priceCost: 7.77, priceSell: 10.50, priceRetail: 14,
     formula: i => i.shedActive ? Math.ceil(i.shed.ptBandLF * 1.05 / 10) : 0 },
   { id: "shed_girt_2x6", label: "Side shed: 2×6×20 SYP wall girt", cat: "Side shed", uom: "ea (20')", packSize: null,
-    priceCost: 14.72, priceSell: 19, priceRetail: 24,
+    priceCost: 12.56, priceSell: 16.21, priceRetail: 20.48,
     formula: i => i.shedActive ? Math.ceil(i.shed.girtLF_SYP * 1.05 / 20) : 0 },
   { id: "shed_purlin_2x4", label: "Side shed: 2×4×20 SYP roof purlin", cat: "Side shed", uom: "ea (20')", packSize: null,
-    priceCost: 8.51, priceSell: 11, priceRetail: 14,
+    priceCost: 10.53, priceSell: 13.61, priceRetail: 17.32,
     formula: i => i.shedActive ? Math.ceil(i.shed.lathLF * 1.05 / 20) : 0 },
   // Rafters — stick: builder-selected lumber size · cypress: timber size (both cut to top chord)
   { id: "shed_rafter_2x8", label: "Side shed: stick rafter (SYP)", cat: "Side shed", uom: "LF", packSize: null,
@@ -6294,14 +6295,14 @@ const MATERIALS = [
     }},
   // Steel mono-slope trusses — only when steel framing
   { id: "shed_steel_truss", label: "Side shed: steel mono-slope truss", cat: "Side shed", uom: "ea", packSize: null,
-    priceCost: 145, priceSell: 195, priceRetail: 250,
+    priceCost: 183.53, priceSell: 246.82, priceRetail: 316.43,
     formula: i => (i.shedActive && i.shed.framing === 'steel') ? i.shed.steelTrussCount : 0 },
   // Roof panels (mono-slope, TR 29ga)
   { id: "shed_roof_panel_tr", label: "Side shed: TR 29ga roof panel (cut to top chord)", cat: "Side shed", uom: "LF", packSize: null,
-    priceCost: 2.58, priceSell: 3.40, priceRetail: 4.25,
+    priceCost: 2.8, priceSell: 3.69, priceRetail: 4.61,
     formula: i => i.shedActive ? Math.ceil(i.shed.panelLF * 1.05) : 0 },
   { id: "shed_wall_panel_tr", label: "Side shed: TR 29ga wall panel (outboard + ends)", cat: "Side shed", uom: "LF", packSize: null,
-    priceCost: 2.58, priceSell: 3.40, priceRetail: 4.25,
+    priceCost: 2.8, priceSell: 3.69, priceRetail: 4.61,
     // Outboard wall (sL × sH) + 2 trapezoid end walls (avg of low/high) ÷ 3' coverage.
     // Shed wainscot takes the bottom 3' of the run; windows deduct their area.
     formula: i => {
@@ -6335,18 +6336,18 @@ const MATERIALS = [
     priceCost: 6.98, priceSell: 9.00, priceRetail: 11.00,
     formula: i => i.extActive ? (i.ext.sakreteBags || 0) : 0 },
   { id: "ext_truss", label: "Extension: roof truss (gable, spans extension width)", cat: "Building extension", uom: "ea", packSize: null,
-    priceCost: 11.00, priceSell: 14.00, priceRetail: 17.50,
+    priceCost: 3.6, priceSell: 4.58, priceRetail: 5.73,
     labelFn: i => {
       const x = i.ext || {};
       return `Extension: gable truss ${x.W || 0}' span @ ${x.trussSpacing || 4}' OC`;
     },
-    customUnitPrice: i => ((i.ext || {}).W || 0) * 11,
+    customUnitPrice: i => ((i.ext || {}).W || 0) * 3.60,
     formula: i => i.extActive ? i.ext.trussCount : 0 },
   { id: "ext_purlin_2x4", label: "Extension: 2×4×20 SYP roof purlin", cat: "Building extension", uom: "ea (20')", packSize: null,
-    priceCost: 8.51, priceSell: 11, priceRetail: 14,
+    priceCost: 10.53, priceSell: 13.61, priceRetail: 17.32,
     formula: i => i.extActive ? Math.ceil(i.ext.lathLF * 1.05 / 20) : 0 },
   { id: "ext_girt_2x6", label: "Extension: 2×6×20 SYP wall girt", cat: "Building extension", uom: "ea (20')", packSize: null,
-    priceCost: 14.72, priceSell: 19, priceRetail: 24,
+    priceCost: 12.56, priceSell: 16.21, priceRetail: 20.48,
     formula: i => i.extActive ? Math.ceil(i.ext.girtLF * 1.05 / 20) : 0 },
   { id: "ext_pt_band", label: "Extension: 2×6 PT splash band", cat: "Building extension", uom: "LF", packSize: null,
     priceCost: 1.25, priceSell: 1.60, priceRetail: 2.00,
@@ -6357,14 +6358,14 @@ const MATERIALS = [
     customUnitPrice: i => shedMemberCostLF('lumber', '2x6'),
     formula: i => i.extActive ? Math.ceil(i.ext.studLF * 1.05) : 0 },
   { id: "ext_roof_panel_tr", label: "Extension: TR 29ga roof panel (cut to top chord)", cat: "Building extension", uom: "LF", packSize: null,
-    priceCost: 2.58, priceSell: 3.40, priceRetail: 4.25,
+    priceCost: 2.8, priceSell: 3.69, priceRetail: 4.61,
     labelFn: i => {
       const x = i.ext || {};
       return `Extension: TR 29ga roof panel${x.roofColor ? ' — ' + x.roofColor : ''} (cut to top chord)`;
     },
     formula: i => i.extActive ? Math.ceil(i.ext.panelLF * 1.05) : 0 },
   { id: "ext_wall_panel_tr", label: "Extension: TR 29ga wall panel (eaves + far gable)", cat: "Building extension", uom: "LF", packSize: null,
-    priceCost: 2.58, priceSell: 3.40, priceRetail: 4.25,
+    priceCost: 2.8, priceSell: 3.69, priceRetail: 4.61,
     labelFn: i => {
       const x = i.ext || {};
       return `Extension: TR 29ga wall panel${x.sidingColor ? ' — ' + x.sidingColor : ''} (eaves + far gable)`;
@@ -6469,7 +6470,7 @@ const MATERIALS = [
       return Math.ceil(lf / 3 * 1.05);
     }},
   { id: "emseal_roll_20", label: "EM-Seal expanding sealant 20' roll (B&B seams)", cat: "Metal wall trim", uom: "roll", packSize: null,
-    priceCost: 16.90, priceSell: 22, priceRetail: 27,
+    priceCost: 24.5, priceSell: 31.89, priceRetail: 39.14,
     formula: i => {
       if (i.sidingProduct !== 'mbb_26') return 0;
       return Math.ceil(i.extWallLF * 1.05 / 50);
@@ -6477,7 +6478,7 @@ const MATERIALS = [
 
   // ---------------- SHEATHING (stick-frame only) ----------------
   { id: "zip_716_sheet", label: "7/16\" Zip sheathing (4×8)", cat: "Wall sheathing", uom: "sheet", packSize: null,
-    priceCost: 25.2, priceSell: 47, priceRetail: 65,
+    priceCost: 25, priceSell: 46.63, priceRetail: 64.48,
     formula: i => i.wallSystem === 'sheathed' ? Math.ceil(i.wallArea / 32 * 1.10) : 0 },
   { id: "zip_tape_roll", label: "Zip tape 3.75\" × 90' roll", cat: "Wall sheathing", uom: "roll", packSize: null,
     priceCost: 32, priceSell: 42, priceRetail: 52,
@@ -6557,7 +6558,7 @@ const MATERIALS = [
     priceCost: 3.25, priceSell: 4.10, priceRetail: 4.4,
     formula: i => Math.ceil(i.roofArea * (i.pctStick / 100) * 0.55) },
   { id: "zip_12_roof_sheet", label: "1/2\" Zip roof sheathing (4×8)", cat: "Roof structure", uom: "sheet", packSize: null,
-    priceCost: 42, priceSell: 52, priceRetail: 75,
+    priceCost: 25, priceSell: 30.95, priceRetail: 44.64,
     formula: i => i.roofSystem === 'sheathed' ? Math.ceil(i.roofArea / 32 * 1.10) : 0 },
   { id: "purlin_2x4_lf", label: '2×4×16 purlin/lath (24" OC · 16 ft sticks)', cat: "Roof structure", uom: "LF", packSize: null,
     priceCost: 1.45, priceSell: 1.85, priceRetail: 1.5,
@@ -6571,7 +6572,7 @@ const MATERIALS = [
 
   // ---------------- ROOF SKIN (dynamic — only one will calculate based on product) ----------------
   { id: "tuffrib_29_roof_lf", label: "Tuff Rib 29 ga roof panel (cut to order)", cat: "Roof skin", uom: "LF", packSize: null,
-    priceCost: 2.58, priceSell: 3.65, productGate: "tuffrib_29_roof",
+    priceCost: 2.8, priceSell: 3.96, productGate: "tuffrib_29_roof",
     formula: i => i.roofProduct === 'tuffrib_29' ? Math.ceil(i.metalRoofTotalLF) : 0 },
   { id: "pbr_26_roof_lf", label: "PBR 26 ga roof panel (cut to order)", cat: "Roof skin", uom: "LF", packSize: null,
     priceCost: 3.85, priceSell: 4.95, productGate: "pbr_26_roof",
@@ -6588,7 +6589,7 @@ const MATERIALS = [
     priceCost: 95, priceSell: 125, priceRetail: 165, productGate: "shingles",
     formula: i => (i.roofProduct === 'shingles' && i.roofSystem === 'sheathed') ? Math.ceil(i.roofArea / 100 * 1.10) : 0 },
   { id: "metal_screws_bag250", label: "Metal panel screws (250-ct bag)", cat: "Roof skin", uom: "bag", packSize: null,
-    priceCost: 22, priceSell: 28,
+    priceCost: 25, priceSell: 31.82,
     formula: i => {
       const isMetal = ['tuffrib_29', 'pbr_26'].includes(i.roofProduct) || ['tuffrib_29', 'mbb_26'].includes(i.sidingProduct);
       if (!isMetal) return 0;
@@ -6659,7 +6660,7 @@ const MATERIALS = [
   // Long sides: eave walls only — gable-end walls are carried entirely by the
   // stepped gable-end panel line below (floor-to-peak pieces, wall + rise).
   { id: "tuffrib_29_wall_lf", label: "Tuff Rib 29 ga wall panel — eave walls", cat: "Siding skin", uom: "LF", packSize: null,
-    priceCost: 2.58, priceSell: 3.65,
+    priceCost: 2.8, priceSell: 3.96,
     formula: i => {
       if (i.sidingProduct !== 'tuffrib_29') return 0;
       // Eave-wall area = measured exterior wall LF minus the gable-end walls (those are
@@ -6678,7 +6679,7 @@ const MATERIALS = [
       return Math.ceil(Math.max(0, rectArea) / 3 * 1.05);
     }},
   { id: "tuffrib_29_gable_lf", label: "Tuff Rib 29 ga wall panel — gable ends, floor-to-peak (3' panels stepped to pitch)", cat: "Siding skin", uom: "LF", packSize: null,
-    priceCost: 2.58, priceSell: 3.65,
+    priceCost: 2.8, priceSell: 3.96,
     formula: i => {
       if (i.sidingProduct !== 'tuffrib_29') return 0;
       // Full-height gable-end panels: wall height + stepped rise + 6" allowance per panel,
@@ -6690,7 +6691,7 @@ const MATERIALS = [
     }},
   // Wainscot — 36" band around the walls in its own color, Z bar trim on top.
   { id: "wainscot_panel_lf", label: "Wainscot 36\" — metal panels", cat: "Siding skin", uom: "LF", packSize: null,
-    priceCost: 2.58, priceSell: 3.65,
+    priceCost: 2.8, priceSell: 3.96,
     formula: i => {
       if (i.sidingProduct !== 'tuffrib_29' && i.sidingProduct !== 'mbb_26') return 0;
       let run = i.wainscotOn ? i.wainscotRunLF : 0;
@@ -6895,13 +6896,13 @@ const MATERIALS = [
     }},
   // Fascia backer 1×6 — for metal siding builds
   { id: "fascia_2x6x12", label: "2×6×12 sub-fascia board (nailed to truss tails · eave + rake length)", cat: "Soffit & fascia", uom: "ea (12')", packSize: null,
-    priceCost: 8.47, priceSell: 11, priceRetail: 14,
+    priceCost: 7.56, priceSell: 9.82, priceRetail: 12.5,
     // Fascia framing on the truss tails — always 2×6, ordered in 12' boards. Quantity from the
     // eave + rake run (fasciaLF = both eaves + all rakes) with 5% waste, divided into 12' boards.
     formula: i => Math.ceil((i.fasciaLF || 0) * 1.05 / 12) },
   // Metal fascia trim — for metal siding builds (10' sticks)
   { id: "metal_fascia_trim_10", label: "Metal fascia trim (10' sticks)", cat: "Soffit & fascia", uom: "ea", packSize: null,
-    priceCost: 18, priceSell: 24,
+    priceCost: 15.96, priceSell: 21.28,
     formula: i => (i.sidingProduct === 'tuffrib_29' || i.sidingProduct === 'mbb_26') ? Math.ceil(i.fasciaLF / 10 * 1.05) : 0 },
   // 1×8 LP fascia — for LP siding
   { id: "lp_fascia_1x8_lf", label: "1×8×16 LP SmartSide fascia (16' sticks)", cat: "Soffit & fascia", uom: "LF", packSize: null,
@@ -6913,7 +6914,7 @@ const MATERIALS = [
     formula: i => (i.sidingProduct === 'tuffrib_29' || i.sidingProduct === 'mbb_26') ? Math.ceil(i.fjLF * 1.05 / 10) : 0 },
   // Large outside corner — WALL portion (1 L-shaped stick per corner, length = nearest stock ≥ wall ht + 1')
   { id: "large_corner_wall_10", label: "Large outside corner — wall (per corner · wall ht + 1', nearest stock)", cat: "Metal wall trim", uom: "ea", packSize: null,
-    priceCost: 17.53, priceSell: 23, priceRetail: 30,
+    priceCost: 16, priceSell: 20.99, priceRetail: 27.38,
     // One stick per corner, ordered at the shortest stock (10/12/14/16) that covers wall height + 1'.
     // Priced per foot (17.53 ÷ 10' base) × the chosen stock length.
     formula: i => {
@@ -6938,7 +6939,7 @@ const MATERIALS = [
   // Large outside corner — GABLE RAKE portion. Follows the true rake (sloped) line,
   // split into the fewest equal pieces, each + 1' waste, ordered at the nearest stock length.
   { id: "large_corner_gable_custom", label: "Large outside corner — gable rake (fewest pieces · +1'/piece, nearest stock)", cat: "Metal wall trim", uom: "ea", packSize: null,
-    priceCost: 22, priceSell: 30,
+    priceCost: 17.6, priceSell: 24,
     formula: i => {
       if (i.sidingProduct !== 'tuffrib_29' && i.sidingProduct !== 'mbb_26') return 0;
       // Full rake (eave corner to ridge), truss-table aware; fewest equal pieces.
@@ -7097,7 +7098,7 @@ const MATERIALS = [
   
   // 8×8 cypress decorative posts (height-conditional pricing)
   { id: "cypress_post_8x8x10", label: "8×8×10 cypress post (decorative timber porch)", cat: "Cypress timber porch", uom: "ea", packSize: null,
-    priceCost: 188.50, priceSell: 240, priceRetail: 295,
+    priceCost: 187.5, priceSell: 238.73, priceRetail: 293.44,
     formula: i => (i.cypressPorchActive && i.cypressPostHeight === '10' && (i.porchDims || {}).timberPostSize === '8x8' && (i.porchDims || {}).timberPostType === 'cypress') ? i.cypressPostCount : 0 },
   { id: "cypress_post_8x8x12", label: "8×8×12 cypress post (decorative timber porch)", cat: "Cypress timber porch", uom: "ea", packSize: null,
     priceCost: 228.80, priceSell: 290, priceRetail: 360,
@@ -7157,7 +7158,7 @@ const MATERIALS = [
 
   // Valley metal — where the crows-foot gable ties into the porch roof (2 valleys)
   { id: "porch_valley_metal", label: "Porch valley metal — gable ties into porch roof (10' sticks)", cat: "Cypress timber porch", uom: "ea (10')", packSize: null,
-    priceCost: 18.86, priceSell: 24, priceRetail: 30,
+    priceCost: 21.98, priceSell: 27.97, priceRetail: 34.96,
     formula: i => {
       if (!i.cypressPorchActive || i.cypressStyle !== 'gable') return 0;
       const front = ((i.porchAgg && i.porchAgg.sides) || []).find(s2 => s2.side === 'front');
@@ -7187,7 +7188,7 @@ const MATERIALS = [
   
   // 8×8 Decorative post base — one per cypress post
   { id: "cypress_post_base_8x8", label: "8×8 Decorative post base — OWT-LITE-LS (54209)", cat: "Cypress timber porch", uom: "ea", packSize: null,
-    priceCost: 68.42, priceSell: 87, priceRetail: 108,
+    priceCost: 61, priceSell: 77.57, priceRetail: 96.29,
     formula: i => (i.cypressPorchActive && i.cypressPostBases === 'yes') ? i.cypressPostCount : 0 },
   
   // Structural post plate — mounts to concrete underneath each post. ONE per post.
@@ -8626,7 +8627,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v246';
+const BB_VERSION = 'v247';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
