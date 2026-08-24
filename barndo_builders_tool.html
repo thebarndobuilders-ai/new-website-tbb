@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v252</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v253</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8763,7 +8763,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v252';
+const BB_VERSION = 'v253';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -9514,8 +9514,18 @@ function barndoSaveModel() {
   finish(hero);
 }
 
+const BB_BUILTIN_OVR_KEY = 'bb_builtin_overrides_v1';
+function bbBuiltinOverrides() { try { return JSON.parse(localStorage.getItem(BB_BUILTIN_OVR_KEY) || '{}'); } catch (e) { return {}; } }
 function barndoAllModels() {
-  const builtins = Array.isArray(window.BARNDO_BUILTIN_MODELS) ? window.BARNDO_BUILTIN_MODELS : [];
+  const ovr = bbBuiltinOverrides();
+  const builtins = (Array.isArray(window.BARNDO_BUILTIN_MODELS) ? window.BARNDO_BUILTIN_MODELS : [])
+    .map(m => {
+      const o = ovr[m.id];
+      if (!o) return m;
+      const merged = Object.assign({}, m, o, { updated: true });
+      merged.metaLine = (o.footprint || m.footprint) + ' · ' + ((o.sqft || m.sqft) || 0).toLocaleString() + " sqft · factory model — updated " + String(o.updatedDate || '').slice(0, 10);
+      return merged;
+    });
   return builtins.concat(barndoModels());
 }
 
@@ -9531,14 +9541,17 @@ function renderBarndoGrid() {
   grid.innerHTML = list.map(m => {
     const meta = m.metaLine
       ? m.metaLine
-      : `${m.beds} bed · ${m.baths} bath${m.footprint ? ' · ' + m.footprint : ''}${m.sqft ? ' · ' + m.sqft.toLocaleString() + ' sqft' : ''}`;
+      : `${(m.beds || m.baths) ? m.beds + ' bed · ' + m.baths + ' bath · ' : ''}${m.footprint ? m.footprint + ' · ' : ''}${m.sqft ? m.sqft.toLocaleString() + ' sqft' : ''}`.replace(/ · $/, '');
+    const bpSrc = (m.blueprints && m.blueprints.length) ? m : (m.baseId ? list.find(x => x.id === m.baseId && x.blueprints && x.blueprints.length) : null);
+    const invSrc = m.invoice ? m : (m.baseId ? list.find(x => x.id === m.baseId && x.invoice) : null);
     const extras = [
-      (m.blueprints && m.blueprints.length) ? `<button onclick="barndoShowPlans('${m.id}')" style="flex:1;">📐 Blueprints (${m.blueprints.length} sheets)</button>` : '',
-      m.invoice ? `<button onclick="barndoShowInvoice('${m.id}')" style="flex:1;">🧾 Material list</button>` : '',
+      bpSrc ? `<button onclick="barndoShowPlans('${m.id}')" style="flex:1;">📐 Blueprints (${bpSrc.blueprints.length} sheets)</button>` : '',
+      invSrc ? `<button onclick="barndoShowInvoice('${m.id}')" style="flex:1;">🧾 Material list</button>` : '',
     ].filter(Boolean).join('');
     return `
     <div class="qbs-card" style="margin:0; overflow:hidden;${m.builtin ? ' border-color:var(--copper);' : ''}">
-      ${m.builtin ? '<div style="font-family:var(--font-mono); font-size:10px; color:var(--copper); text-transform:uppercase; letter-spacing:.09em; margin-bottom:8px;">★ Barndo Builders model</div>' : ''}
+      ${m.builtin ? '<div style="font-family:var(--font-mono); font-size:10px; color:var(--copper); text-transform:uppercase; letter-spacing:.09em; margin-bottom:8px;">★ Barndo Builders model' + (m.updated ? ' · ✏ UPDATED' : '') + '</div>'
+        : (m.client ? `<div style="font-family:var(--font-mono); font-size:10px; color:#5aa24a; text-transform:uppercase; letter-spacing:.09em; margin-bottom:8px;">📋 Client build — ${m.client}${m.baseName ? ' · from ' + m.baseName : ''}</div>` : '')}
       ${m.hero ? `<img src="${m.hero}" style="width:100%; height:170px; object-fit:cover; border-radius:6px; cursor:pointer;" onclick="barndoLoad('${m.id}')" alt="${m.name}" />`
                 : `<div style="height:170px; display:flex; align-items:center; justify-content:center; background:var(--surface-2); border-radius:6px; cursor:pointer; font-size:42px;" onclick="barndoLoad('${m.id}')">🏠</div>`}
       <div style="margin-top:10px;">
@@ -9552,7 +9565,7 @@ function renderBarndoGrid() {
         <div style="display:flex; gap:6px;">
           <button onclick="barndoLoad('${m.id}')" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); flex:1;">Load into 3D tool</button>
           <button onclick="barndoExportOne('${m.id}')" title="Export this model as a file">⬇</button>
-          ${m.builtin ? '' : `<button onclick="barndoDelete('${m.id}')" title="Delete this model" class="opening-remove-btn">×</button>`}
+          ${m.builtin ? (m.updated ? `<button onclick="bbResetFactoryModel('${m.id}')" title="Undo your update — back to the shipped version">↺</button>` : '') : `<button onclick="barndoDelete('${m.id}')" title="Delete this model" class="opening-remove-btn">×</button>`}
         </div>
       </div>
     </div>`;
@@ -9563,7 +9576,16 @@ function barndoLoad(id) {
   const m = barndoAllModels().find(x => x.id === id);
   if (!m) return;
   barndoApply(m.cfg);
+  window._bbModelSource = m.client
+    ? { versionId: m.id, baseId: m.baseId || null, baseName: m.baseName || '', client: m.client }
+    : { versionId: null, baseId: m.id, baseName: m.name, client: '' };
   switchTab('workspace');
+  try { bbClientSaveCardRender(); } catch (e) {}
+  try {
+    bbToast(m.client
+      ? 'Loaded ' + m.client + "'s build — changes save back to their version with 💾 at the top of the rail."
+      : 'Loaded ' + m.name + ' — make changes, then 💾 Save for a client (top of the Builder rail). The original stays untouched.');
+  } catch (e) {}
 }
 
 function barndoDelete(id) {
@@ -9613,7 +9635,8 @@ function barndoImportFile(input) {
 // =============================================================
 let _bbBpState = { pages: [], idx: 0, title: '' };
 function barndoShowPlans(id) {
-  const m = barndoAllModels().find(x => x.id === id);
+  let m = barndoAllModels().find(x => x.id === id);
+  if (m && !(m.blueprints && m.blueprints.length) && m.baseId) m = barndoAllModels().find(x => x.id === m.baseId) || m;
   if (!m || !m.blueprints || !m.blueprints.length) return;
   _bbBpState = { pages: m.blueprints, idx: 0, title: m.name };
   let ov = document.getElementById('bb-bp-overlay');
@@ -9677,7 +9700,8 @@ function bbBrandLogoHTML(maxW) {
 }
 
 function barndoShowInvoice(id) {
-  const m = barndoAllModels().find(x => x.id === id);
+  let m = barndoAllModels().find(x => x.id === id);
+  if (m && !m.invoice && m.baseId) m = barndoAllModels().find(x => x.id === m.baseId) || m;
   if (!m || !m.invoice) return;
   const inv = m.invoice;
   const money = v => '$' + (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -10170,6 +10194,130 @@ function jcCSV(id) {
   bbToast('CSV exported.');
 }
 
+// =============================================================
+// 💾 CLIENT VERSIONS — start from a factory or saved model, change
+// anything, and save it under the customer's name. The source model
+// never changes; re-saving the same client updates their version.
+// Client versions inherit the base model's blueprints + invoice.
+// =============================================================
+window._bbModelSource = null;
+function bbClientSaveCardRender() {
+  const left = document.getElementById('ws-left');
+  if (!left) return;
+  let card = document.getElementById('ws-client-save-card');
+  if (!card) {
+    card = document.createElement('div');
+    card.className = 'qbs-card';
+    card.id = 'ws-client-save-card';
+  }
+  if (left.firstChild !== card) left.insertBefore(card, left.firstChild);
+  const src = window._bbModelSource;
+  const started = (src && src.baseName) ? 'Started from <b>' + src.baseName + '</b>. ' : '';
+  const clientVal = (src && src.client) || ((document.getElementById('client_name') || {}).value || '');
+  card.innerHTML = '<h3>💾 Save for a client</h3>'
+    + '<p class="qbs-sub" style="margin-bottom:8px;">' + started
+    + 'Make any changes, then save this build under the customer\'s name — '
+    + ((src && src.baseName) ? 'the original model stays untouched.' : 'it shows up on the 🏠 Barndos tab.')
+    + ' Re-saving the same client updates their version.</p>'
+    + '<div style="display:flex; gap:6px; flex-wrap:wrap;">'
+    + '<input id="bb-client-save-name" placeholder="Client name" value="' + String(clientVal || '').replace(/"/g, '&quot;') + '" style="flex:1; min-width:130px;">'
+    + '<button onclick="bbSaveClientVersion()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper);">💾 Save client version</button>'
+    + '</div><div id="bb-client-save-status" class="qbs-sub" style="margin:6px 0 0;"></div>'
+    + (function () {
+        if (!src || !src.baseId || src.client) return '';
+        const base = (window.BARNDO_BUILTIN_MODELS || []).find(b => b.id === src.baseId);
+        if (!base) return '';
+        const hasOvr = !!bbBuiltinOverrides()[base.id];
+        return '<div style="border-top:1px solid var(--surface-2); margin-top:10px; padding-top:8px;">'
+          + '<div style="display:flex; gap:6px; flex-wrap:wrap;">'
+          + '<button onclick="bbUpdateFactoryModel()" style="font-size:11px;">⟳ Update the factory model itself</button>'
+          + (hasOvr ? '<button onclick="bbResetFactoryModel()" style="font-size:11px;">↺ Reset to shipped version</button>' : '')
+          + '</div><div class="qbs-note" style="margin-top:4px;">Saves this layout — window &amp; door placement included — as the new ' + base.name + ' on this device. Client versions stay separate.</div></div>';
+      })();
+}
+function bbSaveClientVersion() {
+  const st = document.getElementById('bb-client-save-status');
+  const client = ((document.getElementById('bb-client-save-name') || {}).value || '').trim();
+  if (!client) { if (st) st.textContent = '⚠ Type the client name first.'; return; }
+  const src = window._bbModelSource;
+  const c = window._lastCalc || {};
+  const i = c.i || {};
+  let hero = null;
+  try { const f = (typeof window.bb3dCaptureTurntable === 'function') ? window.bb3dCaptureTurntable(1, 640, 360) : null; hero = f && f[0] ? f[0] : null; } catch (e) {}
+  const list = barndoModels();
+  let m = null;
+  if (src && src.versionId) m = list.find(x => x.id === src.versionId);
+  if (!m) m = list.find(x => x.client && x.client.toLowerCase() === client.toLowerCase() && (x.baseId || null) === ((src && src.baseId) || null));
+  const stamp = {
+    client,
+    baseId: (src && src.baseId) || null,
+    baseName: (src && src.baseName) || null,
+    footprint: (i.W && i.L) ? (i.W + '×' + i.L) : '',
+    sqft: Math.round(i.living || (i.W * i.L) || 0),
+    startingAt: Math.round(c.grand || 0),
+    cfg: barndoSnapshot(),
+    date: new Date().toISOString(),
+  };
+  let created = false;
+  if (m) {
+    Object.assign(m, stamp);
+    if (hero) m.hero = hero;
+    m.name = (stamp.baseName ? stamp.baseName + ' — ' : '') + client;
+  } else {
+    created = true;
+    m = Object.assign({
+      id: 'bmc_' + Date.now().toString(36),
+      name: (stamp.baseName ? stamp.baseName + ' — ' : '') + client,
+      beds: 0, baths: 0, hero, plan: null,
+    }, stamp);
+    list.push(m);
+  }
+  if (!barndoStore(list)) { if (st) st.textContent = '⚠ Storage full — delete an old model or export one first.'; return; }
+  window._bbModelSource = { versionId: m.id, baseId: m.baseId, baseName: m.baseName, client: m.client };
+  const cn = document.getElementById('client_name');
+  if (cn && !cn.value.trim()) cn.value = client;
+  try { bbToast(created ? 'Client version saved — find it on the 🏠 Barndos tab.' : client + "'s version updated."); } catch (e) {}
+  try { renderBarndoGrid(); } catch (e) {}
+  try { bbClientSaveCardRender(); } catch (e) {}
+  const st2 = document.getElementById('bb-client-save-status');
+  if (st2) st2.textContent = created ? ('✓ Saved "' + m.name + '" — it\'s on the 🏠 Barndos tab.') : ('✓ Updated ' + client + "'s version.");
+}
+
+// ---- Factory model updates: override the shipped model in place ----------
+function bbUpdateFactoryModel() {
+  const src = window._bbModelSource;
+  const base = src && src.baseId ? (window.BARNDO_BUILTIN_MODELS || []).find(b => b.id === src.baseId) : null;
+  if (!base) { bbToast('Load a factory model first (🏠 Barndos tab), then update it.'); return; }
+  const c = window._lastCalc || {};
+  const i = c.i || {};
+  let hero = null;
+  try { const f = (typeof window.bb3dCaptureTurntable === 'function') ? window.bb3dCaptureTurntable(1, 640, 360) : null; hero = f && f[0] ? f[0] : null; } catch (e) {}
+  const ovr = bbBuiltinOverrides();
+  ovr[base.id] = {
+    cfg: barndoSnapshot(),
+    startingAt: Math.round(c.grand || 0) || base.startingAt,
+    footprint: (i.W && i.L) ? (i.W + '×' + i.L) : base.footprint,
+    sqft: Math.round(i.living || (i.W * i.L) || 0) || base.sqft,
+    updatedDate: new Date().toISOString(),
+  };
+  if (hero) ovr[base.id].hero = hero;
+  try { localStorage.setItem(BB_BUILTIN_OVR_KEY, JSON.stringify(ovr)); }
+  catch (e) { bbToast('Storage full — could not save the factory update.'); return; }
+  bbToast(base.name + ' updated — the factory card now loads this layout. ↺ resets to the shipped version.');
+  try { renderBarndoGrid(); } catch (e) {}
+  try { bbClientSaveCardRender(); } catch (e) {}
+}
+function bbResetFactoryModel(id) {
+  const bid = id || ((window._bbModelSource || {}).baseId);
+  const ovr = bbBuiltinOverrides();
+  if (!bid || !ovr[bid]) return;
+  delete ovr[bid];
+  try { localStorage.setItem(BB_BUILTIN_OVR_KEY, JSON.stringify(ovr)); } catch (e) {}
+  bbToast('Factory model reset to the shipped version.');
+  try { renderBarndoGrid(); } catch (e) {}
+  try { bbClientSaveCardRender(); } catch (e) {}
+}
+
 let _wsAdopted = false;
 const _wsHomes = [];   // [{node, placeholder}]
 function _wsAdoptNode(node, slot) {
@@ -10202,6 +10350,7 @@ function wsEnter() {
       .map(([t, l]) => `<button onclick="switchTab('${t}')" style="font-size:11px;">${l}</button>`).join('') + '</div>';
   nav.id = 'ws-nav-card';
   left.appendChild(nav);
+  try { bbClientSaveCardRender(); } catch (e) {}
   // Per-card CLEAR buttons (v219): reset just that section, never the others
   document.querySelectorAll('#ws-left > .qbs-card').forEach(card => {
     if (card.id === 'ws-nav-card' || card.querySelector('.ws-clear-btn')) return;
