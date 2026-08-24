@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v253</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v254</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -5842,6 +5842,32 @@ function shedSizeLabel(sz) {
 function shedMatLabel(mat) { return mat === 'cypress' ? 'cypress' : (mat === 'pt' ? 'PT' : 'SYP'); }
 
 const MATERIALS = [
+  // === SHEETROCK (drywall) — driven by the Sheetrock card on the Takeoff tab.
+  // Quantities come from bbSheetrockQty(); everything is 0 until the card's
+  // "Add to quote" toggle is on. Unit costs are editable on the card and flow
+  // through customUnitPrice so global markups build sell/retail as usual.
+  { id: "srock_sheet", label: "Drywall sheet 1/2\" 4×12", cat: "Sheetrock", uom: "sheet", packSize: null,
+    priceCost: 18.50, priceSell: 23.15, priceRetail: 27.75,
+    labelFn: i => { const s = bbSheetrockState(); const nm = s.sheetSize === 32 ? "4×8" : (s.sheetSize === 40 ? "4×10" : "4×12"); return 'Drywall sheet 1/2\" ' + nm + (s.layers > 1 ? ' — ' + s.layers + ' layers' : ''); },
+    customUnitPrice: i => bbSheetrockState().pSheet,
+    formula: i => bbSheetrockQty('sheets') },
+  { id: "srock_mud", label: "Joint compound — 4.5 gal box (~450 sqft)", cat: "Sheetrock", uom: "box", packSize: null,
+    priceCost: 17.00, priceSell: 21.25, priceRetail: 25.50,
+    customUnitPrice: i => bbSheetrockState().pMud,
+    formula: i => bbSheetrockQty('mud') },
+  { id: "srock_tape", label: "Joint tape — 500' roll", cat: "Sheetrock", uom: "roll", packSize: null,
+    priceCost: 6.50, priceSell: 8.15, priceRetail: 9.75,
+    customUnitPrice: i => bbSheetrockState().pTape,
+    formula: i => bbSheetrockQty('tape') },
+  { id: "srock_screws", label: "Drywall screws 1-1/4\" — 1 lb (~300 sqft)", cat: "Sheetrock", uom: "lb", packSize: null,
+    priceCost: 7.00, priceSell: 8.75, priceRetail: 10.50,
+    customUnitPrice: i => bbSheetrockState().pScrews,
+    formula: i => bbSheetrockQty('screws') },
+  { id: "srock_bead", label: "Corner bead — 8' stick", cat: "Sheetrock", uom: "stick", packSize: null,
+    priceCost: 4.50, priceSell: 5.65, priceRetail: 6.75,
+    customUnitPrice: i => bbSheetrockState().pBead,
+    formula: i => bbSheetrockQty('bead') },
+
   // ---------------- BLOCK FOUNDATION (CMU) ----------------
   // Stem wall + piers. Both feed into the same SKU lines when block size matches.
   // Stem wall: 1.125 blocks/sf of wall face. Piers: 4 blocks × courses × pier count.
@@ -8763,7 +8789,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v253';
+const BB_VERSION = 'v254';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -10318,6 +10344,174 @@ function bbResetFactoryModel(id) {
   try { bbClientSaveCardRender(); } catch (e) {}
 }
 
+// =============================================================
+// 🧱 SHEETROCK TAKEOFF CARD — lives on the Takeoff tab, but is
+// INJECTED AT RUNTIME so the locked takeoff markup/script stay
+// byte-identical to the v198 snapshot. Industry-standard math:
+// perimeter × height + ceiling, no deduction for openings < 32 sqft
+// (garage doors auto-deduct), ÷ sheet size + waste. Mud/tape/screws
+// by the standard coverage rules. Materials flow through the normal
+// catalog (cat "Sheetrock") so markup, quote, and order sheets all
+// work like any other line.
+// =============================================================
+const BB_SROCK_KEY = 'bb_sheetrock_v1';
+const _bbSrockDefaults = {
+  on: false, scope: 'both', layers: 1, sheetSize: 48, waste: 10,
+  perimAuto: true, perim: 0, hAuto: true, wallH: 0,
+  ceilAuto: true, ceilArea: 0, deductAuto: true, deduct: 0, beadSticks: 0,
+  pSheet: 18.50, pMud: 17.00, pTape: 6.50, pScrews: 7.00, pBead: 4.50,
+};
+const _bbSrockSheetPrice = { 32: 12.50, 40: 15.50, 48: 18.50 };
+let _bbSrock = null;
+function bbSheetrockState() {
+  if (!_bbSrock) {
+    _bbSrock = Object.assign({}, _bbSrockDefaults);
+    try { Object.assign(_bbSrock, JSON.parse(localStorage.getItem(BB_SROCK_KEY) || '{}')); } catch (e) {}
+  }
+  return _bbSrock;
+}
+function bbSheetrockSave() { try { localStorage.setItem(BB_SROCK_KEY, JSON.stringify(_bbSrock)); } catch (e) {} }
+
+function bbSheetrockCalc() {
+  const s = bbSheetrockState();
+  const i = (window._lastCalc || {}).i || {};
+  const W = +i.W || 0, L = +i.L || 0, H = +i.H || 0;
+  const perim = s.perimAuto ? 2 * (W + L) : (+s.perim || 0);
+  const wallH = s.hAuto ? H : (+s.wallH || 0);
+  const ceil = s.ceilAuto ? W * L : (+s.ceilArea || 0);
+  // Auto deduction = garage door openings only (industry rule: openings
+  // under ~32 sqft come out of scrap and are NOT deducted).
+  let deduct = +s.deduct || 0;
+  if (s.deductAuto) {
+    deduct = 0;
+    try { (openingsState.garage || []).forEach(g => { deduct += (g.qty || 1) * (g.w || 0) * (g.h || 0); }); } catch (e) {}
+    deduct = Math.round(deduct);
+  }
+  const wallSF = (s.scope === 'ceiling') ? 0 : Math.max(0, perim * wallH - deduct);
+  const ceilSF = (s.scope === 'walls') ? 0 : ceil;
+  const sf = (wallSF + ceilSF) * (s.layers || 1);
+  const sfWaste = sf * (1 + (+s.waste || 0) / 100);
+  const sheetSF = +s.sheetSize || 48;
+  return {
+    perim, wallH, ceil, deduct, wallSF: Math.round(wallSF), ceilSF: Math.round(ceilSF),
+    sf: Math.round(sf), sfWaste: Math.round(sfWaste),
+    sheets: sf > 0 ? Math.ceil(sfWaste / sheetSF) : 0,
+    mud: sf > 0 ? Math.ceil(sf / 450) : 0,
+    tape: sf > 0 ? Math.ceil(sf * 0.37 / 500) : 0,
+    screws: sf > 0 ? Math.ceil(sf / 300) : 0,
+    bead: +s.beadSticks || 0,
+  };
+}
+function bbSheetrockQty(kind) {
+  const s = bbSheetrockState();
+  if (!s.on) return 0;
+  const c = bbSheetrockCalc();
+  return c[kind] || 0;
+}
+function bbSheetrockSet(field, value) {
+  const s = bbSheetrockState();
+  if (['perimAuto', 'hAuto', 'ceilAuto', 'deductAuto'].includes(field)) s[field] = !!value;
+  else if (field === 'scope') s.scope = value;
+  else if (field === 'sheetSize') { s.sheetSize = parseInt(value, 10) || 48; s.pSheet = _bbSrockSheetPrice[s.sheetSize] || s.pSheet; }
+  else s[field] = parseFloat(value) || 0;
+  bbSheetrockSave();
+  bbSheetrockRender();
+  try { recalc(); } catch (e) {}
+}
+function bbSheetrockToggleQuote() {
+  const s = bbSheetrockState();
+  s.on = !s.on;
+  bbSheetrockSave();
+  bbSheetrockRender();
+  try { recalc(); } catch (e) {}
+  try { bbToast(s.on ? 'Sheetrock package added — see the Sheetrock category on Materials/Quote.' : 'Sheetrock package removed from the quote.'); } catch (e) {}
+}
+
+function bbSheetrockRender() {
+  const tab = document.getElementById('tab-takeoff');
+  if (!tab) return;
+  let card = document.getElementById('bb-sheetrock-card');
+  if (!card) {
+    card = document.createElement('div');
+    card.className = 'qbs-card';
+    card.id = 'bb-sheetrock-card';
+    card.style.marginTop = '14px';
+    tab.appendChild(card);
+  }
+  const s = bbSheetrockState();
+  const c = bbSheetrockCalc();
+  const money = v => '$' + (v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const cost = c.sheets * s.pSheet + c.mud * s.pMud + c.tape * s.pTape + c.screws * s.pScrews + c.bead * s.pBead;
+  const autoField = (label, autoKey, valKey, autoVal, manVal, unit) => `
+    <div class="qbs-field">
+      <label>${label}
+        <span style="text-transform:none; letter-spacing:0;">
+          <label style="display:inline-flex; align-items:center; gap:4px; cursor:pointer; font-size:10px; color:var(--text-3);">
+            <input type="checkbox" ${s[autoKey] ? 'checked' : ''} onchange="bbSheetrockSet('${autoKey}', this.checked)" style="width:13px; height:13px;"> auto
+          </label>
+        </span>
+      </label>
+      ${s[autoKey]
+        ? `<input value="${autoVal}${unit ? ' ' + unit : ''}" readonly style="background:var(--bg-deep); color:var(--text-3);">`
+        : `<input type="number" step="0.5" value="${manVal || ''}" oninput="bbSheetrockSet('${valKey}', this.value)">`}
+    </div>`;
+  const row = (label, qty, uom, price, pKey) => `
+    <tr><td>${label}</td><td style="text-align:right; font-family:var(--font-mono);"><b>${qty.toLocaleString()}</b> ${uom}</td>
+    <td style="text-align:right;"><input type="number" step="0.05" value="${price}" onchange="bbSheetrockSet('${pKey}', this.value)" style="width:80px; text-align:right; font-size:11.5px;"></td>
+    <td style="text-align:right; font-family:var(--font-mono); white-space:nowrap;">${money(qty * price)}</td></tr>`;
+  card.innerHTML = `
+    <h3>🧱 Sheetrock takeoff <span class="badge">Walls + ceiling · sheets, mud, tape, screws · cost basis</span></h3>
+    <p class="qbs-sub" style="margin-bottom:12px;">Auto-figures from the current building (or type measured numbers from the plan above). Industry rule baked in: openings under 32 sqft are NOT deducted — garage doors auto-deduct. Hit <strong>Add to quote</strong> and the whole package lands in Materials under "Sheetrock" with your normal markups.</p>
+    <div class="qbs-grid-4" style="margin-bottom:10px;">
+      <div class="qbs-field"><label>Scope</label>
+        <select onchange="bbSheetrockSet('scope', this.value)">
+          <option value="both" ${s.scope === 'both' ? 'selected' : ''}>Walls + ceiling</option>
+          <option value="walls" ${s.scope === 'walls' ? 'selected' : ''}>Walls only</option>
+          <option value="ceiling" ${s.scope === 'ceiling' ? 'selected' : ''}>Ceiling only</option>
+        </select></div>
+      <div class="qbs-field"><label>Sheet size</label>
+        <select onchange="bbSheetrockSet('sheetSize', this.value)">
+          <option value="32" ${s.sheetSize === 32 ? 'selected' : ''}>4×8 — 32 sqft</option>
+          <option value="40" ${s.sheetSize === 40 ? 'selected' : ''}>4×10 — 40 sqft</option>
+          <option value="48" ${s.sheetSize === 48 ? 'selected' : ''}>4×12 — 48 sqft</option>
+        </select></div>
+      <div class="qbs-field"><label>Layers</label>
+        <select onchange="bbSheetrockSet('layers', this.value)">
+          <option value="1" ${s.layers === 1 ? 'selected' : ''}>Single layer</option>
+          <option value="2" ${s.layers === 2 ? 'selected' : ''}>Double layer</option>
+        </select></div>
+      <div class="qbs-field"><label>Waste %</label><input type="number" step="1" value="${s.waste}" oninput="bbSheetrockSet('waste', this.value)"></div>
+    </div>
+    <div class="qbs-grid-4" style="margin-bottom:10px;">
+      ${autoField('Wall perimeter (LF)', 'perimAuto', 'perim', c.perim, s.perim, 'LF')}
+      ${autoField('Wall height (ft)', 'hAuto', 'wallH', c.wallH, s.wallH, 'ft')}
+      ${autoField('Ceiling area (sqft)', 'ceilAuto', 'ceilArea', c.ceil, s.ceilArea, 'sqft')}
+      ${autoField('Big-opening deduction (sqft)', 'deductAuto', 'deduct', c.deduct, s.deduct, 'sqft')}
+    </div>
+    <div class="qbs-grid-4" style="margin-bottom:12px;">
+      <div class="qbs-field"><label>Corner bead (8' sticks)</label><input type="number" step="1" value="${s.beadSticks}" oninput="bbSheetrockSet('beadSticks', this.value)"><div class="qbs-note">Count your outside corners</div></div>
+    </div>
+    <div style="font-family:var(--font-mono); font-size:11px; color:var(--text-2); margin-bottom:8px;">
+      Walls ${c.wallSF.toLocaleString()} sqft${c.deduct ? ' (−' + c.deduct + ' openings)' : ''} + ceiling ${c.ceilSF.toLocaleString()} sqft
+      ${s.layers > 1 ? '× ' + s.layers + ' layers ' : ''}= <b>${c.sf.toLocaleString()} sqft</b> → +${s.waste}% waste = <b style="color:var(--copper);">${c.sfWaste.toLocaleString()} sqft</b>
+    </div>
+    <div style="overflow-x:auto;"><table class="qbs-table" style="width:100%; max-width:760px; font-size:12px;">
+      <thead><tr><th>Item</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Unit cost $</th><th style="text-align:right;">Cost</th></tr></thead>
+      <tbody>
+        ${row('Drywall 1/2" ' + (s.sheetSize === 32 ? '4×8' : s.sheetSize === 40 ? '4×10' : '4×12'), c.sheets, 'sheets', s.pSheet, 'pSheet')}
+        ${row('Joint compound 4.5 gal box', c.mud, 'boxes', s.pMud, 'pMud')}
+        ${row("Joint tape 500' roll", c.tape, 'rolls', s.pTape, 'pTape')}
+        ${row('Screws 1-1/4" (lb)', c.screws, 'lb', s.pScrews, 'pScrews')}
+        ${row("Corner bead 8'", c.bead, 'sticks', s.pBead, 'pBead')}
+      </tbody>
+      <tfoot><tr style="font-weight:700;"><td>Sheetrock package — cost</td><td></td><td></td><td style="text-align:right; font-family:var(--font-mono);">${money(cost)}</td></tr></tfoot>
+    </table></div>
+    <button onclick="bbSheetrockToggleQuote()" style="margin-top:10px; ${s.on ? 'background:var(--copper); color:var(--bg-deep); border-color:var(--copper);' : 'background:transparent; color:var(--copper); border:1px solid var(--copper);'}">
+      ${s.on ? '✓ In the quote — Sheetrock category on Materials' : '+ Add to quote'}
+    </button>`;
+}
+try { bbSheetrockRender(); } catch (e) {}
+
 let _wsAdopted = false;
 const _wsHomes = [];   // [{node, placeholder}]
 function _wsAdoptNode(node, slot) {
@@ -10714,6 +10908,7 @@ function switchTab(name) {
   if (name === 'framing') { try { renderFramingPages(); } catch (e) {} }
   if (name === 'barndos') { try { renderBarndoGrid(); } catch (e) {} }
   if (name === 'jobcost') { try { renderJobCost(); } catch (e) {} }
+  if (name === 'takeoff') { try { bbSheetrockRender(); } catch (e) {} }
   if (name === 'calcs') { ['grCalc','gsCalc','shCalc','swCalc','stCalc','csCalc','phCalc','rfCalc','gpCalc','dwCalc','bfCalc','cbCalc','cfCalc','rsCalc','wsCalc'].forEach(f => { try { window[f] ? window[f]() : eval(f + '()'); } catch (e) {} }); }
   if (name === 'takeoff' && typeof takeoffInit === 'function') takeoffInit();
   if (name === 'subs') {
