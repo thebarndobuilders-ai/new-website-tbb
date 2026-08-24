@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v254</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v255</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2315,7 +2315,7 @@
     <div class="qbs-tab" data-tab="barndos" onclick="switchTab('barndos')" style="color:var(--copper);">🏠 Barndos</div>
     <div class="qbs-tab" data-tab="framing" onclick="switchTab('framing')">📐 Framing pages</div>
     <div class="qbs-tab" data-tab="workspace" onclick="switchTab('workspace')" style="color:var(--copper); font-weight:700;">⚡ 3D Buildout</div>
-    <div class="qbs-tab" data-tab="inputs" onclick="switchTab('inputs')">2. Dimensions</div>
+    <div class="qbs-tab" data-tab="inputs" onclick="switchTab('inputs')" style="display:none">2. Dimensions</div>
     <div class="qbs-tab" data-tab="foundation" onclick="switchTab('foundation')">3. Foundation</div>
     <div class="qbs-tab" data-tab="materials" onclick="switchTab('materials')">4. Materials</div>
     <div class="qbs-tab" data-tab="subs" onclick="switchTab('subs')">5. Subs &amp; labor</div>
@@ -8789,7 +8789,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v254';
+const BB_VERSION = 'v255';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -10359,6 +10359,7 @@ const _bbSrockDefaults = {
   on: false, scope: 'both', layers: 1, sheetSize: 48, waste: 10,
   perimAuto: true, perim: 0, hAuto: true, wallH: 0,
   ceilAuto: true, ceilArea: 0, deductAuto: true, deduct: 0, beadSticks: 0,
+  ceilType: 'flat', ceilPitch: 4, pitchAuto: true, vaultWAuto: true, vaultW: 0, gableTri: true,
   pSheet: 18.50, pMud: 17.00, pTape: 6.50, pScrews: 7.00, pBead: 4.50,
 };
 const _bbSrockSheetPrice = { 32: 12.50, 40: 15.50, 48: 18.50 };
@@ -10387,12 +10388,23 @@ function bbSheetrockCalc() {
     try { (openingsState.garage || []).forEach(g => { deduct += (g.qty || 1) * (g.w || 0) * (g.h || 0); }); } catch (e) {}
     deduct = Math.round(deduct);
   }
-  const wallSF = (s.scope === 'ceiling') ? 0 : Math.max(0, perim * wallH - deduct);
-  const ceilSF = (s.scope === 'walls') ? 0 : ceil;
+  // Vaulted ceilings — the industry pitch-factor method: flat plan area ×
+  // √(rise² + 12²)/12. Scissor vault pitch defaults to HALF the roof pitch.
+  let pitch = 0;
+  if (s.ceilType === 'vault') pitch = +s.ceilPitch || 0;
+  else if (s.ceilType === 'scissor') pitch = s.pitchAuto ? ((+i.pitch || 0) / 2) : (+s.ceilPitch || 0);
+  const factor = pitch > 0 ? Math.sqrt(pitch * pitch + 144) / 12 : 1;
+  // Gable-end triangles: vaulted end walls grow by ½ × width × rise, ×2 ends.
+  const vaultW = s.vaultWAuto ? W : (+s.vaultW || 0);
+  const rise = vaultW / 2 * pitch / 12;
+  const triSF = (s.ceilType !== 'flat' && s.gableTri && s.scope !== 'ceiling') ? vaultW * rise : 0;
+  const wallSF = (s.scope === 'ceiling') ? 0 : Math.max(0, perim * wallH - deduct) + triSF;
+  const ceilSF = (s.scope === 'walls') ? 0 : ceil * factor;
   const sf = (wallSF + ceilSF) * (s.layers || 1);
   const sfWaste = sf * (1 + (+s.waste || 0) / 100);
   const sheetSF = +s.sheetSize || 48;
   return {
+    pitch, factor, vaultW, triSF: Math.round(triSF),
     perim, wallH, ceil, deduct, wallSF: Math.round(wallSF), ceilSF: Math.round(ceilSF),
     sf: Math.round(sf), sfWaste: Math.round(sfWaste),
     sheets: sf > 0 ? Math.ceil(sfWaste / sheetSF) : 0,
@@ -10410,8 +10422,8 @@ function bbSheetrockQty(kind) {
 }
 function bbSheetrockSet(field, value) {
   const s = bbSheetrockState();
-  if (['perimAuto', 'hAuto', 'ceilAuto', 'deductAuto'].includes(field)) s[field] = !!value;
-  else if (field === 'scope') s.scope = value;
+  if (['perimAuto', 'hAuto', 'ceilAuto', 'deductAuto', 'pitchAuto', 'vaultWAuto', 'gableTri'].includes(field)) s[field] = !!value;
+  else if (field === 'scope' || field === 'ceilType') s[field] = value;
   else if (field === 'sheetSize') { s.sheetSize = parseInt(value, 10) || 48; s.pSheet = _bbSrockSheetPrice[s.sheetSize] || s.pSheet; }
   else s[field] = parseFloat(value) || 0;
   bbSheetrockSave();
@@ -10436,7 +10448,7 @@ function bbSheetrockRender() {
     card.className = 'qbs-card';
     card.id = 'bb-sheetrock-card';
     card.style.marginTop = '14px';
-    tab.appendChild(card);
+    (document.getElementById('to-split-rail') || tab).appendChild(card);
   }
   const s = bbSheetrockState();
   const c = bbSheetrockCalc();
@@ -10483,6 +10495,22 @@ function bbSheetrockRender() {
       <div class="qbs-field"><label>Waste %</label><input type="number" step="1" value="${s.waste}" oninput="bbSheetrockSet('waste', this.value)"></div>
     </div>
     <div class="qbs-grid-4" style="margin-bottom:10px;">
+      <div class="qbs-field"><label>Ceiling type</label>
+        <select onchange="bbSheetrockSet('ceilType', this.value)">
+          <option value="flat" ${s.ceilType === 'flat' ? 'selected' : ''}>Flat</option>
+          <option value="vault" ${s.ceilType === 'vault' ? 'selected' : ''}>Vaulted — set pitch</option>
+          <option value="scissor" ${s.ceilType === 'scissor' ? 'selected' : ''}>Scissor vault — ½ roof pitch</option>
+        </select></div>
+      ${s.ceilType === 'flat' ? '' : (s.ceilType === 'scissor'
+        ? autoField('Vault pitch (X/12)', 'pitchAuto', 'ceilPitch', c.pitch, s.ceilPitch, '/12')
+        : `<div class="qbs-field"><label>Vault pitch (X/12)</label><input type="number" step="0.5" value="${s.ceilPitch}" oninput="bbSheetrockSet('ceilPitch', this.value)"></div>`)}
+      ${s.ceilType === 'flat' ? '' : autoField('Vault width (ft)', 'vaultWAuto', 'vaultW', c.vaultW, s.vaultW, 'ft')}
+      ${s.ceilType === 'flat' ? '' : `<div class="qbs-field"><label>Gable-end triangles</label>
+        <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:12px; padding-top:8px;">
+          <input type="checkbox" ${s.gableTri ? 'checked' : ''} onchange="bbSheetrockSet('gableTri', this.checked)" style="width:15px; height:15px;"> Add to walls (${c.triSF.toLocaleString()} sqft)
+        </label><div class="qbs-note">Vaulted end walls grow ½ × width × rise, both ends</div></div>`}
+    </div>
+    <div class="qbs-grid-4" style="margin-bottom:10px;">
       ${autoField('Wall perimeter (LF)', 'perimAuto', 'perim', c.perim, s.perim, 'LF')}
       ${autoField('Wall height (ft)', 'hAuto', 'wallH', c.wallH, s.wallH, 'ft')}
       ${autoField('Ceiling area (sqft)', 'ceilAuto', 'ceilArea', c.ceil, s.ceilArea, 'sqft')}
@@ -10492,7 +10520,8 @@ function bbSheetrockRender() {
       <div class="qbs-field"><label>Corner bead (8' sticks)</label><input type="number" step="1" value="${s.beadSticks}" oninput="bbSheetrockSet('beadSticks', this.value)"><div class="qbs-note">Count your outside corners</div></div>
     </div>
     <div style="font-family:var(--font-mono); font-size:11px; color:var(--text-2); margin-bottom:8px;">
-      Walls ${c.wallSF.toLocaleString()} sqft${c.deduct ? ' (−' + c.deduct + ' openings)' : ''} + ceiling ${c.ceilSF.toLocaleString()} sqft
+      Walls ${c.wallSF.toLocaleString()} sqft${c.deduct ? ' (−' + c.deduct + ' openings)' : ''}${c.triSF ? ' (incl. ' + c.triSF.toLocaleString() + ' gable tri)' : ''}
+      + ceiling ${c.ceilSF.toLocaleString()} sqft${c.factor > 1 ? ' (flat ' + Math.round(c.ceil).toLocaleString() + ' × ' + c.factor.toFixed(3) + ' pitch factor, ' + c.pitch.toFixed(1) + '/12 vault)' : ''}
       ${s.layers > 1 ? '× ' + s.layers + ' layers ' : ''}= <b>${c.sf.toLocaleString()} sqft</b> → +${s.waste}% waste = <b style="color:var(--copper);">${c.sfWaste.toLocaleString()} sqft</b>
     </div>
     <div style="overflow-x:auto;"><table class="qbs-table" style="width:100%; max-width:760px; font-size:12px;">
@@ -10511,6 +10540,58 @@ function bbSheetrockRender() {
     </button>`;
 }
 try { bbSheetrockRender(); } catch (e) {}
+
+// =============================================================
+// 📐 TAKEOFF SPLIT LAYOUT — plan viewer on the left, the whole
+// Dimensions rail on the right (same card-adoption pattern as the
+// 3D workspace), so plan, dims, and sheetrock share one screen.
+// RUNTIME ONLY: the locked takeoff markup is re-parented in the DOM,
+// never edited — the locked source stays byte-identical to v198.
+// =============================================================
+let _toAdopted = false;
+const _toHomes = [];
+function bbTakeoffRailEnter() {
+  const tab = document.getElementById('tab-takeoff');
+  if (!tab) return;
+  let split = document.getElementById('to-split');
+  if (!split) {
+    split = document.createElement('div');
+    split.id = 'to-split';
+    split.style.cssText = 'display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap;';
+    const main = document.createElement('div');
+    main.id = 'to-split-main';
+    main.style.cssText = 'flex:1 1 640px; min-width:0;';
+    const rail = document.createElement('div');
+    rail.id = 'to-split-rail';
+    rail.style.cssText = 'flex:0 0 380px; width:380px; max-width:100%; max-height:calc(100vh - 90px); overflow-y:auto; position:sticky; top:64px;';
+    while (tab.firstChild) main.appendChild(tab.firstChild);
+    split.appendChild(main);
+    split.appendChild(rail);
+    tab.appendChild(split);
+  }
+  if (_toAdopted) return;
+  const rail = document.getElementById('to-split-rail');
+  const inputsTab = document.getElementById('tab-inputs');
+  if (inputsTab) Array.from(inputsTab.children).forEach(node => {
+    const ph = document.createComment('to-home');
+    node.parentNode.insertBefore(ph, node);
+    _toHomes.push({ node, ph });
+    rail.appendChild(node);
+  });
+  const sr = document.getElementById('bb-sheetrock-card');
+  if (sr) rail.insertBefore(sr, rail.firstChild);
+  _toAdopted = true;
+  try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+}
+function bbTakeoffRailLeave() {
+  if (!_toAdopted) return;
+  while (_toHomes.length) {
+    const { node, ph } = _toHomes.pop();
+    if (ph.parentNode) { ph.parentNode.insertBefore(node, ph); ph.remove(); }
+  }
+  _toAdopted = false;
+  try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+}
 
 let _wsAdopted = false;
 const _wsHomes = [];   // [{node, placeholder}]
@@ -10904,11 +10985,12 @@ function switchTab(name) {
   if (name === 'schedule') { try { renderSchedule(); } catch (e) {} }
   if (name === 'quote') { try { renderDrawSchedule(); renderChangeOrders(); } catch (e) {} }
   if (name === 'vendors') { try { renderVendors(); } catch (e) {} }
+  if (name !== 'takeoff') { try { bbTakeoffRailLeave(); } catch (e) {} }
   if (name === 'workspace') { try { wsEnter(); } catch (e) {} } else { try { wsLeave(); } catch (e) {} }
   if (name === 'framing') { try { renderFramingPages(); } catch (e) {} }
   if (name === 'barndos') { try { renderBarndoGrid(); } catch (e) {} }
   if (name === 'jobcost') { try { renderJobCost(); } catch (e) {} }
-  if (name === 'takeoff') { try { bbSheetrockRender(); } catch (e) {} }
+  if (name === 'takeoff') { try { bbTakeoffRailEnter(); } catch (e) {} try { bbSheetrockRender(); } catch (e) {} }
   if (name === 'calcs') { ['grCalc','gsCalc','shCalc','swCalc','stCalc','csCalc','phCalc','rfCalc','gpCalc','dwCalc','bfCalc','cbCalc','cfCalc','rsCalc','wsCalc'].forEach(f => { try { window[f] ? window[f]() : eval(f + '()'); } catch (e) {} }); }
   if (name === 'takeoff' && typeof takeoffInit === 'function') takeoffInit();
   if (name === 'subs') {
