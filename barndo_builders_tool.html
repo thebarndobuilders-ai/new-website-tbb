@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v256</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v257</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8789,7 +8789,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v256';
+const BB_VERSION = 'v257';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -10595,51 +10595,57 @@ function bbTakeoffRailLeave() {
 }
 
 // =============================================================
-// 📦 TAKEOFF RAIL ACCORDION — every card in the right-hand rail
-// collapses to a named box; click the title to open/close. Which
-// boxes are open is remembered per device. CSS is scoped to the
-// takeoff rail only, so the same cards render normally when they
-// travel back to the 3D Buildout rail.
+// 📦 RAIL ACCORDION (Takeoff + 3D Buildout) — every card in either
+// rail collapses to a named box; click the title to open/close.
+// Which boxes are open is remembered per device and SHARED between
+// the Takeoff rail and the 3D Buildout rail (same box, same state).
 // =============================================================
 const BB_TO_ACC_KEY = 'bb_to_acc_open_v1';
 function _toAccOpenMap() { try { return JSON.parse(localStorage.getItem(BB_TO_ACC_KEY) || '{}'); } catch (e) { return {}; } }
-function bbTakeoffAccordionize() {
-  const rail = document.getElementById('to-split-rail');
+function bbTakeoffAccordionize() { bbRailAccordionize('to-split-rail'); }
+const BB_ACC_DEFAULT_OPEN = { 'ws-client-save-card': 1, 'ws-nav-card': 1 };
+function bbRailAccordionize(railId) {
+  const rail = document.getElementById(railId);
   if (!rail) return;
   if (!document.getElementById('bb-to-acc-style')) {
     const st = document.createElement('style');
     st.id = 'bb-to-acc-style';
     st.textContent = [
-      '#to-split-rail > .qbs-card > h3 { cursor: pointer; user-select: none; }',
-      "#to-split-rail > .qbs-card > h3::before { content: '\u25be'; color: var(--copper); margin-right: 8px; font-size: 11px; }",
-      "#to-split-rail > .qbs-card.to-collapsed > h3::before { content: '\u25b8'; }",
-      '#to-split-rail > .qbs-card.to-collapsed > h3 { margin-bottom: 0; }',
-      '#to-split-rail > .qbs-card.to-collapsed > *:not(h3) { display: none !important; }',
-      '#to-split-rail > .qbs-card.to-collapsed { padding-bottom: 14px; }',
+      '#to-split-rail > .qbs-card > h3, #ws-left > .qbs-card > h3 { cursor: pointer; user-select: none; }',
+      "#to-split-rail > .qbs-card > h3::before, #ws-left > .qbs-card > h3::before { content: '\u25be'; color: var(--copper); margin-right: 8px; font-size: 11px; }",
+      "#to-split-rail > .qbs-card.to-collapsed > h3::before, #ws-left > .qbs-card.to-collapsed > h3::before { content: '\u25b8'; }",
+      '#to-split-rail > .qbs-card.to-collapsed > h3, #ws-left > .qbs-card.to-collapsed > h3 { margin-bottom: 0; }',
+      '#to-split-rail > .qbs-card.to-collapsed > *:not(h3), #ws-left > .qbs-card.to-collapsed > *:not(h3) { display: none !important; }',
+      '#to-split-rail > .qbs-card.to-collapsed, #ws-left > .qbs-card.to-collapsed { padding-bottom: 14px; }',
     ].join('\n');
     document.head.appendChild(st);
   }
   const open = _toAccOpenMap();
   Array.from(rail.children).forEach((card, idx) => {
     if (!card.classList || !card.classList.contains('qbs-card')) return;
-    if (!card.dataset.toAccKey) {
+    let key = card.dataset.toAccKey;
+    if (!key) {
       const h3 = card.querySelector(':scope > h3');
-      const key = card.id || (h3 ? h3.textContent.replace(/\s+/g, ' ').trim().slice(0, 48) : 'card_' + idx);
+      key = card.id || (h3 ? h3.textContent.replace(/\s+/g, ' ').trim().slice(0, 48) : 'card_' + idx);
       card.dataset.toAccKey = key;
-      card.classList.toggle('to-collapsed', !open[key]);
+    }
+    if (!card.dataset.toAccInit) {
+      card.dataset.toAccInit = '1';
+      const isOpen = (key in open) ? !!open[key] : !!BB_ACC_DEFAULT_OPEN[key];
+      card.classList.toggle('to-collapsed', !isOpen);
     }
   });
   if (!rail.dataset.accWired) {
     rail.dataset.accWired = '1';
     rail.addEventListener('click', e => {
-      const h3 = e.target.closest('#to-split-rail > .qbs-card > h3');
+      const h3 = e.target.closest('.qbs-card > h3');
       if (!h3) return;
-      if (e.target.closest('button, input, select, a, textarea')) return;
       const card = h3.parentElement;
+      if (card.parentElement !== rail) return;
+      if (e.target.closest('button, input, select, a, textarea')) return;
       card.classList.toggle('to-collapsed');
       const map = _toAccOpenMap();
-      const k = card.dataset.toAccKey || '';
-      if (card.classList.contains('to-collapsed')) delete map[k]; else map[k] = 1;
+      map[card.dataset.toAccKey || ''] = card.classList.contains('to-collapsed') ? 0 : 1;
       try { localStorage.setItem(BB_TO_ACC_KEY, JSON.stringify(map)); } catch (err) {}
     });
   }
@@ -10678,6 +10684,7 @@ function wsEnter() {
   nav.id = 'ws-nav-card';
   left.appendChild(nav);
   try { bbClientSaveCardRender(); } catch (e) {}
+  try { bbRailAccordionize('ws-left'); } catch (e) {}
   // Per-card CLEAR buttons (v219): reset just that section, never the others
   document.querySelectorAll('#ws-left > .qbs-card').forEach(card => {
     if (card.id === 'ws-nav-card' || card.querySelector('.ws-clear-btn')) return;
