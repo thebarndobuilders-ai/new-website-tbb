@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v257</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v258</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2335,8 +2335,9 @@
 
   <!-- TAB 1: PROJECT -->
   <div class="qbs-tab-content" id="tab-inputs">
-    <div class="qbs-card" id="enclosure-card">
-      <h3>Enclosure <span class="badge">First selection — how much of the building gets wall metal</span></h3>
+    <div class="qbs-card" id="build-type-card">
+      <h3>Build type <span class="badge">Enclosure · framing system</span></h3>
+      <div style="font-family: var(--font-mono); font-size: 10px; color: var(--copper); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px;">Enclosure <span style="color: var(--text-4); text-transform: none; letter-spacing: 0;">· how much of the building gets wall metal</span></div>
       <div class="qbs-grid-4">
         <div class="qbs-field" style="grid-column: span 2;">
           <label>Building enclosure</label>
@@ -2370,9 +2371,9 @@
         </div>
       </div>
       <div class="qbs-note" style="margin-top:8px;">Open builds carry on posts alone — wall girts/studs are only figured where areas are enclosed. Fine-tune any line on the 📐 Framing pages.</div>
-    </div>
-    <div class="qbs-card">
-      <h3>Build tier</h3>
+      <!-- Build tier chooser hidden per builder (v258) — setTier machinery intact; unhide by removing display:none -->
+      <div id="build-tier-section" style="display:none">
+      <div style="font-family: var(--font-mono); font-size: 10px; color: var(--copper); text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 10px;">Build tier</div>
       <div class="qbs-grid-2">
         <button class="qbs-tier-btn active" data-tier="shell" onclick="setTier('shell')">
           <div class="qbs-tier-name">Shell</div>
@@ -2383,10 +2384,8 @@
           <div class="qbs-tier-desc">Same shell, single shop area</div>
         </button>
       </div>
-    </div>
-
-    <div class="qbs-card">
-      <h3>Construction system <span class="badge">Stick frame vs post frame · drives material types</span></h3>
+      </div>
+      <div style="font-family: var(--font-mono); font-size: 10px; color: var(--copper); text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 10px;">Construction system <span style="color: var(--text-4); text-transform: none; letter-spacing: 0;">· stick frame vs post frame — drives material types</span></div>
       <div class="qbs-grid-2">
         <button class="qbs-tier-btn active" data-construction="stick" onclick="setConstruction('stick')">
           <div class="qbs-tier-name">Stick frame</div>
@@ -8789,7 +8788,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v257';
+const BB_VERSION = 'v258';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
