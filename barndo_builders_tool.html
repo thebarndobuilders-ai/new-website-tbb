@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v259</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v260</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2395,6 +2395,32 @@
           <div class="qbs-tier-name">Post frame</div>
           <div class="qbs-tier-desc">6×6 PT posts at spacing, horizontal girts, no studs. Default for shops. Always lath/purlin.</div>
         </button>
+      </div>
+    </div>
+
+    <div class="qbs-card" id="widows-peak-card">
+      <h3>Widow's peak &amp; gable timbers <span class="badge">Stick-built roof extension · cypress crow's foot + corbels</span></h3>
+      <div class="qbs-grid-4">
+        <div class="qbs-field">
+          <label>Widow's peak</label>
+          <select id="wp_mode" onchange="recalc()">
+            <option value="none">None</option>
+            <option value="left">Left gable end</option>
+            <option value="right">Right gable end</option>
+            <option value="both">Both gable ends</option>
+          </select>
+        </div>
+        <div class="qbs-field">
+          <label>Roof extension</label>
+          <select id="wp_depth" onchange="recalc()">
+            <option value="2">2' widow's peak extension</option>
+            <option value="3">3' widow's peak extension</option>
+          </select>
+        </div>
+        <div class="qbs-field" style="grid-column: span 2;">
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; padding-top:6px;"><input type="checkbox" id="wp_cypress" checked onchange="recalc()" style="width:15px;height:15px;"> Cypress crow's foot + corbels</label>
+          <div class="qbs-note">Per gable: crow's foot = 3× 2×6×10' cypress · corbels = 3× 4×6×10' cypress. Metal: 2× 10' large corner, 2× 10' fascia, 1 ridge cap, 2 roof panels at the building's panel length.</div>
+        </div>
       </div>
     </div>
 
@@ -5821,7 +5847,7 @@ const SHED_LF_COST = {
   lumber:  { '1x4': 0.30, '2x4': 0.53, '2x6': 0.63, '2x8': 0.92, '2x10': 1.25, '2x12': 1.53 },
   pt:      { '2x4': 0.53, '2x6': 0.82, '2x8': 2.10, '2x10': 3.00, '2x12': 4.00,
              '4x4': 1.05, '4x6': 2.15, '6x6': 3.55, '6x8': 5.60, '8x8': 8.60 },
-  cypress: { '4x4': 3.30, '4x6': 6.50, '6x6': 9.80, '6x8': 13.00, '8x8': 18.75, '8x10': 23.50, '10x10': 29.00 },
+  cypress: { '2x6': 3.25, '4x4': 3.30, '4x6': 6.50, '6x6': 9.80, '6x8': 13.00, '8x8': 18.75, '8x10': 23.50, '10x10': 29.00 },
   // Yellow pine (YP) rough timbers — placeholders until real supplier numbers land
   yp:      { '4x6': 3.20, '6x6': 4.50, '6x8': 6.50, '8x8': 9.50, '8x10': 12.00, '10x10': 15.00 },
 };
@@ -5862,6 +5888,46 @@ const MATERIALS = [
     priceCost: 4.50, priceSell: 5.65, priceRetail: 6.75,
     customUnitPrice: i => bbSheetrockState().pBead,
     formula: i => bbSheetrockQty('bead') },
+  // === WIDOW'S PEAK — stick-built peak + cypress crow's foot & corbels (builder recipe) ===
+  { id: "wp_frame_2x6", label: "Widow's peak stick framing — 2×6×12 SYP (5/gable)", cat: "Widow's peak", uom: "pc", packSize: null,
+    priceCost: 7.56, priceSell: 9.45, priceRetail: 11.35,
+    customUnitPrice: i => (SHED_LF_COST.lumber['2x6'] || 0.63) * 12,
+    formula: i => 5 * (i.wpCount || 0) },
+  { id: "wp_cyp_crow", label: "Cypress crow's foot — 2×6×10 (3 per gable)", cat: "Widow's peak", uom: "pc", packSize: null,
+    priceCost: 32.50, priceSell: 40.65, priceRetail: 48.75,
+    customUnitPrice: i => (SHED_LF_COST.cypress['2x6'] || 3.25) * 10,
+    formula: i => i.wpCypress ? 3 * (i.wpCount || 0) : 0 },
+  { id: "wp_cyp_corbel", label: "Cypress corbels — 4×6×10 (3 per gable)", cat: "Widow's peak", uom: "pc", packSize: null,
+    priceCost: 65.00, priceSell: 81.25, priceRetail: 97.50,
+    customUnitPrice: i => (SHED_LF_COST.cypress['4x6'] || 6.50) * 10,
+    formula: i => i.wpCypress ? 3 * (i.wpCount || 0) : 0 },
+  { id: "wp_corner_trim", label: "Large corner trim 10' (2 per gable)", cat: "Widow's peak", uom: "pc", packSize: null,
+    priceCost: 17.53, priceSell: 21.90, priceRetail: 26.30,
+    formula: i => 2 * (i.wpCount || 0) },
+  { id: "wp_fascia_trim", label: "Fascia trim 10' (2 per gable)", cat: "Widow's peak", uom: "pc", packSize: null,
+    priceCost: 15.96, priceSell: 19.95, priceRetail: 23.95,
+    formula: i => 2 * (i.wpCount || 0) },
+  { id: "wp_ridge_cap", label: "Ridge cap 10'3\" (1 per gable)", cat: "Widow's peak", uom: "pc", packSize: null,
+    priceCost: 17.19, priceSell: 21.50, priceRetail: 25.80,
+    formula: i => 1 * (i.wpCount || 0) },
+  { id: "wp_roof_panel", label: "Roof metal — 2 panels per gable @ panel length", cat: "Widow's peak", uom: "LF", packSize: null,
+    priceCost: 2.80, priceSell: 3.50, priceRetail: 4.20,
+    labelFn: i => {
+      const run = (i.W || 0) / 2, rise = run * ((i.pitch || 0) / 12);
+      const slope = Math.sqrt(run * run + rise * rise) + (i.eaveOH || 0) * Math.sqrt(1 + Math.pow((i.pitch || 0) / 12, 2));
+      const len = Math.ceil(slope * 2) / 2;
+      return "Roof metal — 2 panels per gable @ " + len + "' (matches building panels)";
+    },
+    formula: i => {
+      if (!(i.wpCount || 0)) return 0;
+      const run = (i.W || 0) / 2, rise = run * ((i.pitch || 0) / 12);
+      const slope = Math.sqrt(run * run + rise * rise) + (i.eaveOH || 0) * Math.sqrt(1 + Math.pow((i.pitch || 0) / 12, 2));
+      const len = Math.ceil(slope * 2) / 2;
+      return Math.round(2 * len * i.wpCount * 10) / 10;
+    } },
+  { id: "wp_timber_screws", label: "10\" timber screws (12 per gable w/ cypress)", cat: "Widow's peak", uom: "ea", packSize: null,
+    priceCost: 1.38, priceSell: 1.75, priceRetail: 2.10,
+    formula: i => i.wpCypress ? 12 * (i.wpCount || 0) : 0 },
 
   // ---------------- BLOCK FOUNDATION (CMU) ----------------
   // Stem wall + piers. Both feed into the same SKU lines when block size matches.
@@ -8784,7 +8850,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v259';
+const BB_VERSION = 'v260';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -13254,6 +13320,11 @@ function getInputs() {
   const _hasGeom = (L > 0 || W > 0 || num('ext_wall_lf') > 0);
   const eaveOH = _hasGeom ? num('eave_overhang') / 12 : 0; // inches → feet
   const gableOH = _hasGeom ? num('gable_overhang') / 12 : 0;
+  // Widow's peak — stick-built peak extension + cypress gable timbers
+  const wpMode = ((document.getElementById('wp_mode') || {}).value) || 'none';
+  const wpDepth = num('wp_depth') || 2;
+  const wpCypress = !!((document.getElementById('wp_cypress') || {}).checked);
+  const wpCount = wpMode === 'both' ? 2 : (wpMode === 'none' ? 0 : 1);
   const span = W; // truss length = building width
   const run = span / 2;
   const rise = run * (pitch / 12); // heel height
@@ -13643,6 +13714,7 @@ function getInputs() {
     tier: currentTier,
     L, W, H, pitch,
     eaveOH, gableOH,
+    wpMode, wpDepth, wpCypress, wpCount,
     span, run, rise, topChord, slopeAngleDeg,
     roofArea, ceilingArea, gableTriangleArea, totalGableSidingArea, wallRectArea, wallArea,
     // Interior wall area: LF × wall height × 2 sides (both faces get sheetrock)
@@ -18716,6 +18788,7 @@ function makeTuffRibTexture(isRoof, hexColor) {
 // black trim/openings. Each color identifies a quoted shell category.
 // =============================================================================
 const CATEGORY_COLORS = {
+  widows_peak:       { hex: 0xb0824d, label: "Widow's peak timbers", textHex: '#c9995f' },
   foundation:        { hex: 0xc7c7c1, label: 'Foundation / slab', textHex: '#9a9a92' },
   mudsill:           { hex: 0xd97706, label: 'Mudsill / PT plate', textHex: '#d97706' },
   wall_framing:      { hex: 0xa78a5e, label: 'Wall framing (studs)', textHex: '#a78a5e' },
@@ -19452,6 +19525,7 @@ function generateModel() {
 
   // === SIDE SHED / LEAN-TO (from the Additions tab card) ===
   try { buildSideShed(dims, wallBase); } catch (e) { console.warn('3D side shed skipped:', e); }
+  try { buildWidowsPeak(dims, wallBase); } catch (e) { console.warn('3D widow\'s peak skipped:', e); }
   try { buildPorch3D(dims, wallBase); } catch (e) { console.warn('3D porch skipped:', e); }
   try { buildCrowsFoot3D(dims, wallBase); } catch (e) { console.warn('3D crows foot skipped:', e); }
   try { buildExtension3D(dims, wallBase); } catch (e) { console.warn('3D extension skipped:', e); }
@@ -20062,6 +20136,93 @@ function buildPorch3D(dims, wallBase) {
 
 // === BUILDING EXTENSION — continues the building off a gable end with its own
 // size, height, framing (post/stud), enclosure (open/enclosed) and colors.
+// =============================================================
+// WIDOW'S PEAK 3D — stick-built roof extension at the gable ridge
+// (tapers back to the normal rake) + cypress crow's foot & corbels
+// on the gable wall, matching the builder's timber-accent look.
+// =============================================================
+function buildWidowsPeak(dims, wallBase) {
+  const modeEl = document.getElementById('wp_mode');
+  const mode = modeEl ? modeEl.value : 'none';
+  if (!mode || mode === 'none') return;
+  const { L, W, H, pitch, eaveOH, gableOH } = dims;
+  if (!(L > 0 && W > 0)) return;
+  const D = parseFloat((document.getElementById('wp_depth') || {}).value) || 2;
+  const withCypress = !!((document.getElementById('wp_cypress') || {}).checked);
+  const run = W / 2, rise = run * (pitch / 12);
+  const wallTop = wallBase + H;
+  const ridgeY = wallTop + rise + 0.14;
+  const slopeK = pitch / 12;
+  const colors = (typeof bb3dSelectedColors === 'function') ? bb3dSelectedColors() : { roof: 0x1c1c1e };
+  const roofMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, map: makeTuffRibTexture(true, colors.roof), roughness: 0.3, metalness: 0.55, side: THREE.DoubleSide });
+  const cypMat = () => new THREE.MeshStandardMaterial({ color: 0xb0824d, roughness: 0.7, metalness: 0.05 });
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x141517, roughness: 0.45, metalness: 0.4 });
+  const sides = mode === 'both' ? [-1, 1] : [mode === 'left' ? -1 : 1];
+  const tag = (mesh, label) => {
+    mesh.userData = { categoryKey: 'widows_peak', label };
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    buildingGroup.add(mesh); allMeshes.push(mesh);
+    return mesh;
+  };
+  const angled = (a, b, w, h, mat, label) => {
+    const len = a.distanceTo(b);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, len), mat);
+    m.position.copy(a.clone().add(b).multiplyScalar(0.5));
+    m.lookAt(b);
+    return tag(m, label);
+  };
+  sides.forEach(s => {
+    const sideName = s < 0 ? 'left' : 'right';
+    const x0 = s * (L / 2 + gableOH);
+    const xTip = s * (L / 2 + gableOH + D);
+    const dropZ = Math.min(run, D * 2.4);
+    // tapered extension planes, one per slope
+    [-1, 1].forEach(zs => {
+      const pos = [x0, ridgeY, 0, xTip, ridgeY, 0, x0, ridgeY - dropZ * slopeK, zs * dropZ];
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 0.9, 0, 0, 1.4], 2));
+      g.computeVertexNormals();
+      tag(new THREE.Mesh(g, roofMat), "Widow's peak roof metal — " + sideName);
+    });
+    // ridge cap stub to the tip
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(xTip - x0) + 0.3, 0.16, 0.95), capMat);
+    cap.position.set((x0 + xTip) / 2, ridgeY + 0.1, 0);
+    tag(cap, "Widow's peak ridge cap — " + sideName);
+    if (!withCypress) return;
+    // ---- cypress crow's foot on the gable wall ----
+    const xFace = s * (L / 2 + 0.14);
+    const ch = Math.min(9, W * 0.34);           // horizontal chord length
+    const hd = (ch / 2) * slopeK;               // drop from ridge at chord ends
+    const chordY = ridgeY - 0.3 - hd;
+    // horizontal chord (2x6 on the flat face)
+    const chord = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.46, ch), cypMat());
+    chord.position.set(xFace, chordY, 0);
+    tag(chord, "Crow's foot chord — " + sideName);
+    // rake chords following the roof pitch
+    const peakPt = new THREE.Vector3(xFace, ridgeY - 0.34, 0);
+    [-1, 1].forEach(zs => {
+      const endPt = new THREE.Vector3(xFace, chordY + 0.1, zs * ch / 2);
+      angled(peakPt, endPt, 0.14, 0.46, cypMat(), "Crow's foot rake — " + sideName);
+      // fan strut mid-bay
+      const mid = new THREE.Vector3(xFace, (peakPt.y + endPt.y) / 2 + 0.05, zs * ch / 4);
+      angled(new THREE.Vector3(xFace, chordY - 0.18, 0), mid, 0.12, 0.4, cypMat(), "Crow's foot strut — " + sideName);
+    });
+    // center strut to the peak
+    angled(new THREE.Vector3(xFace, chordY - 0.18, 0), peakPt, 0.12, 0.4, cypMat(), "Crow's foot strut — " + sideName);
+    // ---- corbels (4x6) under the chord ends ----
+    [-1, 1].forEach(zs => {
+      const topPt = new THREE.Vector3(xFace, chordY - 0.23, zs * (ch / 2 - 0.25));
+      const wallPt = new THREE.Vector3(xFace, chordY - 2.6, zs * (ch / 2 - 0.25));
+      const v = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.4, 0.46), cypMat());
+      v.position.set(xFace, chordY - 1.45, zs * (ch / 2 - 0.25));
+      tag(v, 'Corbel — ' + sideName);
+      angled(wallPt, new THREE.Vector3(xFace, chordY - 0.28, zs * (ch / 2 - 1.9)), 0.3, 0.46, cypMat(), 'Corbel brace — ' + sideName);
+    });
+  });
+}
+
 function buildExtension3D(dims, wallBase) {
   const en = document.getElementById('ext_enabled');
   if (!en || !en.checked) return;
