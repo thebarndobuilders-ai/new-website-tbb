@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v269</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v270</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3312,6 +3312,8 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           <select id="wp_depth" onchange="recalc()">
             <option value="2">2' widow's peak — 6' wide</option>
             <option value="3">3' widow's peak — 8' wide</option>
+            <option value="4">4' widow's peak — 10' wide</option>
+            <option value="5">5' widow's peak — 12' wide</option>
           </select>
         </div>
         <div class="qbs-field" style="grid-column: span 2;">
@@ -8851,7 +8853,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v269';
+const BB_VERSION = 'v270';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -20202,7 +20204,7 @@ function buildMetalTrim(dims, wallBase) {
   // meets the roof (the taper return point) instead of running to the ridge.
   const wpModeT = ((document.getElementById('wp_mode') || {}).value) || 'none';
   const wpDT = parseFloat((document.getElementById('wp_depth') || {}).value) || 2;
-  const wpHalf = (wpDT >= 3 ? 8 : 6) / 2;
+  const wpHalf = ({ 2: 6, 3: 8, 4: 10, 5: 12 }[wpDT] || 6) / 2;
   const zEave = W / 2 + eaveOH;
   [-1, 1].forEach(sx => [-1, 1].forEach(sz => {
     const hasPeak = wpModeT === 'both' || (wpModeT === 'front' && sx > 0) || (wpModeT === 'rear' && sx < 0);
@@ -20250,7 +20252,7 @@ function buildWidowsPeak(dims, wallBase) {
     const sideName = s < 0 ? 'rear' : 'front';
     const x0 = s * (L / 2 + gableOH);
     const xTip = s * (L / 2 + gableOH + D);
-    const dropZ = (D >= 3 ? 8 : 6) / 2;   // standard widths: 2' peak = 6' wide, 3' peak = 8' wide (half each side of the ridge)
+    const dropZ = ({ 2: 6, 3: 8, 4: 10, 5: 12 }[D] || 6) / 2;   // standard widths: 2'=6', 3'=8', 4'=10', 5'=12' wide (half each side)
     // tapered extension planes, one per slope
     [-1, 1].forEach(zs => {
       const xIn = x0 - s * 0.35;   // tuck 4" onto the main roof so the rake edge face never peeks through
@@ -20260,10 +20262,11 @@ function buildWidowsPeak(dims, wallBase) {
       g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 0.9, 0, 0, 1.4], 2));
       g.computeVertexNormals();
       tag(new THREE.Mesh(g, roofMat), "Widow's peak roof metal — " + sideName);
-      // edge trim along the taper line — covers the seam like the real flashing does
-      angled(new THREE.Vector3(xTip, ridgeY + 0.02, 0),
-             new THREE.Vector3(xIn, ridgeY - dropZ * slopeK + 0.02, zs * dropZ),
-             0.24, 0.12, capMat, "Widow's peak roof metal trim — " + sideName);
+      // rake trim on the peak's front edges — same profile as the building
+      // rake trim, so the trim line runs continuous: eave -> return -> tip
+      angled(new THREE.Vector3(xTip, ridgeY - 0.08, 0),
+             new THREE.Vector3(xIn, ridgeY - dropZ * slopeK - 0.08, zs * dropZ),
+             0.14, 0.5, capMat, "Widow's peak roof metal trim — " + sideName);
     });
     // ridge cap stub to the tip
     // stub starts where the MAIN ridge cap ends — no overlap, no z-fighting
