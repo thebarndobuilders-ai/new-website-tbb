@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v263</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v264</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8851,7 +8851,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v263';
+const BB_VERSION = 'v264';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -20152,8 +20152,8 @@ function buildWidowsPeak(dims, wallBase) {
   const withCypress = !!((document.getElementById('wp_cypress') || {}).checked);
   const run = W / 2, rise = run * (pitch / 12);
   const wallTop = wallBase + H;
-  const ridgeY = wallTop + rise + 0.02;
-  const slopeK = pitch / 12;
+  const ridgeY = wallTop + rise + 0.12;   // just above the roof boxes' edge faces so nothing peeks through the peak
+  const slopeK = rise / (run + eaveOH);   // match the RENDERED roof's effective slope (ridge -> eave outer edge), not the raw pitch
   const colors = (typeof bb3dSelectedColors === 'function') ? bb3dSelectedColors() : { roof: 0x1c1c1e };
   const roofMat = new THREE.MeshStandardMaterial({
     color: 0xffffff, map: makeTuffRibTexture(true, colors.roof), roughness: 0.3, metalness: 0.55, side: THREE.DoubleSide });
@@ -20180,29 +20180,35 @@ function buildWidowsPeak(dims, wallBase) {
     const dropZ = Math.min(run, D * 2.4);   // partial taper — returns to the normal rake partway down the slope (builder-preferred look)
     // tapered extension planes, one per slope
     [-1, 1].forEach(zs => {
-      const pos = [x0, ridgeY, 0, xTip, ridgeY, 0, x0, ridgeY - dropZ * slopeK, zs * dropZ];
+      const xIn = x0 - s * 0.35;   // tuck 4" onto the main roof so the rake edge face never peeks through
+      const pos = [xIn, ridgeY, 0, xTip, ridgeY, 0, xIn, ridgeY - dropZ * slopeK, zs * dropZ];
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
       g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 0.9, 0, 0, 1.4], 2));
       g.computeVertexNormals();
       tag(new THREE.Mesh(g, roofMat), "Widow's peak roof metal — " + sideName);
+      // edge trim along the taper line — covers the seam like the real flashing does
+      angled(new THREE.Vector3(xTip, ridgeY + 0.02, 0),
+             new THREE.Vector3(xIn, ridgeY - dropZ * slopeK + 0.02, zs * dropZ),
+             0.24, 0.12, capMat, "Widow's peak roof metal trim — " + sideName);
     });
     // ridge cap stub to the tip
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(xTip - x0) + 0.3, 0.18, 0.6), capMat);
-    cap.position.set((x0 + xTip) / 2, wallTop + rise + 0.1, 0);
+    // stub starts where the MAIN ridge cap ends — no overlap, no z-fighting
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(xTip - x0), 0.18, 0.6), capMat);
+    cap.position.set((x0 + xTip) / 2 + s * 0.02, wallTop + rise + 0.115, 0);
     tag(cap, "Widow's peak ridge cap — " + sideName);
     if (!withCypress) return;
     // ---- cypress crow's foot on the gable wall ----
     const xFace = s * (L / 2 + 0.14);
     const ch = Math.min(9, W * 0.34);           // horizontal chord length
     const hd = (ch / 2) * slopeK;               // drop from ridge at chord ends
-    const chordY = ridgeY - 0.3 - hd;
+    const chordY = ridgeY - 0.55 - hd;   // clear the peak roof planes — no poking through
     // horizontal chord (2x6 on the flat face)
     const chord = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.46, ch), cypMat());
     chord.position.set(xFace, chordY, 0);
     tag(chord, "Crow's foot chord — " + sideName);
     // rake chords following the roof pitch
-    const peakPt = new THREE.Vector3(xFace, ridgeY - 0.34, 0);
+    const peakPt = new THREE.Vector3(xFace, ridgeY - 0.58, 0);
     [-1, 1].forEach(zs => {
       const endPt = new THREE.Vector3(xFace, chordY + 0.1, zs * ch / 2);
       angled(peakPt, endPt, 0.14, 0.46, cypMat(), "Crow's foot rake — " + sideName);
@@ -22173,6 +22179,26 @@ window.bb3dListMeshes = function(filter) {
     .filter(m => !filter || String((m.userData || {}).label || '').indexOf(filter) >= 0)
     .map(m => ({ label: (m.userData || {}).label || '(none)', key: (m.userData || {}).shedWallKey || null,
                  visible: m.visible, pos: m.getWorldPosition(new THREE.Vector3()).toArray().map(v => +v.toFixed(1)) }));
+};
+
+// QA hooks: recolor / show-hide meshes by label substring (headless debugging)
+window.bb3dPaint = function(filter, hex) {
+  if (!initialized) return 0;
+  let n = 0;
+  allMeshes.forEach(m => {
+    if (filter && String((m.userData || {}).label || '').indexOf(filter) < 0) return;
+    if (m.material && m.material.color) { m.material = m.material.clone(); m.material.map = null; m.material.color.setHex(hex); n++; }
+  });
+  return n;
+};
+window.bb3dShow = function(filter, visible) {
+  if (!initialized) return 0;
+  let n = 0;
+  allMeshes.forEach(m => {
+    if (filter && String((m.userData || {}).label || '').indexOf(filter) < 0) return;
+    m.visible = !!visible; n++;
+  });
+  return n;
 };
 
 window.bb3dRefresh = function() {
