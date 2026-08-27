@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v272</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v273</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2314,6 +2314,7 @@
     <div class="qbs-tab active" data-tab="takeoff" onclick="switchTab('takeoff')">1. Takeoff</div>
     <div class="qbs-tab" data-tab="barndos" onclick="switchTab('barndos')" style="color:var(--copper);">🏠 Barndos</div>
     <div class="qbs-tab" data-tab="framing" onclick="switchTab('framing')">📐 Framing pages</div>
+    <div class="qbs-tab" data-tab="blueprints" onclick="switchTab('blueprints')">📃 Blueprints</div>
     <div class="qbs-tab" data-tab="workspace" onclick="switchTab('workspace')" style="color:var(--copper); font-weight:700;">⚡ 3D Buildout</div>
     <div class="qbs-tab" data-tab="inputs" onclick="switchTab('inputs')" style="display:none">2. Dimensions</div>
     <div class="qbs-tab" data-tab="foundation" onclick="switchTab('foundation')">3. Foundation</div>
@@ -4039,6 +4040,19 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
       <div id="jc-dash"></div>
     </div>
     <div id="jc-detail"></div>
+  </div>
+
+  <!-- TAB: BLUEPRINTS — construction set generated from the live configuration -->
+  <div class="qbs-tab-content" id="tab-blueprints" style="display:none">
+    <div class="qbs-card">
+      <h3>📃 Blueprints <span class="badge">Generated live · elevations · plans · truss & floor framing · schedule</span></h3>
+      <p class="qbs-sub" style="margin-bottom:10px;">Drawn straight from the current building — dimensions, openings (place them on walls in the 3D tool for exact positions), porches, trusses, floor system, widow's peaks. <strong>Preliminary set — not stamped engineering drawings.</strong></p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+        <button onclick="bbBPRender(); bbToast('Sheets regenerated from the current build.')">↻ Regenerate</button>
+        <button onclick="bbBPPrint()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper);">🖨 Print / Save as PDF</button>
+      </div>
+      <div id="bbp-sheets" style="display:grid; gap:18px;"></div>
+    </div>
   </div>
 
   <div class="qbs-tab-content" id="tab-framing" style="display:none">
@@ -8872,7 +8886,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v272';
+const BB_VERSION = 'v273';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -10734,6 +10748,562 @@ function bbRailAccordionize(railId) {
   }
 }
 
+// =============================================================
+// 📃 BLUEPRINT GENERATOR — a basic construction set drawn as SVG
+// sheets from the live configuration. Sheets: A-1 front/back
+// elevations, A-2 left/right (gable) elevations, S-1 foundation,
+// A-3 floor plan, S-2 roof framing / truss plan, S-3 floor framing,
+// A-4 window & door schedule. Barndo Builders title block on every
+// sheet. Preliminary set — not stamped engineering.
+// =============================================================
+const BBP_SW = 1584, BBP_SH = 1224, BBP_M = 46, BBP_TBW = 250;
+const BBP_DRW = BBP_SW - BBP_M * 2 - BBP_TBW - 20;
+const BBP_DRH = BBP_SH - BBP_M * 2;
+
+function bbpEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+function bbpLn(x1, y1, x2, y2, w, dash, color) {
+  return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + (color || '#111') + '" stroke-width="' + (w || 1.4) + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>';
+}
+function bbpRect(x, y, w, h, sw, dash, fill) {
+  return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="' + (fill || 'none') + '" stroke="#111" stroke-width="' + (sw || 1.4) + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>';
+}
+function bbpTxt(x, y, s, size, anchor, bold, color) {
+  return '<text x="' + x + '" y="' + y + '" font-size="' + (size || 15) + '" text-anchor="' + (anchor || 'start') + '" fill="' + (color || '#111') + '"' + (bold ? ' font-weight="bold"' : '') + ' font-family="Arial">' + bbpEsc(s) + '</text>';
+}
+function bbpDim(x1, y1, x2, y2, label, off) {
+  off = off || 0;
+  const horiz = Math.abs(y2 - y1) < 0.5;
+  let o = '';
+  if (horiz) {
+    const y = y1 + off;
+    o += bbpLn(x1, y1, x1, y + (off >= 0 ? 8 : -8), 0.8) + bbpLn(x2, y2, x2, y + (off >= 0 ? 8 : -8), 0.8);
+    o += bbpLn(x1, y, x2, y, 1);
+    o += bbpLn(x1 - 4, y + 4, x1 + 4, y - 4, 1.4) + bbpLn(x2 - 4, y + 4, x2 + 4, y - 4, 1.4);
+    o += bbpTxt((x1 + x2) / 2, y - 6, label, 15, 'middle', true);
+  } else {
+    const x = x1 + off;
+    o += bbpLn(x1, y1, x + (off >= 0 ? 8 : -8), y1, 0.8) + bbpLn(x2, y2, x + (off >= 0 ? 8 : -8), y2, 0.8);
+    o += bbpLn(x, y1, x, y2, 1);
+    o += bbpLn(x - 4, y1 + 4, x + 4, y1 - 4, 1.4) + bbpLn(x - 4, y2 + 4, x + 4, y2 - 4, 1.4);
+    o += '<text x="' + (x - 6) + '" y="' + ((y1 + y2) / 2) + '" font-size="15" text-anchor="middle" font-weight="bold" font-family="Arial" transform="rotate(-90 ' + (x - 6) + ' ' + ((y1 + y2) / 2) + ')">' + bbpEsc(label) + '</text>';
+  }
+  return o;
+}
+function bbpFtIn(ft) {
+  if (ft == null || isNaN(ft)) return '';
+  const neg = ft < 0; ft = Math.abs(ft);
+  let f = Math.floor(ft + 1e-6);
+  let inch = Math.round((ft - f) * 12);
+  if (inch === 12) { f++; inch = 0; }
+  return (neg ? '-' : '') + f + "'-" + inch + '"';
+}
+function bbpGrade(x1, x2, y) {
+  let o = bbpLn(x1 - 20, y, x2 + 20, y, 2.2);
+  for (let gx = x1 - 12; gx < x2 + 12; gx += 26) o += bbpLn(gx, y, gx - 12, y + 12, 0.8);
+  return o;
+}
+function bbpRibs(x, y, w, h, s) {
+  let o = '';
+  for (let rx = x + 3 * s; rx < x + w - 1; rx += 3 * s) o += bbpLn(rx, y, rx, y + h, 0.4, null, '#aaa');
+  return o;
+}
+
+// title block — pulls project/client info live
+function bbpTitleBlock(sheetTitle, sheetNo, ctx) {
+  const x = BBP_SW - BBP_M - BBP_TBW;
+  let o = '';
+  o += bbpRect(BBP_M, BBP_M, BBP_SW - 2 * BBP_M, BBP_SH - 2 * BBP_M, 3);
+  o += bbpRect(x, BBP_M, BBP_TBW, BBP_SH - 2 * BBP_M, 2.4);
+  o += '<rect x="' + (x + 18) + '" y="' + (BBP_M + 24) + '" width="' + (BBP_TBW - 36) + '" height="120" fill="#0c0d0f"/>';
+  o += bbpTxt(x + BBP_TBW / 2, BBP_M + 70, 'THE', 16, 'middle', true, '#fff');
+  o += bbpTxt(x + BBP_TBW / 2, BBP_M + 102, 'BARNDO', 34, 'middle', true, '#fff');
+  o += bbpTxt(x + BBP_TBW / 2, BBP_M + 126, 'B U I L D E R S', 14, 'middle', false, '#fff');
+  o += bbpTxt(x + BBP_TBW / 2, BBP_M + 172, 'INFO@THEBARNDOBUILDERS.COM', 11, 'middle');
+  o += bbpLn(x, BBP_M + 190, x + BBP_TBW, BBP_M + 190, 1.4);
+  const proj = (ctx.project || 'BARNDO PROJECT').toUpperCase();
+  const p1 = proj.length > 15 ? proj.slice(0, proj.lastIndexOf(' ', 15) > 4 ? proj.lastIndexOf(' ', 15) : 15) : proj;
+  const p2 = proj.slice(p1.length).trim();
+  o += bbpTxt(x + BBP_TBW / 2, BBP_M + 240, p1, 24, 'middle', true);
+  if (p2) o += bbpTxt(x + BBP_TBW / 2, BBP_M + 270, p2.slice(0, 16), 24, 'middle', true);
+  o += bbpTxt(x + BBP_TBW / 2, BBP_M + 300, ctx.desc1, 12, 'middle');
+  o += bbpTxt(x + BBP_TBW / 2, BBP_M + 318, ctx.desc2, 12, 'middle');
+  o += bbpLn(x, BBP_M + 340, x + BBP_TBW, BBP_M + 340, 1.4);
+  const t = sheetTitle.toUpperCase();
+  if (t.length > 22) {
+    const cut = t.lastIndexOf(' ', 22);
+    o += bbpTxt(x + BBP_TBW / 2, BBP_M + 382, t.slice(0, cut), 17, 'middle', true);
+    o += bbpTxt(x + BBP_TBW / 2, BBP_M + 404, t.slice(cut + 1), 17, 'middle', true);
+  } else {
+    o += bbpTxt(x + BBP_TBW / 2, BBP_M + 392, t, 18, 'middle', true);
+  }
+  o += bbpLn(x, BBP_M + 418, x + BBP_TBW, BBP_M + 418, 1.4);
+  const rows = [['DATE:', new Date().toLocaleDateString('en-US')], ['SCALE:', 'NOT TO SCALE'], ['DRAWN:', 'BB ESTIMATOR'], ['CLIENT:', (ctx.client || '—').slice(0, 16).toUpperCase()]];
+  rows.forEach((r, i) => {
+    o += bbpTxt(x + 20, BBP_M + 452 + i * 30, r[0], 13, 'start', true);
+    o += bbpTxt(x + 105, BBP_M + 452 + i * 30, r[1], 13);
+    o += bbpLn(x, BBP_M + 462 + i * 30, x + BBP_TBW, BBP_M + 462 + i * 30, 0.6);
+  });
+  const ny = BBP_SH - BBP_M - 230;
+  o += bbpLn(x, ny, x + BBP_TBW, ny, 1.4);
+  ['THESE PLANS ARE THE SOLE', 'PROPERTY OF THE BARNDO', 'BUILDERS. ANY UNAUTHORIZED', 'REPRODUCTION IS STRICTLY', 'PROHIBITED.', '', 'PRELIMINARY — NOT FOR', 'CONSTRUCTION UNLESS', 'REVIEWED BY BUILDER.'].forEach((s, i) => {
+    o += bbpTxt(x + BBP_TBW / 2, ny + 26 + i * 17, s, 11, 'middle');
+  });
+  o += bbpRect(x, BBP_SH - BBP_M - 64, BBP_TBW, 64, 2.4);
+  o += bbpTxt(x + 20, BBP_SH - BBP_M - 24, 'SHEET', 13, 'start', true);
+  o += bbpTxt(x + BBP_TBW - 24, BBP_SH - BBP_M - 18, sheetNo, 34, 'end', true);
+  return o;
+}
+
+// openings collected per wall + schedule rows, with stable tags
+function bbBPCollect() {
+  const out = { rows: [], walls: { front: [], back: [], left: [], right: [] } };
+  const AZ = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const defs = [['garage', 'G', 'OVERHEAD DOOR'], ['extdoor', 'D', 'ENTRY DOOR'], ['window', 'W', 'WINDOW'], ['intdoor', 'I', 'INTERIOR DOOR']];
+  defs.forEach(([type, pre, typeName]) => {
+    ((typeof openingsState !== 'undefined' && openingsState[type]) || []).forEach((row, idx) => {
+      const tg = (row.label && String(row.label).trim()) || (pre + '-' + AZ[idx % 26]);
+      const q = Math.max(1, Math.round(parseFloat(row.qty) || 1));
+      out.rows.push({ tag: tg, typeName, w: parseFloat(row.w) || 3, h: parseFloat(row.h) || (type === 'window' ? 4 : 6.667), style: row.style || row.doorType || '', qty: q });
+      if (type === 'intdoor') return;
+      for (let k = 0; k < q; k++) {
+        const wall = row.wall || 'front';
+        const pos = (row.pos != null) ? Math.min(0.96, Math.max(0.04, row.pos + (q > 1 ? (k - (q - 1) / 2) * 0.12 : 0))) : null;
+        (out.walls[wall] || out.walls.front).push({ tag: tg, w: parseFloat(row.w) || 3, h: parseFloat(row.h) || 4, pos, type, sill: (row.sill != null ? parseFloat(row.sill) : 3), placed: row.wall != null });
+      }
+    });
+  });
+  Object.keys(out.walls).forEach(w => {
+    const un = out.walls[w].filter(o => o.pos == null);
+    un.forEach((o, i2) => { o.pos = (i2 + 1) / (un.length + 1); });
+    out.walls[w].sort((a, b) => a.pos - b.pos);
+  });
+  return out;
+}
+
+function bbBPPorches() {
+  const on = id => { const el = document.getElementById(id); return el ? el.checked : false; };
+  const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+  return {
+    front: on('porch_front_on') ? { depth: n('porch_front_depth') || 8, len: n('porch_front_len') } : null,
+    back: on('porch_back_on') ? { depth: n('porch_back_depth') || 8, len: n('porch_back_len') } : null,
+    left: on('porch_left_on') ? { depth: n('porch_left_depth') || 8, len: n('porch_left_len') } : null,
+    right: on('porch_right_on') ? { depth: n('porch_right_depth') || 8, len: n('porch_right_len') } : null,
+    postH: n('porch_post_height') || 9,
+    spacing: n('porch_post_spacing') || 10,
+    pitch: n('porch_pitch') || 3,
+  };
+}
+
+// opening glyph in elevation (x = center px, gy = grade y, s = px/ft)
+function bbpOpeningElev(op, xc, gy, s) {
+  let o = '';
+  const w = op.w * s, h = op.h * s;
+  if (op.type === 'window') {
+    const sill = Math.min(10, Math.max(1, op.sill != null ? op.sill : 3));
+    const y0 = gy - (sill + op.h) * s;
+    o += bbpRect(xc - w / 2, y0, w, h, 2);
+    o += bbpLn(xc - w / 2, y0 + h / 2, xc + w / 2, y0 + h / 2, 0.9);
+    o += bbpLn(xc, y0, xc, y0 + h, 0.9);
+    o += bbpTxt(xc, y0 - 8, op.tag, 13, 'middle', true);
+  } else if (op.type === 'garage') {
+    o += bbpRect(xc - w / 2, gy - h, w, h, 2.2);
+    for (let yy = gy - h + h / 6; yy < gy - 3; yy += h / 6) o += bbpLn(xc - w / 2, yy, xc + w / 2, yy, 0.7);
+    for (let xx = xc - w / 2 + w / 4; xx < xc + w / 2 - 2; xx += w / 4) o += bbpLn(xx, gy - h, xx, gy, 0.7);
+    o += bbpTxt(xc, gy - h - 8, op.tag, 13, 'middle', true);
+  } else {
+    o += bbpRect(xc - w / 2, gy - h, w, h, 2);
+    o += bbpRect(xc - w / 2 + 5, gy - h + 5, w - 10, h * 0.45, 0.9);
+    o += bbpTxt(xc, gy - h - 8, op.tag, 13, 'middle', true);
+  }
+  return o;
+}
+
+// ---- SHEET BUILDERS --------------------------------------------------------
+function bbBPSheets() {
+  const i = getInputs();
+  const W = i.W || 0, L = i.L || 0, H = i.H || 0, pitch = i.pitch || 4;
+  const rise = (W / 2) * (pitch / 12);
+  const eaveOH = i.eaveOH || 1, gableOH = i.gableOH || 1;
+  const col = bbBPCollect();
+  const por = bbBPPorches();
+  const wpMode = i.wpMode || 'none', wpD = i.wpDepth || 2;
+  const wpHalf = ({ 2: 6, 3: 8, 4: 10, 5: 12 }[Math.round(wpD)] || 6) / 2;
+  const construction = (typeof currentConstruction !== 'undefined') ? currentConstruction : 'stick';
+  const client = ((document.getElementById('client_name') || {}).value || '').trim();
+  const proj = client ? client + ' BUILD' : 'BARNDO PROJECT';
+  const trussSpacingFt = (function () { const el = document.getElementById('truss_spacing'); return el ? (parseFloat(el.value) || 4) : 4; })();
+  const steel = ((document.getElementById('truss_type') || {}).value === 'steel');
+  const scissor = (typeof trussGroups !== 'undefined') && trussGroups.some(g => g.type === 'scissor');
+  const ctx = {
+    project: proj, client,
+    desc1: W + "' x " + L + "' x " + H + "' — " + pitch + '/12 ' + (steel ? 'STEEL' : (scissor ? 'SCISSOR' : 'WOOD')) + ' TRUSS',
+    desc2: (construction === 'post' ? 'POST FRAME' : 'STICK FRAME') + (por.front || por.back || por.left || por.right ? ' · OPEN PORCHES' : ''),
+  };
+  const extras = [];
+  if ((document.getElementById('shed_enabled') || {}).checked) extras.push('SIDE SHED (NOT DRAWN — SEE 3D)');
+  if ((document.getElementById('ext_enabled') || {}).checked) extras.push('BUILDING EXTENSION (NOT DRAWN — SEE 3D)');
+  const sheets = [];
+  const sheet = (title, no, body) => sheets.push({ title, no, svg: '<svg viewBox="0 0 ' + BBP_SW + ' ' + BBP_SH + '" xmlns="http://www.w3.org/2000/svg"><rect width="' + BBP_SW + '" height="' + BBP_SH + '" fill="#fff"/>' + bbpTitleBlock(title, no, ctx) + body + '</svg>' });
+  if (!(W > 0 && L > 0 && H > 0)) {
+    sheet('Blueprints', 'A-0', bbpTxt(BBP_M + 60, BBP_M + 120, 'ENTER BUILDING DIMENSIONS (W x L x WALL HEIGHT) TO GENERATE THE SET.', 22, 'start', true));
+    return sheets;
+  }
+
+  // ===== LONG-WALL ELEVATION (front/back) =====
+  function elevLong(wall, oy) {
+    let o = '';
+    const p = por[wall];
+    const availW = BBP_DRW - 160;
+    const s = Math.min(15, availW / (L + 2 * gableOH + 4));
+    const x0 = BBP_M + 110 + (availW - L * s) / 2, x1 = x0 + L * s;
+    const gy = oy;
+    const wallTop = gy - H * s, ridge = wallTop - rise * s;
+    o += bbpRect(x0 - gableOH * s, wallTop - 0.4 * s, L * s + 2 * gableOH * s, 0.4 * s, 2);
+    o += '<polygon points="' + (x0 - gableOH * s) + ',' + (wallTop - 0.4 * s) + ' ' + (x0 - gableOH * s) + ',' + ridge + ' ' + (x1 + gableOH * s) + ',' + ridge + ' ' + (x1 + gableOH * s) + ',' + (wallTop - 0.4 * s) + '" fill="#fff" stroke="#111" stroke-width="2.2"/>';
+    o += bbpTxt(x0 + L * s / 2, ridge - 8, 'RIDGE BEYOND — ' + pitch + '/12', 12, 'middle');
+    if (p) {
+      const covTop = gy - (por.postH + p.depth * por.pitch / 12) * s;
+      o += bbpRect(x0, wallTop, L * s, covTop - wallTop, 2.2);
+      o += bbpRibs(x0, wallTop, L * s, covTop - wallTop, s);
+      const pl = p.len > 0 ? p.len : L;
+      const px0 = x0 + (L - pl) / 2 * s, px1 = px0 + pl * s;
+      o += '<polygon points="' + (px0 - 0.5 * s) + ',' + covTop + ' ' + (px1 + 0.5 * s) + ',' + covTop + ' ' + (px1 + 0.5 * s) + ',' + (gy - por.postH * s) + ' ' + (px0 - 0.5 * s) + ',' + (gy - por.postH * s) + '" fill="#fff" stroke="#111" stroke-width="2.2"/>';
+      o += bbpTxt((px0 + px1) / 2, covTop + (gy - por.postH * s - covTop) / 2 + 5, 'PORCH ROOF — ' + por.pitch + '/12', 13, 'middle');
+      const nP = Math.max(2, Math.round(pl / por.spacing) + 1);
+      for (let k = 0; k < nP; k++) {
+        const px = px0 + (pl * s) * k / (nP - 1);
+        o += bbpRect(px - 5, gy - por.postH * s, 10, por.postH * s, 1.8);
+      }
+      o += bbpTxt((px0 + px1) / 2, gy - por.postH * s / 2, "POSTS @ " + por.spacing + "' OC", 12, 'middle');
+      o += bbpDim(x1 + gableOH * s + 40, gy, x1 + gableOH * s + 40, gy - por.postH * s, bbpFtIn(por.postH) + ' PORCH', 0);
+    } else {
+      o += bbpRect(x0, wallTop, L * s, H * s, 2.6);
+      o += bbpRibs(x0, wallTop, L * s, H * s, s);
+      col.walls[wall].forEach(op => { o += bbpOpeningElev(op, x0 + op.pos * L * s, gy, s); });
+      o += bbpDim(x1 + gableOH * s + 40, gy, x1 + gableOH * s + 40, wallTop, bbpFtIn(H) + ' T.O. PLATE', 0);
+    }
+    o += bbpGrade(x0 - gableOH * s, x1 + gableOH * s, gy);
+    o += bbpDim(x0, gy + 28, x1, gy + 28, bbpFtIn(L), 0);
+    o += bbpDim(x0 - gableOH * s - 40, gy, x0 - gableOH * s - 40, ridge, bbpFtIn(H + rise + 0.4) + ' RIDGE', 0);
+    if (p && col.walls[wall].length) o += bbpTxt(x0, gy + 58, 'NOTE: OPENINGS ON THIS WALL BEHIND PORCH — SEE FLOOR PLAN: ' + col.walls[wall].map(x => x.tag).join(', '), 12);
+    return o;
+  }
+
+  // ===== GABLE ELEVATION (left/right) =====
+  function elevGable(wall, oy) {
+    let o = '';
+    const hasFront = !!por.front, hasBack = !!por.back;
+    const leftP = wall === 'left' ? hasBack : hasFront;   // mirror: which porch shows on which side of the view
+    const rightP = wall === 'left' ? hasFront : hasBack;
+    const pdL = leftP ? (wall === 'left' ? por.back.depth : por.front.depth) : 0;
+    const pdR = rightP ? (wall === 'left' ? por.front.depth : por.back.depth) : 0;
+    const availW = BBP_DRW - 160;
+    const s = Math.min(16, availW / (pdL + W + pdR + 4));
+    const totW = (pdL + W + pdR) * s;
+    const ox = BBP_M + 110 + (availW - totW) / 2;
+    const x0 = ox + pdL * s, x1 = x0 + W * s;
+    const gy = oy;
+    const wallTop = gy - H * s, ridge = wallTop - (rise + 0.4) * s;
+    [[leftP, pdL, -1, x0], [rightP, pdR, 1, x1]].forEach(([has, pd, sd, px]) => {
+      if (!has) return;
+      const ex = px + sd * pd * s;
+      o += bbpLn(px, gy - (por.postH + pd * por.pitch / 12) * s, ex, gy - por.postH * s, 2);
+      o += bbpLn(ex, gy - por.postH * s, ex, gy - (por.postH - 0.6) * s, 2);
+      o += bbpRect(ex - sd * 0.7 * s - 4, gy - por.postH * s + 0.6 * s, 8, por.postH * s - 0.6 * s, 1.6);
+    });
+    o += bbpRect(x0, wallTop, W * s, H * s, 2.6);
+    o += bbpRibs(x0, wallTop, W * s, H * s, s);
+    o += '<polygon points="' + (x0 - eaveOH * s) + ',' + wallTop + ' ' + (x0 + W * s / 2) + ',' + ridge + ' ' + (x1 + eaveOH * s) + ',' + wallTop + '" fill="#fff" stroke="#111" stroke-width="2.6"/>';
+    // widow's peak on this gable? wp 'front' = right wall, wp 'rear' = left wall
+    const hasWP = wpMode === 'both' || (wpMode === 'front' && wall === 'right') || (wpMode === 'rear' && wall === 'left');
+    if (hasWP) {
+      const apX = x0 + W * s / 2, apY = ridge;
+      const retY = wallTop + (rise - wpHalf * (pitch / 12)) * -1 * s + 0;  // y on the rake at wpHalf from center
+      const ry = apY + wpHalf * (pitch / 12) * s;
+      o += bbpLn(apX - wpHalf * s, ry, apX, apY, 2.4) + bbpLn(apX, apY, apX + wpHalf * s, ry, 2.4);
+      o += bbpLn(apX - wpHalf * s, ry, apX + wpHalf * s, ry, 1.2, '6 4');
+      o += bbpTxt(apX, apY - 12, wpD + "' WIDOW'S PEAK — " + (wpHalf * 2) + "' WIDE" + (i.wpCypress ? ' · CYPRESS CROW\'S FOOT + CORBELS' : ''), 12.5, 'middle', true);
+      if (i.wpCypress) {
+        o += bbpLn(apX - wpHalf * s * 0.9, ry - 4, apX, apY + 10, 1.6) + bbpLn(apX, apY + 10, apX + wpHalf * s * 0.9, ry - 4, 1.6);
+        o += bbpLn(apX - wpHalf * s * 0.9, ry - 4, apX + wpHalf * s * 0.9, ry - 4, 1.6);
+        o += bbpLn(apX, ry - 4, apX, apY + 10, 1.2);
+        [[-0.45], [0.45]].forEach(([f]) => { o += bbpLn(apX + f * wpHalf * s, ry - 4, apX, apY + 10, 1); });
+      }
+    }
+    col.walls[wall].forEach(op => { o += bbpOpeningElev(op, x0 + op.pos * W * s, gy, s); });
+    o += bbpGrade(ox, ox + totW, gy);
+    o += bbpDim(x0, gy + 28, x1, gy + 28, bbpFtIn(W) + ' MAIN', 0);
+    if (pdL || pdR) o += bbpDim(ox, gy + 62, ox + totW, gy + 62, bbpFtIn(pdL + W + pdR) + ' OVERALL', 0);
+    o += bbpDim(x1 + (pdR ? pdR * s : eaveOH * s) + 40, gy, x1 + (pdR ? pdR * s : eaveOH * s) + 40, wallTop, bbpFtIn(H) + ' T.O. PLATE', 0);
+    o += bbpDim(ox - 40, gy, ox - 40, ridge, bbpFtIn(H + rise + 0.4) + ' RIDGE', 0);
+    return o;
+  }
+
+  // A-1 front & back
+  let b = bbpTxt(BBP_M + 40, BBP_M + 44, 'FRONT ELEVATION', 22, 'start', true);
+  b += elevLong('front', BBP_M + 470);
+  b += bbpTxt(BBP_M + 40, BBP_M + 620, 'BACK ELEVATION', 22, 'start', true);
+  b += elevLong('back', BBP_M + 1055);
+  if (extras.length) b += bbpTxt(BBP_M + 40, BBP_SH - BBP_M - 20, 'ALSO ON THIS BUILD: ' + extras.join(' · '), 12);
+  sheet('Front & Back Elevations', 'A-1', b);
+
+  // A-2 left & right
+  b = bbpTxt(BBP_M + 40, BBP_M + 44, 'LEFT SIDE ELEVATION', 22, 'start', true);
+  b += elevGable('left', BBP_M + 470);
+  b += bbpTxt(BBP_M + 40, BBP_M + 620, 'RIGHT SIDE ELEVATION', 22, 'start', true);
+  b += elevGable('right', BBP_M + 1055);
+  sheet('Left & Right Elevations', 'A-2', b);
+
+  // ===== S-1 FOUNDATION (plan: gables left/right on page => draw L horizontal) =====
+  (function () {
+    const pdT = por.back ? por.back.depth : 0;    // back = top of plan
+    const pdB = por.front ? por.front.depth : 0;  // front = bottom
+    const pdL2 = por.left ? por.left.depth : 0, pdR2 = por.right ? por.right.depth : 0;
+    const availW = BBP_DRW - 180, availH = BBP_DRH - 330;
+    const s = Math.min(availW / (pdL2 + L + pdR2 + 4), availH / (pdT + W + pdB + 4));
+    const ox = BBP_M + 120 + (availW - (pdL2 + L + pdR2) * s) / 2;
+    const oy = BBP_M + 150 + (availH - (pdT + W + pdB) * s) / 2;
+    const mx = ox + pdL2 * s, my = oy + pdT * s;
+    let o = bbpTxt(BBP_M + 40, BBP_M + 44, 'FOUNDATION PLAN', 22, 'start', true);
+    o += bbpTxt(BBP_M + 40, BBP_M + 70, '4" 4000 PSI CONCRETE SLAB — THICKENED EDGE FOOTING W/ (2) #4 REBAR CONT. — VERIFY SOILS & LOCAL CODE', 14);
+    // porch slabs
+    const porchRects = [];
+    if (pdT) porchRects.push([mx, oy, L * s, pdT * s]);
+    if (pdB) porchRects.push([mx, my + W * s, L * s, pdB * s]);
+    if (pdL2) porchRects.push([ox, my, pdL2 * s, W * s]);
+    if (pdR2) porchRects.push([mx + L * s, my, pdR2 * s, W * s]);
+    porchRects.forEach(r => {
+      o += bbpRect(r[0], r[1], r[2], r[3], 1.8);
+      o += bbpTxt(r[0] + r[2] / 2, r[1] + r[3] / 2 + 5, '4" PORCH SLAB', 12, 'middle');
+    });
+    o += bbpRect(mx, my, L * s, W * s, 3);
+    o += bbpRect(mx + 0.9 * s, my + 0.9 * s, L * s - 1.8 * s, W * s - 1.8 * s, 1.2, '8 5');
+    o += bbpTxt(mx + L * s / 2, my + W * s / 2 - 10, '4" SLAB — MAIN', 15, 'middle', true);
+    o += bbpTxt(mx + L * s / 2, my + W * s / 2 + 12, 'THICKENED EDGE FOOTING (DASHED)', 12, 'middle');
+    if (construction === 'post') {
+      const psp = (function () { const el = document.getElementById('post_spacing'); return el ? (parseFloat(el.value) || 10) : 10; })();
+      const mark = (x, y) => { return bbpRect(x - 6, y - 6, 12, 12, 1.6, null, '#111'); };
+      for (let d = 0; d <= L + 0.01; d += psp) { o += mark(mx + Math.min(d, L) * s, my); o += mark(mx + Math.min(d, L) * s, my + W * s); }
+      for (let d = psp; d < W - 0.01; d += psp) { o += mark(mx, my + d * s); o += mark(mx + L * s, my + d * s); }
+      o += bbpTxt(mx + L * s / 2, my - 14, "6x6 PT POSTS @ " + psp + "' OC — " + ((i.postFoundation === 'on_slab') ? 'DRY-SET PLATES ON SLAB' : 'EMBEDDED / SAKRETE SET'), 12.5, 'middle', true);
+    } else {
+      o += bbpTxt(mx + L * s / 2, my - 14, '2x6 PT PLATES — TITEN HD 1/2x6 ANCHORS — SILL SEAL', 12.5, 'middle', true);
+    }
+    o += bbpDim(mx, my + W * s + (pdB ? pdB * s : 0) + 30, mx + L * s, my + W * s + (pdB ? pdB * s : 0) + 30, bbpFtIn(L), 0);
+    o += bbpDim(ox - 40, my, ox - 40, my + W * s, bbpFtIn(W), 0);
+    if (pdT || pdB) o += bbpDim(ox - 76, oy, ox - 76, oy + (pdT + W + pdB) * s, bbpFtIn(pdT + W + pdB) + ' OVERALL', 0);
+    sheet('Foundation Plan', 'S-1', o);
+  })();
+
+  // ===== A-3 FLOOR PLAN =====
+  (function () {
+    const pdT = por.back ? por.back.depth : 0, pdB = por.front ? por.front.depth : 0;
+    const pdL2 = por.left ? por.left.depth : 0, pdR2 = por.right ? por.right.depth : 0;
+    const availW = BBP_DRW - 180, availH = BBP_DRH - 330;
+    const s = Math.min(availW / (pdL2 + L + pdR2 + 4), availH / (pdT + W + pdB + 4));
+    const ox = BBP_M + 120 + (availW - (pdL2 + L + pdR2) * s) / 2;
+    const oy = BBP_M + 150 + (availH - (pdT + W + pdB) * s) / 2;
+    const mx = ox + pdL2 * s, my = oy + pdT * s;
+    const wt = Math.max(4, 0.5 * s);
+    let o = bbpTxt(BBP_M + 40, BBP_M + 44, 'FLOOR PLAN', 22, 'start', true);
+    o += bbpTxt(BBP_M + 40, BBP_M + 70, (construction === 'post' ? "6x6 PT POSTS + 2x6 GIRTS" : '2x6 STUD WALLS @ 16" OC') + " — " + bbpFtIn(H) + ' T.O. PLATE — OPENINGS TAGGED PER SCHEDULE (A-4)', 14);
+    const porchRect = (x, y, w2, h2, label) => {
+      let r = bbpRect(x, y, w2, h2, 1.6);
+      r += bbpTxt(x + w2 / 2, y + h2 / 2 + 4, label, 12, 'middle');
+      return r;
+    };
+    if (pdT) o += porchRect(mx, oy, L * s, pdT * s, 'OPEN PORCH');
+    if (pdB) o += porchRect(mx, my + W * s, L * s, pdB * s, 'OPEN PORCH');
+    if (pdL2) o += porchRect(ox, my, pdL2 * s, W * s, 'OPEN PORCH');
+    if (pdR2) o += porchRect(mx + L * s, my, pdR2 * s, W * s, 'OPEN PORCH');
+    o += bbpRect(mx, my, L * s, W * s, 2.6);
+    o += bbpRect(mx + wt, my + wt, L * s - 2 * wt, W * s - 2 * wt, 1.4);
+    // openings: front wall = bottom edge (y = my + W*s), back = top, left = left edge, right = right edge
+    const cut = (x, y, w2, h2, tag, horiz, dashed) => {
+      let r = '<rect x="' + x + '" y="' + y + '" width="' + w2 + '" height="' + h2 + '" fill="#fff"/>';
+      if (horiz) { r += bbpLn(x, y, x, y + h2, 1.4) + bbpLn(x + w2, y, x + w2, y + h2, 1.4); r += bbpLn(x, y + h2 / 2, x + w2, y + h2 / 2, 1, dashed ? '3 3' : '6 4'); }
+      else { r += bbpLn(x, y, x + w2, y, 1.4) + bbpLn(x, y + h2, x + w2, y + h2, 1.4); r += bbpLn(x + w2 / 2, y, x + w2 / 2, y + h2, 1, dashed ? '3 3' : '6 4'); }
+      return r;
+    };
+    col.walls.front.forEach(op => {
+      const xc = mx + op.pos * L * s;
+      o += cut(xc - op.w * s / 2, my + W * s - wt, op.w * s, wt, op.tag, true, op.type === 'window');
+      o += bbpTxt(xc, my + W * s + 20, op.tag, 13, 'middle', true);
+    });
+    col.walls.back.forEach(op => {
+      const xc = mx + op.pos * L * s;
+      o += cut(xc - op.w * s / 2, my, op.w * s, wt, op.tag, true, op.type === 'window');
+      o += bbpTxt(xc, my - 8, op.tag, 13, 'middle', true);
+    });
+    col.walls.left.forEach(op => {
+      const yc = my + op.pos * W * s;
+      o += cut(mx, yc - op.w * s / 2, wt, op.w * s, op.tag, false, op.type === 'window');
+      o += bbpTxt(mx - 12, yc + 5, op.tag, 13, 'end', true);
+    });
+    col.walls.right.forEach(op => {
+      const yc = my + op.pos * W * s;
+      o += cut(mx + L * s - wt, yc - op.w * s / 2, wt, op.w * s, op.tag, false, op.type === 'window');
+      o += bbpTxt(mx + L * s + 12, yc + 5, op.tag, 13, 'start', true);
+    });
+    // posts on plan for post-frame
+    if (construction === 'post') {
+      const psp = (function () { const el = document.getElementById('post_spacing'); return el ? (parseFloat(el.value) || 10) : 10; })();
+      for (let d = 0; d <= L + 0.01; d += psp) { o += bbpRect(mx + Math.min(d, L) * s - 5, my - 5, 10, 10, 1.4, null, '#fff') + bbpRect(mx + Math.min(d, L) * s - 5, my + W * s - 5, 10, 10, 1.4, null, '#fff'); }
+    }
+    // porch posts
+    ['front', 'back'].forEach(wl => {
+      const p = por[wl]; if (!p) return;
+      const pl = p.len > 0 ? p.len : L;
+      const py = wl === 'front' ? my + W * s + p.depth * s - 0.7 * s : oy + 0.7 * s;
+      const nP = Math.max(2, Math.round(pl / por.spacing) + 1);
+      for (let k = 0; k < nP; k++) {
+        const px = mx + (L - pl) / 2 * s + pl * s * k / (nP - 1);
+        o += bbpRect(px - 5, py - 5, 10, 10, 1.4) + bbpLn(px - 5, py - 5, px + 5, py + 5, 0.9) + bbpLn(px - 5, py + 5, px + 5, py - 5, 0.9);
+      }
+    });
+    // loft dashed
+    if (i.floorSystem && i.floorSystem !== 'none' && (i.floorArea || 0) > 0) {
+      const depth = Math.min(L, (i.floorArea || 0) / Math.max(1, W));
+      o += bbpRect(mx + wt, my + wt, depth * s - wt, W * s - 2 * wt, 1.3, '10 6');
+      o += bbpTxt(mx + depth * s / 2, my + W * s / 2 + 26, 'LOFT/FLOOR ABOVE — ' + Math.round(i.floorArea) + ' SQ FT (DASHED) — SEE S-3', 12.5, 'middle');
+    }
+    o += bbpTxt(mx + L * s / 2, my + W * s / 2 - 4, (i.living ? (Math.round(i.living).toLocaleString() + ' SQ FT · ') : '') + 'SLAB ON GRADE', 15, 'middle', true);
+    o += bbpDim(mx, my + W * s + (pdB ? pdB * s : 0) + 34, mx + L * s, my + W * s + (pdB ? pdB * s : 0) + 34, bbpFtIn(L), 0);
+    o += bbpDim(ox - 40, my, ox - 40, my + W * s, bbpFtIn(W), 0);
+    sheet('Floor Plan', 'A-3', o);
+  })();
+
+  // ===== S-2 ROOF FRAMING / TRUSS PLAN =====
+  (function () {
+    const availW = BBP_DRW - 180, availH = BBP_DRH - 330;
+    const s = Math.min(availW / (L + 8), availH / (W + 8));
+    const mx = BBP_M + 140 + (availW - L * s) / 2, my = BBP_M + 170 + (availH - W * s) / 2;
+    const count = Math.max(2, Math.ceil(L / trussSpacingFt) + 1);
+    const purl = (function () { const el = document.getElementById('purlin_spacing'); return el ? (parseFloat(el.value) || 2) : 2; })();
+    let o = bbpTxt(BBP_M + 40, BBP_M + 44, 'ROOF FRAMING / TRUSS PLAN', 22, 'start', true);
+    o += bbpTxt(BBP_M + 40, BBP_M + 70, '(' + count + ') ' + W + "' " + (steel ? 'STEEL' : (scissor ? 'WOOD SCISSOR' : 'WOOD')) + ' TRUSSES ' + pitch + '/12 @ ' + (trussSpacingFt * 12) + '" OC INCL. GABLE TRUSSES — 2x4 PURLINS @ ' + (purl * 12) + '" OC' + (steel ? ' ON CLIPS' : ' — H1A CLIP EA. HEEL'), 14);
+    o += bbpRect(mx, my, L * s, W * s, 2.4);
+    o += bbpLn(mx - 12, my + W * s / 2, mx + L * s + 12, my + W * s / 2, 1.6, '14 7');
+    o += bbpTxt(mx - 18, my + W * s / 2 + 5, 'RIDGE', 12, 'end');
+    for (let t = 0; t < count; t++) {
+      const tx = mx + Math.min(t * trussSpacingFt, L) * s;
+      const gable = (t === 0 || t === count - 1 || Math.min(t * trussSpacingFt, L) >= L);
+      o += bbpLn(tx, my, tx, my + W * s, gable ? 3 : 1.1);
+    }
+    o += bbpTxt(mx + 10, my - 10, 'GABLE TRUSS', 11, 'start', true);
+    o += bbpTxt(mx + L * s - 10, my - 10, 'GABLE TRUSS', 11, 'end', true);
+    ['front', 'back'].forEach(wl => {
+      const p = por[wl]; if (!p) return;
+      const py = wl === 'back' ? my - p.depth * s : my + W * s;
+      o += bbpRect(mx, py, L * s, p.depth * s, 1.8);
+      for (let r = 0; r <= L; r += 2) o += bbpLn(mx + r * s, py, mx + r * s, py + p.depth * s, 0.6);
+      o += bbpTxt(mx + L * s / 2, wl === 'back' ? py - 8 : py + p.depth * s + 16, 'PORCH RAFTERS 2x8 @ 24" OC — ' + por.pitch + '/12', 12, 'middle');
+    });
+    o += bbpDim(mx, my + W * s + (por.front ? por.front.depth * s : 0) + 34, mx + L * s, my + W * s + (por.front ? por.front.depth * s : 0) + 34, bbpFtIn(L), 0);
+    o += bbpDim(mx - 46, my, mx - 46, my + W * s, bbpFtIn(W) + ' TRUSS SPAN', 0);
+    // profile inset
+    const ix = BBP_M + 80, iy = BBP_SH - BBP_M - 250, iw = 300;
+    o += bbpRect(ix - 20, iy - 55, iw + 60, 210, 1.4, null, '#fff');
+    o += bbpTxt(ix + iw / 2, iy - 30, (steel ? 'STEEL' : (scissor ? 'SCISSOR' : 'COMMON')) + ' TRUSS PROFILE', 14, 'middle', true);
+    const trise = Math.min(80, (iw / 2) * (pitch / 12));
+    o += '<polygon points="' + ix + ',' + (iy + 100) + ' ' + (ix + iw / 2) + ',' + (iy + 100 - trise) + ' ' + (ix + iw) + ',' + (iy + 100) + '" fill="none" stroke="#111" stroke-width="2.2"/>';
+    if (scissor) o += '<polyline points="' + (ix + 8) + ',' + (iy + 100) + ' ' + (ix + iw / 2) + ',' + (iy + 100 - trise / 2) + ' ' + (ix + iw - 8) + ',' + (iy + 100) + '" fill="none" stroke="#111" stroke-width="1.6"/>';
+    else if (steel) { for (let z = 0; z < 6; z++) { const zx = ix + iw / 12 + z * iw / 6.5; o += bbpLn(zx, iy + 100, zx + iw / 13, iy + 100 - trise * (1 - Math.abs((zx + iw / 26 - ix - iw / 2) / (iw / 2))), 1); } }
+    o += bbpTxt(ix + iw / 2, iy + 130, 'TOP CHORD ' + pitch + '/12' + (scissor ? ' — BOTTOM CHORD ' + (pitch / 2) + '/12 VAULT' : '') + ' — SPAN ' + bbpFtIn(W), 11.5, 'middle');
+    sheet('Roof Framing / Truss Plan', 'S-2', o);
+  })();
+
+  // ===== S-3 FLOOR FRAMING =====
+  (function () {
+    let o = bbpTxt(BBP_M + 40, BBP_M + 44, 'FLOOR FRAMING PLAN', 22, 'start', true);
+    if (!i.floorSystem || i.floorSystem === 'none' || (i.floorArea || 0) <= 0) {
+      o += bbpTxt(BBP_M + 60, BBP_M + 160, 'SLAB ON GRADE — NO FRAMED FLOOR SYSTEM ON THIS BUILD.', 20, 'start', true);
+      o += bbpTxt(BBP_M + 60, BBP_M + 195, 'ENABLE A FLOOR SYSTEM (I-JOIST / FLOOR TRUSS) ON THE FLOOR SYSTEM CARD TO GENERATE THIS SHEET.', 14);
+      sheet('Floor Framing Plan', 'S-3', o);
+      return;
+    }
+    const depth = Math.min(L, (i.floorArea || 0) / Math.max(1, W));
+    const span = Math.min(i.floorSpan || depth, depth);
+    const spc = (i.floorSpacing || 16) / 12; // ft
+    const sysName = i.floorSystem === 'ijoist' ? '11-7/8" I-JOISTS' : (i.floorSystem === 'floor_truss' ? 'FLOOR TRUSSES' : (i.floorLumber || '2x10') + ' JOISTS');
+    o += bbpTxt(BBP_M + 40, BBP_M + 70, sysName + ' @ ' + (i.floorSpacing || 16) + '" OC — ' + Math.round(i.floorArea).toLocaleString() + ' SQ FT — 3/4" T&G SUBFLOOR GLUED + FASTENED', 14);
+    const availW = BBP_DRW - 200, availH = BBP_DRH - 380;
+    const s = Math.min(availW / W, availH / depth, 26);
+    const ox = BBP_M + 140 + (availW - W * s) / 2, oy = BBP_M + 190;
+    o += bbpRect(ox, oy, W * s, depth * s, 2.6);
+    const by = oy + span * s;
+    if (span < depth - 0.5) {
+      o += bbpLn(ox, by - 3, ox + W * s, by - 3, 3) + bbpLn(ox, by + 3, ox + W * s, by + 3, 3);
+      o += bbpTxt(ox + W * s / 2, by - 12, 'FLUSH BEAM / BEARING — SEE PLAN', 13, 'middle', true);
+    }
+    for (let j = 0; j * spc <= W + 0.01; j++) {
+      const jx = ox + Math.min(j * spc, W) * s;
+      o += bbpLn(jx, oy, jx, by - 3, 1);
+      if (span < depth - 0.5) o += bbpLn(jx, by + 3, jx, oy + depth * s, 1);
+    }
+    o += bbpTxt(ox + W * s / 2, oy + Math.min(span, depth) * s / 2, sysName + ' @ ' + (i.floorSpacing || 16) + '" OC — ' + bbpFtIn(span) + ' SPAN', 13, 'middle');
+    o += bbpDim(ox, oy + depth * s + 34, ox + W * s, oy + depth * s + 34, bbpFtIn(W), 0);
+    o += bbpDim(ox - 40, oy, ox - 40, by, bbpFtIn(span) + ' SPAN', 0);
+    o += bbpTxt(BBP_M + 40, BBP_SH - BBP_M - 60, 'NOTES: HANGERS PER MFR AT FLUSH BEAM. RIM PER PLAN. SUBFLOOR ADHESIVE + RING-SHANK OR SCREWS. VERIFY SPANS WITH JOIST SUPPLIER.', 13);
+    sheet('Floor Framing Plan', 'S-3', o);
+  })();
+
+  // ===== A-4 WINDOW & DOOR SCHEDULE =====
+  (function () {
+    let o = bbpTxt(BBP_M + 40, BBP_M + 44, 'WINDOW & DOOR SCHEDULE', 22, 'start', true);
+    const cols = [70, 170, 200, 420, 130];
+    const heads = ['TAG', 'TYPE', 'SIZE', 'STYLE / NOTES', 'QTY'];
+    const rows = col.rows.map(r => [r.tag, r.typeName, bbpFtIn(r.w) + ' x ' + bbpFtIn(r.h), String(r.style || '').toUpperCase().slice(0, 46), String(r.qty)]);
+    if (!rows.length) rows.push(['—', 'NO OPENINGS ENTERED', '', 'ADD DOORS & WINDOWS ON THE OPENINGS CARDS', '']);
+    const tx = BBP_M + 60, ty = BBP_M + 110, rh = 48;
+    const tw = cols.reduce((a, c) => a + c, 0);
+    o += '<rect x="' + tx + '" y="' + ty + '" width="' + tw + '" height="' + rh + '" fill="#eee"/>';
+    o += bbpRect(tx, ty, tw, rh * (rows.length + 1), 2.2);
+    let x = tx;
+    heads.forEach((h, ci) => { o += bbpTxt(x + 14, ty + 31, h, 15, 'start', true); x += cols[ci]; o += bbpLn(x, ty, x, ty + rh * (rows.length + 1), 1); });
+    rows.forEach((r, ri) => {
+      const y = ty + rh * (ri + 1);
+      o += bbpLn(tx, y, tx + tw, y, 1);
+      let cx2 = tx;
+      r.forEach((cell, ci) => { o += bbpTxt(cx2 + 14, y + 31, cell, 14); cx2 += cols[ci]; });
+    });
+    const ny = ty + rh * (rows.length + 1) + 50;
+    o += bbpTxt(tx, ny, 'NOTES:', 15, 'start', true);
+    ['HEADERS PER PLAN — VERIFY ROUGH OPENINGS WITH MANUFACTURER CUT SHEETS BEFORE FRAMING.',
+     'PLACE OPENINGS ON WALLS IN THE 3D TOOL FOR EXACT PLAN LOCATIONS — TAGS MATCH THE FLOOR PLAN.',
+     'EGRESS REQUIREMENTS TO BE VERIFIED FOR ANY CONDITIONED / SLEEPING SPACES (IRC).'].forEach((nn, ni) => {
+      o += bbpTxt(tx, ny + 28 + ni * 26, nn, 13.5);
+    });
+    sheet('Window & Door Schedule', 'A-4', o);
+  })();
+
+  return sheets;
+}
+
+function bbBPRender() {
+  const host = document.getElementById('bbp-sheets');
+  if (!host) return;
+  try { recalc(); } catch (e) {}
+  const sheets = bbBPSheets();
+  host.innerHTML = sheets.map(sh =>
+    '<div class="qbs-card" style="margin:0; padding:10px; background:#3a3d42;">' +
+    '<div style="font-family:var(--font-mono); font-size:11px; color:var(--copper); margin:0 0 8px 4px; text-transform:uppercase;">' + bbpEsc(sh.no + ' — ' + sh.title) + '</div>' +
+    '<div style="border-radius:4px; overflow:hidden; line-height:0;">' + sh.svg.replace('<svg ', '<svg style="width:100%; height:auto;" ') + '</div></div>'
+  ).join('');
+}
+
+function bbBPPrint() {
+  const sheets = bbBPSheets();
+  const w = window.open('', '_blank');
+  if (!w) { bbToast('Pop-up blocked — allow pop-ups to print the blueprint set.'); return; }
+  w.document.write('<!DOCTYPE html><html><head><title>Blueprints — The Barndo Builders</title><style>' +
+    '@page { size: letter landscape; margin: 0.18in; } body { margin: 0; } ' +
+    '.sh { page-break-after: always; } .sh svg { width: 100%; height: auto; display: block; }' +
+    '</style></head><body>' + sheets.map(sh => '<div class="sh">' + sh.svg + '</div>').join('') + '</body></html>');
+  w.document.close();
+  setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 800);
+}
+
 let _wsAdopted = false;
 const _wsHomes = [];   // [{node, placeholder}]
 function _wsAdoptNode(node, slot) {
@@ -11133,6 +11703,7 @@ function switchTab(name) {
   if (name === 'barndos') { try { renderBarndoGrid(); } catch (e) {} }
   if (name === 'jobcost') { try { renderJobCost(); } catch (e) {} }
   if (name === 'takeoff') { try { bbTakeoffRailEnter(); } catch (e) {} try { bbSheetrockRender(); } catch (e) {} }
+  if (name === 'blueprints') { try { bbBPRender(); } catch (e) {} }
   if (name === 'calcs') { ['grCalc','gsCalc','shCalc','swCalc','stCalc','csCalc','phCalc','rfCalc','gpCalc','dwCalc','bfCalc','cbCalc','cfCalc','rsCalc','wsCalc'].forEach(f => { try { window[f] ? window[f]() : eval(f + '()'); } catch (e) {} }); }
   if (name === 'takeoff' && typeof takeoffInit === 'function') takeoffInit();
   if (name === 'subs') {
