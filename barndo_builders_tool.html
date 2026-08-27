@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v270</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v271</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -5896,13 +5896,17 @@ const MATERIALS = [
     priceCost: 7.56, priceSell: 9.45, priceRetail: 11.35,
     customUnitPrice: i => (SHED_LF_COST.lumber['2x6'] || 0.63) * 12,
     formula: i => 5 * (i.wpCount || 0) },
+  // Timber length follows the peak size: 2'/3' peaks (6'/8' wide) use 10'
+  // sticks; 4'/5' peaks (10'/12' wide) use 12' sticks. Priced per-LF.
   { id: "wp_cyp_crow", label: "Cypress crow's foot — 2×6×10 (3 per gable)", cat: "Widow's peak", uom: "pc", packSize: null,
     priceCost: 32.50, priceSell: 40.65, priceRetail: 48.75,
-    customUnitPrice: i => (SHED_LF_COST.cypress['2x6'] || 3.25) * 10,
+    labelFn: i => "Cypress crow's foot — 2×6×" + ((i.wpDepth || 2) >= 4 ? 12 : 10) + " (3 per gable)",
+    customUnitPrice: i => (SHED_LF_COST.cypress['2x6'] || 3.25) * ((i.wpDepth || 2) >= 4 ? 12 : 10),
     formula: i => i.wpCypress ? 3 * (i.wpCount || 0) : 0 },
   { id: "wp_cyp_corbel", label: "Cypress corbels — 4×6×10 (3 per gable)", cat: "Widow's peak", uom: "pc", packSize: null,
     priceCost: 65.00, priceSell: 81.25, priceRetail: 97.50,
-    customUnitPrice: i => (SHED_LF_COST.cypress['4x6'] || 6.50) * 10,
+    labelFn: i => "Cypress corbels — 4×6×" + ((i.wpDepth || 2) >= 4 ? 12 : 10) + " (3 per gable)",
+    customUnitPrice: i => (SHED_LF_COST.cypress['4x6'] || 6.50) * ((i.wpDepth || 2) >= 4 ? 12 : 10),
     formula: i => i.wpCypress ? 3 * (i.wpCount || 0) : 0 },
   { id: "wp_corner_trim", label: "Large corner trim 10' (2 per gable)", cat: "Widow's peak", uom: "pc", packSize: null,
     priceCost: 17.53, priceSell: 21.90, priceRetail: 26.30,
@@ -8853,7 +8857,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v270';
+const BB_VERSION = 'v271';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
