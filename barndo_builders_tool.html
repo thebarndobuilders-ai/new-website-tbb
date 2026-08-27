@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v275</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v276</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8904,7 +8904,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v275';
+const BB_VERSION = 'v276';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -9838,6 +9838,19 @@ function bbBrandLogoHTML(maxW) {
     if (svg && svg.style.display !== 'none') { const c = svg.cloneNode(true); c.removeAttribute('id'); c.setAttribute('width', maxW); return c.outerHTML; }
   } catch (e) {}
   return '<strong style="color:#fff; font-size:22px; letter-spacing:.08em;">THE BARNDO BUILDERS</strong>';
+}
+
+// Header logo as a data URI, for embedding in blueprint SVG sheets and print
+// documents. Returns the uploaded logo file exactly as uploaded when one is
+// set, otherwise the baked-in default mark. Never modifies the logo.
+function bbHeaderLogoURI() {
+  try {
+    const img = document.getElementById('bb-header-logo-custom');
+    if (img && img.src && img.style.display !== 'none' && img.src.indexOf('data:') === 0) return img.src;
+  } catch (e) {}
+  try { const co = getCompany(); if (co.logo && co.logo.indexOf('data:') === 0) return co.logo; } catch (e) {}
+  try { if (BB_DEFAULT_LOGO.indexOf('data:') === 0) return BB_DEFAULT_LOGO; } catch (e) {}
+  return '';
 }
 
 function barndoShowInvoice(id) {
@@ -10832,10 +10845,15 @@ function bbpTitleBlock(sheetTitle, sheetNo, ctx) {
   let o = '';
   o += bbpRect(BBP_M, BBP_M, BBP_SW - 2 * BBP_M, BBP_SH - 2 * BBP_M, 3);
   o += bbpRect(x, BBP_M, BBP_TBW, BBP_SH - 2 * BBP_M, 2.4);
-  o += '<rect x="' + (x + 18) + '" y="' + (BBP_M + 24) + '" width="' + (BBP_TBW - 36) + '" height="120" fill="#0c0d0f"/>';
-  o += bbpTxt(x + BBP_TBW / 2, BBP_M + 70, 'THE', 16, 'middle', true, '#fff');
-  o += bbpTxt(x + BBP_TBW / 2, BBP_M + 102, 'BARNDO', 34, 'middle', true, '#fff');
-  o += bbpTxt(x + BBP_TBW / 2, BBP_M + 126, 'B U I L D E R S', 14, 'middle', false, '#fff');
+  o += '<rect x="' + (x + 18) + '" y="' + (BBP_M + 24) + '" width="' + (BBP_TBW - 36) + '" height="120" fill="#000"/>';
+  const _lg = (typeof bbHeaderLogoURI === 'function') ? bbHeaderLogoURI() : '';
+  if (_lg) {
+    o += '<image href="' + _lg + '" xlink:href="' + _lg + '" x="' + (x + 24) + '" y="' + (BBP_M + 30) + '" width="' + (BBP_TBW - 48) + '" height="108" preserveAspectRatio="xMidYMid meet"/>';
+  } else {
+    o += bbpTxt(x + BBP_TBW / 2, BBP_M + 70, 'THE', 16, 'middle', true, '#fff');
+    o += bbpTxt(x + BBP_TBW / 2, BBP_M + 102, 'BARNDO', 34, 'middle', true, '#fff');
+    o += bbpTxt(x + BBP_TBW / 2, BBP_M + 126, 'B U I L D E R S', 14, 'middle', false, '#fff');
+  }
   o += bbpTxt(x + BBP_TBW / 2, BBP_M + 172, 'INFO@THEBARNDOBUILDERS.COM', 11, 'middle');
   o += bbpLn(x, BBP_M + 190, x + BBP_TBW, BBP_M + 190, 1.4);
   const proj = (ctx.project || 'BARNDO PROJECT').toUpperCase();
@@ -17236,7 +17254,7 @@ function renderProposal() {
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:20px">
         <div>
           ${co.logo
-            ? `<img src="${co.logo}" alt="${co.name}" style="max-height:60px;max-width:260px;display:block;margin-bottom:6px" />`
+            ? `<img src="${bbHeaderLogoURI() || co.logo}" alt="${co.name}" style="max-height:60px;max-width:260px;display:block;margin-bottom:6px" />`
             : `<div style="font-size:20px;font-weight:700">${co.name}</div>`}
           <div style="color:var(--text-3);font-size:12px;margin-top:2px">Construction Proposal</div>
           <div style="color:var(--text-3);font-size:12px;margin-top:6px;line-height:1.5">
@@ -17355,7 +17373,7 @@ function buildClientShareHTML() {
     .sub{color:#777;font-size:12px;line-height:1.5}
   </style></head><body><div class="wrap">
     <div class="hdr">
-      <div>${co.logo ? `<img src="${co.logo}" alt="${co.name}" style="max-height:88px;max-width:360px;display:block;margin-bottom:8px;border-radius:6px">` : `<h1>${co.name}</h1>`}
+      <div>${co.logo ? `<img src="${bbHeaderLogoURI() || co.logo}" alt="${co.name}" style="max-height:88px;max-width:360px;display:block;margin-bottom:8px">` : `<h1>${co.name}</h1>`}
         <div class="sub">Construction Proposal${i.projectQuoteNum ? ' · Quote #' + i.projectQuoteNum : ''} · ${i.projectQuoteDate || new Date().toLocaleDateString()}</div>
         <div class="sub">${[co.address, co.city, co.phone, co.email, co.website].filter(Boolean).join(' · ')}</div></div>
       <div style="text-align:right" class="sub"><b style="color:#222;font-size:14px;">Prepared for</b><br>${i.client || '—'}<br>${i.project || ''}</div>
@@ -17470,7 +17488,7 @@ function printProposal() {
   </style></head><body>
     <div class="hdr">
       <div>
-        ${co.logo ? `<img src="${co.logo}" alt="${co.name}" style="max-height:64px;max-width:280px;display:block;margin-bottom:6px" />` : `<h1>${co.name}</h1>`}
+        ${co.logo ? `<img src="${bbHeaderLogoURI() || co.logo}" alt="${co.name}" style="max-height:64px;max-width:280px;display:block;margin-bottom:6px" />` : `<h1>${co.name}</h1>`}
         <div style="color:#555">Construction Proposal</div>
         <div style="color:#555;font-size:11px;margin-top:6px;line-height:1.5">
           ${co.address ? `<div>${co.address}</div>` : ''}
@@ -17659,7 +17677,7 @@ function printOrderSheets() {
     @media print { .pkg{page-break-after:always} .pkg:last-of-type{page-break-after:auto} }
   </style></head><body>
     <div class="hdr">
-      <div>${co.logo ? `<img src="${co.logo}" alt="${co.name}" style="max-height:56px;max-width:260px;display:block;margin-bottom:4px" />` : `<h1>${co.name}</h1>`}
+      <div>${co.logo ? `<img src="${bbHeaderLogoURI() || co.logo}" alt="${co.name}" style="max-height:56px;max-width:260px;display:block;margin-bottom:4px" />` : `<h1>${co.name}</h1>`}
         <div class="sub">Material order sheets · ${new Date().toLocaleDateString()}</div></div>
       <div style="text-align:right;color:#555">${i.project || ''}<br>${i.client || ''}<br>${bldg}</div>
     </div>
@@ -17704,7 +17722,7 @@ function printCutList() {
     .fine{margin-top:12px;font-size:10px;color:#666}
   </style></head><body>
     <div class="hdr">
-      <div>${co.logo ? `<img src="${co.logo}" alt="${co.name}" style="max-height:56px;max-width:260px;display:block;margin-bottom:4px" />` : `<h1>${co.name}</h1>`}
+      <div>${co.logo ? `<img src="${bbHeaderLogoURI() || co.logo}" alt="${co.name}" style="max-height:56px;max-width:260px;display:block;margin-bottom:4px" />` : `<h1>${co.name}</h1>`}
         <div class="sub">Cut list · ${new Date().toLocaleDateString()}</div></div>
       <div style="text-align:right;color:#555">${i.project || ''}<br>${i.client || ''}<br>${bldg}</div>
     </div>
@@ -17784,7 +17802,7 @@ function exportPDF() {
     border-color: var(--copper) !important;
   }
 </style></head><body>
-  <div class="hdr"><div>${co.logo ? `<img src="${co.logo}" alt="${co.name}" style="height:54px;width:auto;display:block;margin-bottom:4px;background:#000;padding:6px 10px;border-radius:4px" />` : `<div style="font-size:20px;font-weight:bold">${co.name}</div>`}<div style="font-size:11px;color:#333;margin-top:6px">INTERNAL COST SHEET · ${tierLabel} build · ${new Date().toLocaleDateString()}</div><div style="font-size:10px;color:#b00;font-weight:bold;margin-top:2px">Internal use only — contains costs &amp; quantities. Not for the customer.</div></div>
+  <div class="hdr"><div>${co.logo ? `<img src="${bbHeaderLogoURI() || co.logo}" alt="${co.name}" style="height:54px;width:auto;display:block;margin-bottom:4px;background:#000;padding:6px 10px;border-radius:4px" />` : `<div style="font-size:20px;font-weight:bold">${co.name}</div>`}<div style="font-size:11px;color:#333;margin-top:6px">INTERNAL COST SHEET · ${tierLabel} build · ${new Date().toLocaleDateString()}</div><div style="font-size:10px;color:#b00;font-weight:bold;margin-top:2px">Internal use only — contains costs &amp; quantities. Not for the customer.</div></div>
   <div style="text-align:right;font-size:10px"><div><b>Client:</b> ${i.client || '—'}</div><div><b>Project:</b> ${i.project || '—'}</div></div></div>
   <h2>Specifications</h2>
   <table>
