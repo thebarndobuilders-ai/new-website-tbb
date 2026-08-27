@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v267</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v268</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8851,7 +8851,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v267';
+const BB_VERSION = 'v268';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -19527,6 +19527,7 @@ function generateModel() {
   // === SIDE SHED / LEAN-TO (from the Additions tab card) ===
   try { buildSideShed(dims, wallBase); } catch (e) { console.warn('3D side shed skipped:', e); }
   try { buildWidowsPeak(dims, wallBase); } catch (e) { console.warn('3D widow\'s peak skipped:', e); }
+  try { buildMetalTrim(dims, wallBase); } catch (e) { console.warn('3D metal trim skipped:', e); }
   try { buildPorch3D(dims, wallBase); } catch (e) { console.warn('3D porch skipped:', e); }
   try { buildCrowsFoot3D(dims, wallBase); } catch (e) { console.warn('3D crows foot skipped:', e); }
   try { buildExtension3D(dims, wallBase); } catch (e) { console.warn('3D extension skipped:', e); }
@@ -20142,6 +20143,68 @@ function buildPorch3D(dims, wallBase) {
 // (tapers back to the normal rake) + cypress crow's foot & corbels
 // on the gable wall, matching the builder's timber-accent look.
 // =============================================================
+// =============================================================
+// METAL TRIM 3D — the stock trim package drawn on the model in the
+// selected trim color: large corner trim on the wall corners, rake
+// (gable) trim up the roof edges, eave fascia, and rat guard at the
+// base. Categories are skin categories, so Frame view strips them.
+// =============================================================
+function buildMetalTrim(dims, wallBase) {
+  const { L, W, H, pitch, eaveOH, gableOH } = dims;
+  if (!(L > 0 && W > 0 && H > 0)) return;
+  const enc = (typeof bbEnclosure === 'function') ? bbEnclosure() : { mode: 'full' };
+  const colors = (typeof bb3dSelectedColors === 'function') ? bb3dSelectedColors() : { trim: 0x1a1a1a };
+  const trimMat = () => new THREE.MeshStandardMaterial({ color: colors.trim, roughness: 0.38, metalness: 0.5 });
+  const run = W / 2, rise = run * (pitch / 12);
+  const wallTop = wallBase + H;
+  const put = (mesh, key, label) => {
+    mesh.userData = { categoryKey: key, label };
+    mesh.castShadow = mesh.receiveShadow = true;
+    buildingGroup.add(mesh); allMeshes.push(mesh);
+    return mesh;
+  };
+  const angled = (a, b, w, h, key, label) => {
+    const len = a.distanceTo(b);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, len), trimMat());
+    m.position.copy(a.clone().add(b).multiplyScalar(0.5));
+    m.lookAt(b);
+    return put(m, key, label);
+  };
+
+  // --- LARGE CORNER TRIM — 4 wall corners (only when walls are enclosed) ---
+  if (enc.mode === 'full') {
+    [-1, 1].forEach(sx => [-1, 1].forEach(sz => {
+      const c = new THREE.Mesh(new THREE.BoxGeometry(0.38, H, 0.38), trimMat());
+      c.position.set(sx * (L / 2 + 0.02), wallBase + H / 2, sz * (W / 2 + 0.02));
+      put(c, 'corner_trim', 'Corner trim — ' + (sx < 0 ? 'rear' : 'front') + '/' + (sz < 0 ? 'back' : 'front'));
+    }));
+    // --- RAT GUARD — base band around the walls ---
+    const rg = (len, x, z, alongX) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(alongX ? len : 0.1, 0.28, alongX ? 0.1 : len), trimMat());
+      m.position.set(x, wallBase + 0.18, z);
+      put(m, 'corner_trim', 'Rat guard');
+    };
+    rg(L, 0, W / 2 + 0.08, true);
+    rg(L, 0, -W / 2 - 0.08, true);
+    rg(W, L / 2 + 0.08, 0, false);
+    rg(W, -L / 2 - 0.08, 0, false);
+  }
+
+  // --- EAVE FASCIA — along both eave edges (roof always has it) ---
+  [-1, 1].forEach(sz => {
+    const f = new THREE.Mesh(new THREE.BoxGeometry(L + 2 * gableOH, 0.55, 0.14), trimMat());
+    f.position.set(0, wallTop - 0.2, sz * (W / 2 + eaveOH + 0.04));
+    put(f, 'fascia', 'Eave fascia — ' + (sz < 0 ? 'back' : 'front'));
+  });
+
+  // --- RAKE (GABLE) TRIM — up the roof edge on each gable, both slopes ---
+  [-1, 1].forEach(sx => [-1, 1].forEach(sz => {
+    const a = new THREE.Vector3(sx * (L / 2 + gableOH + 0.02), wallTop - 0.05, sz * (W / 2 + eaveOH));
+    const b = new THREE.Vector3(sx * (L / 2 + gableOH + 0.02), wallTop + rise + 0.08, 0);
+    angled(a, b, 0.14, 0.5, 'roof_trim', 'Rake trim — ' + (sx < 0 ? 'rear' : 'front') + ' gable');
+  }));
+}
+
 function buildWidowsPeak(dims, wallBase) {
   const modeEl = document.getElementById('wp_mode');
   const mode = modeEl ? modeEl.value : 'none';
