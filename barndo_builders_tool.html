@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v276</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v277</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8904,7 +8904,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v276';
+const BB_VERSION = 'v277';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -20503,6 +20503,7 @@ function generateModel() {
   // Apply structure-toggle visibility
   applyStructureVisibility();
   applyCategoryFilter();
+  try { bbShowOpeningDims(); } catch (e) {}
 }
 
 // Side shed / lean-to from the Additions tab: single slope off one wall of the main
@@ -22717,6 +22718,156 @@ function makeOpeningsEditable() {
   if (typeof recalc === 'function') recalc();
 }
 
+// ---- Live placement measuring tool ----
+// While an opening is selected or being dragged, dimension lines are drawn on its
+// wall (corner \u2192 opening edge on both sides, plus a wall-centerline marker that
+// turns green when the opening is dead-center) and a HUD readout floats over the
+// canvas with the exact numbers, so symmetric placement is easy to hit.
+let _bbDimGroup = null;
+let _bbDimHudEl = null;
+
+function bbFtInDim(v) {
+  const neg = v < 0; v = Math.abs(v);
+  let ft = Math.floor(v);
+  let inch = Math.round((v - ft) * 12 * 4) / 4;
+  if (inch >= 12) { ft += 1; inch -= 12; }
+  const whole = Math.floor(inch);
+  const fr = { 0.25: '\u00bc', 0.5: '\u00bd', 0.75: '\u00be' }[inch - whole] || '';
+  return (neg ? '\u2212' : '') + ft + "'-" + whole + fr + '"';
+}
+
+function _bbDimHud() {
+  if (_bbDimHudEl && _bbDimHudEl.isConnected) return _bbDimHudEl;
+  const wrap = document.getElementById('audit3d-canvas-wrap');
+  if (!wrap) return null;
+  const d = document.createElement('div');
+  d.id = 'bb-dim-hud';
+  d.style.cssText = 'position:absolute;top:54px;left:50%;transform:translateX(-50%);z-index:40;display:none;pointer-events:none;background:rgba(12,13,15,.93);color:#fff;border:1px solid #b87333;border-radius:8px;padding:7px 14px;font-family:var(--font-mono, monospace);font-size:12.5px;line-height:1.55;text-align:center;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.35)';
+  wrap.appendChild(d);
+  _bbDimHudEl = d;
+  return d;
+}
+
+function bbClearOpeningDims() {
+  if (_bbDimGroup && typeof scene !== 'undefined' && scene) {
+    scene.remove(_bbDimGroup);
+    _bbDimGroup.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); }
+    });
+  }
+  _bbDimGroup = null;
+}
+
+function _bbDimLabel(text) {
+  const m = document.createElement('canvas');
+  const mx = m.getContext('2d');
+  mx.font = 'bold 46px Arial';
+  const tw = Math.ceil(mx.measureText(text).width);
+  m.width = tw + 46; m.height = 76;
+  const g = m.getContext('2d');
+  g.font = 'bold 46px Arial';
+  g.fillStyle = 'rgba(12,13,15,0.92)';
+  const r = 18;
+  g.beginPath();
+  g.moveTo(r, 0); g.lineTo(m.width - r, 0); g.arcTo(m.width, 0, m.width, r, r);
+  g.lineTo(m.width, m.height - r); g.arcTo(m.width, m.height, m.width - r, m.height, r);
+  g.lineTo(r, m.height); g.arcTo(0, m.height, 0, m.height - r, r);
+  g.lineTo(0, r); g.arcTo(0, 0, r, 0, r);
+  g.closePath(); g.fill();
+  g.strokeStyle = '#b87333'; g.lineWidth = 3; g.stroke();
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, m.width / 2, m.height / 2 + 2);
+  const tex = new THREE.CanvasTexture(m);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  const hFt = 1.15;
+  sp.scale.set(hFt * m.width / m.height, hFt, 1);
+  sp.renderOrder = 1002;
+  return sp;
+}
+
+function _bbDimLine(pts, hex) {
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const ln = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: hex, depthTest: false, transparent: true, opacity: 0.95 }));
+  ln.renderOrder = 1001;
+  return ln;
+}
+
+function bbShowOpeningDims() {
+  try {
+    if (typeof scene === 'undefined' || !scene || typeof THREE === 'undefined') return;
+    bbClearOpeningDims();
+    const hud = _bbDimHud();
+    const hide = () => { if (hud) hud.style.display = 'none'; };
+    if (!selectedOpening) { hide(); return; }
+    const row = (openingsState[selectedOpening.type] || [])[selectedOpening.idx];
+    if (!row || !row.wall || row.pos == null) { hide(); return; }
+    const entry = _openingGroups.find(g => g.ref && g.ref.type === selectedOpening.type && g.ref.idx === selectedOpening.idx);
+    if (!entry) { hide(); return; }
+    const dims = getBuildingDims();
+    const isLong = (row.wall === 'front' || row.wall === 'back');
+    const len = isLong ? dims.L : dims.W;
+    const outSign = (row.wall === 'front' || row.wall === 'right') ? 1 : -1;
+    const off = 0.55;
+    const P = (a, y) => isLong
+      ? new THREE.Vector3(a, y, outSign * (dims.W / 2 + off))
+      : new THREE.Vector3(outSign * (dims.L / 2 + off), y, a);
+    const w = parseFloat(row.w) || openingDefault(selectedOpening.type, 'w');
+    const along = -len / 2 + Math.max(0, Math.min(1, row.pos)) * len;
+    const eL = along - w / 2, eR = along + w / 2;
+    const yc = entry.group.position.y;
+    const dl = Math.max(0, eL + len / 2);
+    const dr = Math.max(0, len / 2 - eR);
+    const g = new THREE.Group();
+    const ink = 0x16171a, copper = 0xb87333;
+    [[-len / 2, eL, dl], [eR, len / 2, dr]].forEach(seg => {
+      const a = seg[0], b = seg[1], d = seg[2];
+      g.add(_bbDimLine([P(a, yc), P(b, yc)], ink));
+      g.add(_bbDimLine([P(a, yc - 0.45), P(a, yc + 0.45)], ink));
+      g.add(_bbDimLine([P(b, yc - 0.45), P(b, yc + 0.45)], ink));
+      const lbl = _bbDimLabel(bbFtInDim(d));
+      lbl.position.copy(P((a + b) / 2, yc + 1.1));
+      g.add(lbl);
+    });
+    const ctr = Math.abs(along) < 1 / 24;
+    g.add(_bbDimLine([P(0, yc - 0.9), P(0, yc + 0.9)], ctr ? 0x2e9e4f : copper));
+    const cl = _bbDimLabel(ctr ? 'CENTERED' : 'WALL CL');
+    cl.position.copy(P(0, yc + 2.15));
+    g.add(cl);
+    scene.add(g);
+    _bbDimGroup = g;
+    if (hud) {
+      const l2 = ctr
+        ? '<span style="color:#4fd07a;font-weight:700">\u2316 CENTERED ON WALL</span>'
+        : 'off wall center: <b style="color:#e8a25e">' + bbFtInDim(Math.abs(along)) + '</b>';
+      let gapL = null, gapR = null;
+      ['window', 'extdoor', 'garage'].forEach(t => {
+        (openingsState[t] || []).forEach((r2, i2) => {
+          if (t === selectedOpening.type && i2 === selectedOpening.idx) return;
+          if (r2.wall !== row.wall || r2.pos == null) return;
+          const w2 = parseFloat(r2.w) || openingDefault(t, 'w');
+          const a2 = -len / 2 + r2.pos * len;
+          const gl = eL - (a2 + w2 / 2);
+          const gr = (a2 - w2 / 2) - eR;
+          if (gl >= 0 && (gapL == null || gl < gapL)) gapL = gl;
+          if (gr >= 0 && (gapR == null || gr < gapR)) gapR = gr;
+        });
+      });
+      let l3 = '';
+      if (gapL != null || gapR != null) {
+        l3 = 'gap to next opening: '
+          + (gapL != null ? '\u25c0 ' + bbFtInDim(gapL) : '')
+          + (gapL != null && gapR != null ? ' \u00b7 ' : '')
+          + (gapR != null ? bbFtInDim(gapR) + ' \u25b6' : '');
+      }
+      hud.innerHTML = '<b>\u25c0 ' + bbFtInDim(dl) + '</b> \u00b7 ' + String(row.wall).toUpperCase()
+        + ' wall \u00b7 opening ' + bbFtInDim(w) + ' wide \u00b7 <b>' + bbFtInDim(dr) + ' \u25b6</b><br>'
+        + l2 + (l3 ? '<br>' + l3 : '');
+      hud.style.display = 'block';
+    }
+  } catch (e) {}
+}
+
 // ---- Drag to reposition along a wall ----
 // Openings are ALWAYS grabbable: click a door/window/garage door and drag it along
 // its wall — no Edit-layout toggle needed. Grabbing empty space still orbits the
@@ -22757,6 +22908,7 @@ function _onPointerMove(event) {
   else _dragOpening.group.position.z = along;
   const row = openingsState[_dragOpening.ref.type][_dragOpening.ref.idx];
   if (row) row.pos = frac;
+  try { bbShowOpeningDims(); } catch (e) {}
 }
 
 function _onPointerUp() {
@@ -22860,6 +23012,7 @@ function renderLegend() {
 // BUILD-OUT LAYOUT INSPECTOR
 // =============================================================================
 function renderLayoutInspector() {
+  try { bbShowOpeningDims(); } catch (e) {}
   const toggle = document.getElementById('audit3d-layout-toggle');
   const tools = document.getElementById('audit3d-layout-tools');
   const hint = document.getElementById('audit3d-layout-hint');
@@ -22935,6 +23088,8 @@ function renderLayoutInspector() {
 }
 window.updateSelectedOpening = updateSelectedOpening;
 window.deleteSelectedOpening = deleteSelectedOpening;
+// QA hook: state of the live placement-dimension overlay
+window.bb3dDimInfo = function() { return { group: !!_bbDimGroup, kids: _bbDimGroup ? _bbDimGroup.children.length : 0 }; };
 
 // =============================================================================
 // OPENING GUIDE — draggable size palette (windows / man doors / garage doors)
