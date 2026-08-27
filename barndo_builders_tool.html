@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v268</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v269</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8851,7 +8851,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v268';
+const BB_VERSION = 'v269';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -20197,10 +20197,20 @@ function buildMetalTrim(dims, wallBase) {
     put(f, 'fascia', 'Eave fascia — ' + (sz < 0 ? 'back' : 'front'));
   });
 
-  // --- RAKE (GABLE) TRIM — up the roof edge on each gable, both slopes ---
+  // --- RAKE (GABLE) TRIM — up the roof edge on each gable, both slopes.
+  // On a gable with a widow's peak, the rake trim STOPS where the peak
+  // meets the roof (the taper return point) instead of running to the ridge.
+  const wpModeT = ((document.getElementById('wp_mode') || {}).value) || 'none';
+  const wpDT = parseFloat((document.getElementById('wp_depth') || {}).value) || 2;
+  const wpHalf = (wpDT >= 3 ? 8 : 6) / 2;
+  const zEave = W / 2 + eaveOH;
   [-1, 1].forEach(sx => [-1, 1].forEach(sz => {
-    const a = new THREE.Vector3(sx * (L / 2 + gableOH + 0.02), wallTop - 0.05, sz * (W / 2 + eaveOH));
-    const b = new THREE.Vector3(sx * (L / 2 + gableOH + 0.02), wallTop + rise + 0.08, 0);
+    const hasPeak = wpModeT === 'both' || (wpModeT === 'front' && sx > 0) || (wpModeT === 'rear' && sx < 0);
+    const xR = sx * (L / 2 + gableOH + 0.02);
+    const a = new THREE.Vector3(xR, wallTop - 0.05, sz * zEave);
+    const b = hasPeak
+      ? new THREE.Vector3(xR, wallTop + rise * (1 - wpHalf / zEave) + 0.06, sz * wpHalf)
+      : new THREE.Vector3(xR, wallTop + rise + 0.08, 0);
     angled(a, b, 0.14, 0.5, 'roof_trim', 'Rake trim — ' + (sx < 0 ? 'rear' : 'front') + ' gable');
   }));
 }
