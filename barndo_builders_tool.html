@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v277</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v278</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3963,8 +3963,8 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
 
     <!-- SIDING LABOR -->
     <div class="qbs-card">
-      <h3 style="margin:0 0 6px;">Siding labor <span class="badge">$/sqft &times; sqft</span></h3>
-      <p class="qbs-sub" style="margin-bottom:16px;">Enter your siding labor bid. Click Add to Quote to include in the project total.</p>
+      <h3 style="margin:0 0 6px;">Siding &amp; roof labor <span class="badge">$ / square</span></h3>
+      <p class="qbs-sub" style="margin-bottom:16px;">Priced by the square (1 SQ = 100 sqft). Areas auto-fill from the build and convert to squares &mdash; enter your labor price per square. Each trade adds to the quote on its own.</p>
       <div id="siding-labor-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;"></div>
       <div id="siding-labor-total" style="margin-top:16px;padding:12px 16px;background:var(--copper-soft);border-radius:6px;font-family:var(--font-mono);font-size:14px;color:var(--copper);font-weight:600;text-align:right;">
         Total siding labor: $0.00
@@ -8904,7 +8904,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v277';
+const BB_VERSION = 'v278';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -12679,6 +12679,8 @@ let concreteQuoteAdded = false;
 let concreteQuoteAmount = 0;
 let sidingLaborQuoteAdded = false;
 let sidingLaborQuoteAmount = 0;
+let roofLaborQuoteAdded = false;
+let roofLaborQuoteAmount = 0;
 
 const FRAMING_LABOR_COLUMNS = [
   { key: 'house',         label: 'House framing',         basisField: 'living' },
@@ -12788,7 +12790,7 @@ function syncFramingLaborAutoSqft(i) {
   // If a column's applies state may have changed (e.g., user added shop_sqft so
   // Roof-only no longer auto-applies), rebuild the grid to refresh dimming + N/A hints.
   // Only do this when there are no inputs focused, so we don't steal focus.
-  if (appliesChanged && !document.activeElement?.matches('#framing-labor-grid input')) {
+  if (appliesChanged && !document.activeElement?.matches('#framing-labor-grid input, #siding-labor-grid input')) {
     renderFramingLaborGrid();
     renderConcreteGrid();
     renderSidingLaborGrid();
@@ -13106,6 +13108,7 @@ function allQuotedTotal() {
   if (concreteQuoteAdded) t += concreteQuoteAmount;
   if (concretePorchQuoteAdded) t += concretePorchQuoteAmount;
   if (sidingLaborQuoteAdded) t += sidingLaborQuoteAmount;
+  if (roofLaborQuoteAdded) t += roofLaborQuoteAmount;
   return t;
 }
 
@@ -13240,44 +13243,89 @@ function toggleConcreteToQuote() {
 }
 
 // =============================================================
-// SIDING LABOR CARD
+// SIDING & ROOF LABOR CARDS — priced by the square (1 SQ = 100 sqft).
+// Sqft auto-fills (siding = wall area, roof = main + shed roof area), converts
+// to squares live; the builder enters $ per square. Each trade has its own
+// Add to Quote toggle; both feed allQuotedTotal().
 // =============================================================
 let sidingLaborCardState = { sqft: 0, rate: 0, sqftAuto: true };
+let roofLaborCardState   = { sqft: 0, rate: 0, sqftAuto: true };
+
+function _sqLaborMoney(v) {
+  return '$' + (v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function _sqLaborSquares(st) { return (st.sqft || 0) / 100; }
+function _sqLaborTotal(st) { return _sqLaborSquares(st) * (st.rate || 0); }
 
 function renderSidingLaborGrid() {
   const grid = document.getElementById('siding-labor-grid');
   if (!grid) return;
   let inp = null;
-  try { inp = (typeof getInputs === 'function') ? getInputs() : null; } catch(e) {}
-  const autoSqft = inp ? Math.round(inp.wallArea || 0) : 0;
-  if (sidingLaborCardState.sqftAuto !== false) sidingLaborCardState.sqft = autoSqft;
-  const s = sidingLaborCardState;
-  const total = (s.sqft || 0) * (s.rate || 0);
-  sidingLaborQuoteAmount = sidingLaborQuoteAdded ? total : 0;
-  const autoTag = sidingLaborCardState.sqftAuto !== false ? '<span style="color:var(--text-3);font-size:9px;margin-left:4px;">AUTO</span>' : '';
-  grid.innerHTML = `
+  try { inp = (typeof getInputs === 'function') ? getInputs() : null; } catch (e) {}
+  const autoWall = inp ? Math.round(inp.wallArea || 0) : 0;
+  const autoRoof = inp ? Math.round((inp.roofArea || 0) + ((inp.shedActive && inp.shed) ? (inp.shed.roofArea || 0) : 0)) : 0;
+  if (sidingLaborCardState.sqftAuto !== false) sidingLaborCardState.sqft = autoWall;
+  if (roofLaborCardState.sqftAuto !== false) roofLaborCardState.sqft = autoRoof;
+  sidingLaborQuoteAmount = sidingLaborQuoteAdded ? _sqLaborTotal(sidingLaborCardState) : 0;
+  roofLaborQuoteAmount = roofLaborQuoteAdded ? _sqLaborTotal(roofLaborCardState) : 0;
+  const cards = [
+    { title: 'Siding labor', st: sidingLaborCardState, added: sidingLaborQuoteAdded, pre: 'siding', hint: 'wall area' },
+    { title: 'Roof labor', st: roofLaborCardState, added: roofLaborQuoteAdded, pre: 'roof', hint: 'roof area (main + shed)' },
+  ];
+  grid.innerHTML = cards.map(c => {
+    const s = c.st;
+    const total = _sqLaborTotal(s);
+    const autoTag = s.sqftAuto !== false ? '<span style="color:var(--text-3);font-size:9px;margin-left:4px;">AUTO \u00b7 ' + c.hint + '</span>' : '';
+    const upd = c.pre === 'siding' ? 'updateSidingLaborCard' : 'updateRoofLaborCard';
+    const tog = c.pre === 'siding' ? 'toggleSidingLaborToQuote' : 'toggleRoofLaborToQuote';
+    return `
     <div style="background:var(--surface-2);border:1px solid var(--hairline);border-radius:8px;padding:14px;">
-      <div style="font-family:var(--font-headline);font-size:12px;font-weight:600;color:var(--copper);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:12px;">Siding labor</div>
+      <div style="font-family:var(--font-headline);font-size:12px;font-weight:600;color:var(--copper);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:12px;">${c.title}</div>
       <div style="margin-bottom:10px;">
         <label style="display:block;font-family:var(--font-mono);font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Sqft ${autoTag}</label>
-        <input type="number" min="0" step="1" value="${s.sqft || 0}" oninput="updateSidingLaborCard('sqft',this.value)" style="width:100%;box-sizing:border-box;">
+        <input type="number" min="0" step="1" value="${s.sqft || 0}" oninput="${upd}('sqft',this.value)" style="width:100%;box-sizing:border-box;">
+      </div>
+      <div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline;background:var(--bg-2);border:1px solid var(--hairline);border-radius:4px;padding:7px 10px;">
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;">Squares (sqft \u00f7 100)</span>
+        <span id="${c.pre}-squares-val" style="font-family:var(--font-mono);font-size:15px;font-weight:600;color:var(--text);">${_sqLaborSquares(s).toFixed(2)} SQ</span>
       </div>
       <div style="margin-bottom:10px;">
-        <label style="display:block;font-family:var(--font-mono);font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">$ / sqft</label>
-        <input type="number" min="0" step="0.10" value="${s.rate || ''}" placeholder="0.00" oninput="updateSidingLaborCard('rate',this.value)" style="width:100%;box-sizing:border-box;">
+        <label style="display:block;font-family:var(--font-mono);font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">$ / square</label>
+        <input type="number" min="0" step="1" value="${s.rate || ''}" placeholder="0.00" oninput="${upd}('rate',this.value)" style="width:100%;box-sizing:border-box;">
       </div>
       <div style="border-top:1px solid var(--hairline);padding-top:10px;display:flex;justify-content:space-between;align-items:baseline;">
         <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;">Total</span>
-        <span id="siding-total-val" style="font-family:var(--font-mono);font-size:16px;font-weight:600;color:var(--copper);">$${total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+        <span id="${c.pre}-total-val" style="font-family:var(--font-mono);font-size:16px;font-weight:600;color:var(--copper);">${_sqLaborMoney(total)}</span>
       </div>
-      <button id="siding-quote-btn" onclick="toggleSidingLaborToQuote()"
+      <button id="${c.pre}-quote-btn" onclick="${tog}()"
         style="margin-top:10px;width:100%;padding:6px 0 !important;font-size:12px !important;font-weight:600;border-radius:4px !important;cursor:pointer;
-        ${sidingLaborQuoteAdded ? 'background:var(--copper) !important;color:var(--bg-deep) !important;border:1px solid var(--copper) !important;' : 'background:transparent !important;color:var(--copper) !important;border:1px solid var(--copper) !important;'}">
-        ${sidingLaborQuoteAdded ? '✓ Added to Quote' : '+ Add to Quote'}
+        ${c.added ? 'background:var(--copper) !important;color:var(--bg-deep) !important;border:1px solid var(--copper) !important;' : 'background:transparent !important;color:var(--copper) !important;border:1px solid var(--copper) !important;'}">
+        ${c.added ? '\u2713 Added to Quote' : '+ Add to Quote'}
       </button>
     </div>`;
-  const totalEl = document.getElementById('siding-labor-total');
-  if (totalEl) totalEl.textContent = 'Total siding labor: $' + total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  }).join('');
+  _sqLaborBar();
+}
+
+function _sqLaborBar() {
+  const barEl = document.getElementById('siding-labor-total');
+  if (barEl) barEl.textContent = 'Siding labor: ' + _sqLaborMoney(_sqLaborTotal(sidingLaborCardState))
+    + '  \u00b7  Roof labor: ' + _sqLaborMoney(_sqLaborTotal(roofLaborCardState));
+}
+
+// Targeted updates (no innerHTML re-render) so typing keeps focus.
+function _sqLaborSync(pre, st, added) {
+  const sq = document.getElementById(pre + '-squares-val');
+  if (sq) sq.textContent = _sqLaborSquares(st).toFixed(2) + ' SQ';
+  const tot = document.getElementById(pre + '-total-val');
+  if (tot) tot.textContent = _sqLaborMoney(_sqLaborTotal(st));
+  const btn = document.getElementById(pre + '-quote-btn');
+  if (btn) {
+    btn.textContent = added ? '\u2713 Added to Quote' : '+ Add to Quote';
+    btn.style.setProperty('background', added ? 'var(--copper)' : 'transparent', 'important');
+    btn.style.setProperty('color', added ? 'var(--bg-deep)' : 'var(--copper)', 'important');
+  }
+  _sqLaborBar();
 }
 
 function updateSidingLaborCard(field, value) {
@@ -13285,25 +13333,34 @@ function updateSidingLaborCard(field, value) {
   sidingLaborCardState[field] = parseFloat(value) || 0;
   sidingLaborQuoteAdded = false;
   sidingLaborQuoteAmount = 0;
-  const total = (sidingLaborCardState.sqft || 0) * (sidingLaborCardState.rate || 0);
-  const totalEl = document.getElementById('siding-total-val');
-  if (totalEl) totalEl.textContent = '$' + total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-  const barEl = document.getElementById('siding-labor-total');
-  if (barEl) barEl.textContent = 'Total siding labor: $' + total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  _sqLaborSync('siding', sidingLaborCardState, false);
+  recalc();
+}
+
+function updateRoofLaborCard(field, value) {
+  if (field === 'sqft') roofLaborCardState.sqftAuto = false;
+  roofLaborCardState[field] = parseFloat(value) || 0;
+  roofLaborQuoteAdded = false;
+  roofLaborQuoteAmount = 0;
+  _sqLaborSync('roof', roofLaborCardState, false);
   recalc();
 }
 
 function toggleSidingLaborToQuote() {
-  const total = (sidingLaborCardState.sqft || 0) * (sidingLaborCardState.rate || 0);
+  const total = _sqLaborTotal(sidingLaborCardState);
   if (total <= 0) return;
   sidingLaborQuoteAdded = !sidingLaborQuoteAdded;
   sidingLaborQuoteAmount = sidingLaborQuoteAdded ? total : 0;
-  const btn = document.getElementById('siding-quote-btn');
-  if (btn) {
-    btn.textContent = sidingLaborQuoteAdded ? '✓ Added to Quote' : '+ Add to Quote';
-    btn.style.setProperty('background', sidingLaborQuoteAdded ? 'var(--copper)' : 'transparent', 'important');
-    btn.style.setProperty('color', sidingLaborQuoteAdded ? 'var(--bg-deep)' : 'var(--copper)', 'important');
-  }
+  _sqLaborSync('siding', sidingLaborCardState, sidingLaborQuoteAdded);
+  recalc();
+}
+
+function toggleRoofLaborToQuote() {
+  const total = _sqLaborTotal(roofLaborCardState);
+  if (total <= 0) return;
+  roofLaborQuoteAdded = !roofLaborQuoteAdded;
+  roofLaborQuoteAmount = roofLaborQuoteAdded ? total : 0;
+  _sqLaborSync('roof', roofLaborCardState, roofLaborQuoteAdded);
   recalc();
 }
 
