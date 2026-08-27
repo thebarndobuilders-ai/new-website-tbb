@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v271</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v272</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3318,7 +3318,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         </div>
         <div class="qbs-field" style="grid-column: span 2;">
           <label style="display:flex; align-items:center; gap:6px; cursor:pointer; padding-top:6px;"><input type="checkbox" id="wp_cypress" checked onchange="recalc()" style="width:15px;height:15px;"> Cypress crow's foot + corbels</label>
-          <div class="qbs-note">Per gable: crow's foot = 3× 2×6×10' cypress · corbels = 3× 4×6×10' cypress. Metal: 2× 10' large corner, 2× 10' fascia, 1 ridge cap, 2 roof panels at the building's panel length.</div>
+          <div class="qbs-note">Per gable: crow's foot = 3× 2×6 cypress · corbels = 3× 4×6 cypress (10' sticks on 2'/3', 12' on 4'/5'). Metal: 2× 10' large corner, 2× 10' fascia, 1 ridge cap, 2 roof panels at building panel length. <strong style="color:var(--copper);">Build labor added per gable: 2' = $1,900 · 3' = $2,300 · 4' = $2,700 · 5' = $3,500.</strong></div>
         </div>
       </div>
     </div>
@@ -5935,6 +5935,21 @@ const MATERIALS = [
   { id: "wp_timber_screws", label: "10\" timber screws (12 per gable w/ cypress)", cat: "Widow's peak", uom: "ea", packSize: null,
     priceCost: 1.38, priceSell: 1.75, priceRetail: 2.10,
     formula: i => i.wpCypress ? 12 * (i.wpCount || 0) : 0 },
+  // Widow's peak BUILD LABOR — flat per gable by size, resale price with the
+  // markup baked in (cost = sell, like the framing-labor pattern). Added ON
+  // TOP of the itemized materials above, which stay as the takeoff/orders.
+  { id: "wp_labor_2", label: "Widow's peak build labor — 2' × 6' (per gable, markup baked in)", cat: "Widow's peak", uom: "ea", packSize: null, fixedSell: 1900,
+    priceCost: 1900, priceSell: 1900, priceRetail: 1900,
+    formula: i => (Math.round(i.wpDepth || 2) === 2 ? (i.wpCount || 0) : 0) },
+  { id: "wp_labor_3", label: "Widow's peak build labor — 3' × 8' (per gable, markup baked in)", cat: "Widow's peak", uom: "ea", packSize: null, fixedSell: 2300,
+    priceCost: 2300, priceSell: 2300, priceRetail: 2300,
+    formula: i => (Math.round(i.wpDepth || 2) === 3 ? (i.wpCount || 0) : 0) },
+  { id: "wp_labor_4", label: "Widow's peak build labor — 4' × 10' (per gable, markup baked in)", cat: "Widow's peak", uom: "ea", packSize: null, fixedSell: 2700,
+    priceCost: 2700, priceSell: 2700, priceRetail: 2700,
+    formula: i => (Math.round(i.wpDepth || 2) === 4 ? (i.wpCount || 0) : 0) },
+  { id: "wp_labor_5", label: "Widow's peak build labor — 5' × 12' (per gable, markup baked in)", cat: "Widow's peak", uom: "ea", packSize: null, fixedSell: 3500,
+    priceCost: 3500, priceSell: 3500, priceRetail: 3500,
+    formula: i => (Math.round(i.wpDepth || 2) === 5 ? (i.wpCount || 0) : 0) },
 
   // ---------------- BLOCK FOUNDATION (CMU) ----------------
   // Stem wall + piers. Both feed into the same SKU lines when block size matches.
@@ -8857,7 +8872,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v271';
+const BB_VERSION = 'v272';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
