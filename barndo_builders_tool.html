@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v278</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v279</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8904,7 +8904,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v278';
+const BB_VERSION = 'v279';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -20560,7 +20560,7 @@ function generateModel() {
   // Apply structure-toggle visibility
   applyStructureVisibility();
   applyCategoryFilter();
-  try { bbShowOpeningDims(); } catch (e) {}
+  try { bbSyncOpeningDims(); } catch (e) {}
 }
 
 // Side shed / lean-to from the Additions tab: single slope off one wall of the main
@@ -22739,6 +22739,7 @@ function updateSelectedOpening(field, value) {
   generateModel();
   if (affectsQuote) renderLegend();
   renderLayoutInspector();
+  try { bbShowOpeningDims(); } catch (e) {}
 }
 
 function deleteSelectedOpening() {
@@ -22782,6 +22783,29 @@ function makeOpeningsEditable() {
 // canvas with the exact numbers, so symmetric placement is easy to hit.
 let _bbDimGroup = null;
 let _bbDimHudEl = null;
+let _bbDimHideTimer = null;
+let _bbDimActive = false;
+
+// Hard-hide the measuring overlay (lines + HUD) right now.
+function bbHideOpeningDims() {
+  _bbDimActive = false;
+  if (_bbDimHideTimer) { clearTimeout(_bbDimHideTimer); _bbDimHideTimer = null; }
+  bbClearOpeningDims();
+  if (_bbDimHudEl) _bbDimHudEl.style.display = 'none';
+}
+
+// (Re)start the auto-hide countdown — the overlay clears 4s after the last touch.
+function _bbDimArmHide() {
+  if (_bbDimHideTimer) clearTimeout(_bbDimHideTimer);
+  _bbDimHideTimer = setTimeout(function () { _bbDimHideTimer = null; bbHideOpeningDims(); }, 4000);
+}
+
+// Refresh the overlay only if it is currently showing (used after model
+// rebuilds); never pops it back up on its own.
+function bbSyncOpeningDims() {
+  if (_bbDimActive) bbShowOpeningDims();
+  else { bbClearOpeningDims(); if (_bbDimHudEl) _bbDimHudEl.style.display = 'none'; }
+}
 
 function bbFtInDim(v) {
   const neg = v < 0; v = Math.abs(v);
@@ -22855,7 +22879,11 @@ function bbShowOpeningDims() {
     if (typeof scene === 'undefined' || !scene || typeof THREE === 'undefined') return;
     bbClearOpeningDims();
     const hud = _bbDimHud();
-    const hide = () => { if (hud) hud.style.display = 'none'; };
+    const hide = () => {
+      _bbDimActive = false;
+      if (_bbDimHideTimer) { clearTimeout(_bbDimHideTimer); _bbDimHideTimer = null; }
+      if (hud) hud.style.display = 'none';
+    };
     if (!selectedOpening) { hide(); return; }
     const row = (openingsState[selectedOpening.type] || [])[selectedOpening.idx];
     if (!row || !row.wall || row.pos == null) { hide(); return; }
@@ -22922,6 +22950,8 @@ function bbShowOpeningDims() {
         + l2 + (l3 ? '<br>' + l3 : '');
       hud.style.display = 'block';
     }
+    _bbDimActive = true;
+    _bbDimArmHide();
   } catch (e) {}
 }
 
@@ -22943,6 +22973,7 @@ function _onPointerDown(event) {
   _dragOpening = entry;
   controls.enabled = false;
   renderLayoutInspector();
+  try { bbShowOpeningDims(); } catch (e) {}
 }
 
 function _onPointerMove(event) {
@@ -23069,7 +23100,7 @@ function renderLegend() {
 // BUILD-OUT LAYOUT INSPECTOR
 // =============================================================================
 function renderLayoutInspector() {
-  try { bbShowOpeningDims(); } catch (e) {}
+  try { bbSyncOpeningDims(); } catch (e) {}
   const toggle = document.getElementById('audit3d-layout-toggle');
   const tools = document.getElementById('audit3d-layout-tools');
   const hint = document.getElementById('audit3d-layout-hint');
@@ -23466,6 +23497,7 @@ window.bb3dRefresh = function() {
 // Returns an array of JPEG data URLs; restores the camera/renderer after.
 // Capture a single frame showing ONLY one build stage's meshes (Framing pages).
 window.bb3dCaptureStage = function(stage, w, h) {
+  try { bbHideOpeningDims(); } catch (e) {}
   if (!initialized) init3D();
   if (!renderer || !scene || !camera) return null;
   generateModel();
@@ -23535,6 +23567,7 @@ window.bb3dCaptureStage = function(stage, w, h) {
 };
 
 window.bb3dCaptureTurntable = function(frames, w, h) {
+  try { bbHideOpeningDims(); } catch (e) {}
   if (!initialized) init3D();
   if (!renderer || !scene || !camera) return null;
   generateModel();
