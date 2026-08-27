@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v264</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v265</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3310,8 +3310,8 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <div class="qbs-field">
           <label>Roof extension</label>
           <select id="wp_depth" onchange="recalc()">
-            <option value="2">2' widow's peak extension</option>
-            <option value="3">3' widow's peak extension</option>
+            <option value="2">2' widow's peak — 5' wide</option>
+            <option value="3">3' widow's peak — 6' wide</option>
           </select>
         </div>
         <div class="qbs-field" style="grid-column: span 2;">
@@ -8851,7 +8851,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v264';
+const BB_VERSION = 'v265';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -20177,7 +20177,7 @@ function buildWidowsPeak(dims, wallBase) {
     const sideName = s < 0 ? 'rear' : 'front';
     const x0 = s * (L / 2 + gableOH);
     const xTip = s * (L / 2 + gableOH + D);
-    const dropZ = Math.min(run, D * 2.4);   // partial taper — returns to the normal rake partway down the slope (builder-preferred look)
+    const dropZ = (D >= 3 ? 6 : 5) / 2;   // standard widths: 2' peak = 5' wide, 3' peak = 6' wide (half each side of the ridge)
     // tapered extension planes, one per slope
     [-1, 1].forEach(zs => {
       const xIn = x0 - s * 0.35;   // tuck 4" onto the main roof so the rake edge face never peeks through
@@ -20199,7 +20199,7 @@ function buildWidowsPeak(dims, wallBase) {
     tag(cap, "Widow's peak ridge cap — " + sideName);
     if (!withCypress) return;
     // ---- cypress crow's foot on the gable wall ----
-    const xFace = s * (L / 2 + 0.14);
+    const xFace = s * (L / 2 + 1.14);   // crow's foot stands ~1' off the gable wall, under the peak
     const ch = Math.min(9, W * 0.34);           // horizontal chord length
     const hd = (ch / 2) * slopeK;               // drop from ridge at chord ends
     const chordY = ridgeY - 0.55 - hd;   // clear the peak roof planes — no poking through
@@ -20220,12 +20220,21 @@ function buildWidowsPeak(dims, wallBase) {
     angled(new THREE.Vector3(xFace, chordY - 0.18, 0), peakPt, 0.12, 0.4, cypMat(), "Crow's foot strut — " + sideName);
     // ---- corbels (4x6) under the chord ends ----
     [-1, 1].forEach(zs => {
-      const topPt = new THREE.Vector3(xFace, chordY - 0.23, zs * (ch / 2 - 0.25));
-      const wallPt = new THREE.Vector3(xFace, chordY - 2.6, zs * (ch / 2 - 0.25));
-      const v = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.4, 0.46), cypMat());
-      v.position.set(xFace, chordY - 1.45, zs * (ch / 2 - 0.25));
+      const zc = zs * (ch / 2 - 0.25);
+      const wallX = s * (L / 2 + 0.1);
+      // vertical against the gable wall
+      const v = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.5, 0.46), cypMat());
+      v.position.set(wallX + s * 0.15, chordY - 1.55, zc);
       tag(v, 'Corbel — ' + sideName);
-      angled(wallPt, new THREE.Vector3(xFace, chordY - 0.28, zs * (ch / 2 - 1.9)), 0.3, 0.46, cypMat(), 'Corbel brace — ' + sideName);
+      // horizontal arm running OUT from the wall under the chord end
+      const armLen = Math.abs(xFace - wallX) + 0.5;
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(armLen, 0.42, 0.46), cypMat());
+      arm.position.set((wallX + xFace) / 2 + s * 0.1, chordY - 0.45, zc);
+      tag(arm, 'Corbel arm — ' + sideName);
+      // diagonal kicker from the bottom of the vertical out to the arm tip
+      angled(new THREE.Vector3(wallX + s * 0.15, chordY - 2.7, zc),
+             new THREE.Vector3(xFace + s * 0.1, chordY - 0.62, zc),
+             0.3, 0.46, cypMat(), 'Corbel brace — ' + sideName);
     });
   });
 }
