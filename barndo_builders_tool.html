@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v273</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v274</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2813,6 +2813,15 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <div class="qbs-note">Check a tie and the two porches at that corner pull to the corner and their roofs join with a <strong>hip</strong> — hip framing auto-counts, corner posts merge. Both porches of the corner must be enabled.</div>
       </div>
       <div class="qbs-grid-3" style="margin-bottom: 12px;">
+        <div class="qbs-field">
+          <label>Concrete under porches</label>
+          <select id="porch_concrete" onchange="recalc(); try { renderConcreteGrid(); } catch (e) {}">
+            <option value="none">None — gravel / dirt</option>
+            <option value="4">4" slab</option>
+            <option value="6">6" slab — footing + rebar</option>
+          </select>
+          <div class="qbs-note">Applies to all enabled porch sides. Pushes to the Porch &amp; shed concrete card on Subs &amp; labor and onto the Foundation blueprint.</div>
+        </div>
         <div class="qbs-field" id="porch-spacing-field"><label>Post spacing (ft)</label><input type="number" id="porch_post_spacing" value="10" step="0.5" oninput="recalc()" /><div class="qbs-note">Stick porches. Cypress auto-figures even bays ≤ 12'.</div></div>
         <div class="qbs-field"><label>Roof pitch (X/12)</label><input type="number" id="porch_pitch" value="3" step="0.5" oninput="recalc()" /></div>
         <div class="qbs-field"><label>Post height (ft)</label><input type="number" id="porch_post_height" value="9" step="0.5" oninput="recalc()" /><div class="qbs-note">Height at the outboard posts</div></div>
@@ -3206,6 +3215,15 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
               <option value="left">Left (gable end)</option>
               <option value="right">Right (gable end)</option>
             </select>
+          </div>
+          <div class="qbs-field">
+            <label>Concrete under shed</label>
+            <select id="shed_concrete" onchange="recalc(); try { renderConcreteGrid(); } catch (e) {}">
+              <option value="none">None — gravel / dirt</option>
+              <option value="4">4" slab</option>
+              <option value="6">6" slab — footing + rebar</option>
+            </select>
+            <div class="qbs-note">Pushes to the Porch &amp; shed concrete card (Subs &amp; labor) + Foundation blueprint.</div>
           </div>
           <div class="qbs-field" style="grid-column: span 2;">
             <label>Enclosed walls <span style="text-transform:none; letter-spacing:0; color:var(--text-3);">(uncheck = open bay — posts only)</span></label>
@@ -8886,7 +8904,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v273';
+const BB_VERSION = 'v274';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -11066,16 +11084,53 @@ function bbBPSheets() {
     const mx = ox + pdL2 * s, my = oy + pdT * s;
     let o = bbpTxt(BBP_M + 40, BBP_M + 44, 'FOUNDATION PLAN', 22, 'start', true);
     o += bbpTxt(BBP_M + 40, BBP_M + 70, '4" 4000 PSI CONCRETE SLAB — THICKENED EDGE FOOTING W/ (2) #4 REBAR CONT. — VERIFY SOILS & LOCAL CODE', 14);
-    // porch slabs
+    // porch / shed slabs — thickness from the cards; hatch when concrete is on
+    o += '<defs><pattern id="bbpHatch" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="14" stroke="#666" stroke-width="1"/></pattern></defs>';
+    const pConc = i.porchConcrete || 'none';
+    const sConc = i.shedConcrete || 'none';
     const porchRects = [];
     if (pdT) porchRects.push([mx, oy, L * s, pdT * s]);
     if (pdB) porchRects.push([mx, my + W * s, L * s, pdB * s]);
     if (pdL2) porchRects.push([ox, my, pdL2 * s, W * s]);
     if (pdR2) porchRects.push([mx + L * s, my, pdR2 * s, W * s]);
     porchRects.forEach(r => {
-      o += bbpRect(r[0], r[1], r[2], r[3], 1.8);
-      o += bbpTxt(r[0] + r[2] / 2, r[1] + r[3] / 2 + 5, '4" PORCH SLAB', 12, 'middle');
+      if (pConc === 'none') {
+        o += bbpRect(r[0], r[1], r[2], r[3], 1.4, '8 6');
+        o += bbpTxt(r[0] + r[2] / 2, r[1] + r[3] / 2 + 5, 'OPEN PORCH — NO CONCRETE (GRAVEL/GRADE)', 11.5, 'middle');
+      } else {
+        o += '<rect x="' + r[0] + '" y="' + r[1] + '" width="' + r[2] + '" height="' + r[3] + '" fill="url(#bbpHatch)" opacity="0.5"/>';
+        o += bbpRect(r[0], r[1], r[2], r[3], 2);
+        o += '<rect x="' + (r[0] + r[2] / 2 - 92) + '" y="' + (r[1] + r[3] / 2 - 14) + '" width="184" height="24" fill="#fff"/>';
+        o += bbpTxt(r[0] + r[2] / 2, r[1] + r[3] / 2 + 4, pConc + String.fromCharCode(0x2033) + ' PORCH SLAB' + (pConc === '6' ? ' + FOOTING' : ''), 12.5, 'middle', true);
+      }
     });
+    // side shed slab on its attached side
+    if ((document.getElementById('shed_enabled') || {}).checked) {
+      const shW = parseFloat((document.getElementById('shed_width') || {}).value) || 0;
+      const shL = parseFloat((document.getElementById('shed_length') || {}).value) || 0;
+      const shSide = ((document.getElementById('shed_attached_side') || {}).value) || 'back';
+      if (shW > 0 && shL > 0) {
+        let r;
+        if (shSide === 'back') r = [mx + (L - shL) / 2 * s, my - shW * s, shL * s, shW * s];
+        else if (shSide === 'front') r = [mx + (L - shL) / 2 * s, my + W * s, shL * s, shW * s];
+        else if (shSide === 'left') r = [mx - shW * s, my + (W - shL) / 2 * s, shW * s, shL * s];
+        else r = [mx + L * s, my + (W - shL) / 2 * s, shW * s, shL * s];
+        if (sConc === 'none') {
+          o += bbpRect(r[0], r[1], r[2], r[3], 1.4, '8 6');
+          o += bbpTxt(r[0] + r[2] / 2, r[1] + r[3] / 2 + 5, 'SIDE SHED — NO CONCRETE', 11.5, 'middle');
+        } else {
+          o += '<rect x="' + r[0] + '" y="' + r[1] + '" width="' + r[2] + '" height="' + r[3] + '" fill="url(#bbpHatch)" opacity="0.5"/>';
+          o += bbpRect(r[0], r[1], r[2], r[3], 2);
+          o += '<rect x="' + (r[0] + r[2] / 2 - 86) + '" y="' + (r[1] + r[3] / 2 - 14) + '" width="172" height="24" fill="#fff"/>';
+          o += bbpTxt(r[0] + r[2] / 2, r[1] + r[3] / 2 + 4, sConc + String.fromCharCode(0x2033) + ' SHED SLAB' + (sConc === '6' ? ' + FOOTING' : ''), 12.5, 'middle', true);
+        }
+      }
+    }
+    // concrete notes block
+    const concNotes = [];
+    if (pConc === '4' || sConc === '4') concNotes.push('4' + String.fromCharCode(0x2033) + ' PORCH/SHED SLABS: 4000 PSI — FIBERMESH — 8' + String.fromCharCode(0x2033) + ' THICKENED EDGE — NO REBAR REQ' + String.fromCharCode(39) + 'D.');
+    if (pConc === '6' || sConc === '6') concNotes.push('6' + String.fromCharCode(0x2033) + ' PORCH/SHED SLABS: 4000 PSI — 12' + String.fromCharCode(0x2033) + 'x12' + String.fromCharCode(0x2033) + ' TURNED-DOWN FOOTING W/ (2) #4 REBAR CONT. — WIRE MESH OR FIBERMESH.');
+    concNotes.forEach((nn, ni) => { o += bbpTxt(BBP_M + 40, BBP_SH - BBP_M - 92 + ni * 26, 'NOTE: ' + nn, 13, 'start', true); });
     o += bbpRect(mx, my, L * s, W * s, 3);
     o += bbpRect(mx + 0.9 * s, my + 0.9 * s, L * s - 1.8 * s, W * s - 1.8 * s, 1.2, '8 5');
     o += bbpTxt(mx + L * s / 2, my + W * s / 2 - 10, '4" SLAB — MAIN', 15, 'middle', true);
@@ -12805,6 +12860,7 @@ function allQuotedTotal() {
     if (s) t += (s.qty || 0) * (s.ratePerUnit || 0);
   });
   if (concreteQuoteAdded) t += concreteQuoteAmount;
+  if (concretePorchQuoteAdded) t += concretePorchQuoteAmount;
   if (sidingLaborQuoteAdded) t += sidingLaborQuoteAmount;
   return t;
 }
@@ -12813,13 +12869,17 @@ function allQuotedTotal() {
 // CONCRETE CARD
 // =============================================================
 let concreteCardState = { sqft: 0, rate: 0 };
+// Porch & shed concrete — its own card, fed by the porch/shed selectors
+let concretePorchState = { sqft: 0, rate: 0, sqftAuto: true };
+let concretePorchQuoteAdded = false;
+let concretePorchQuoteAmount = 0;
 
 function renderConcreteGrid() {
   const grid = document.getElementById('concrete-grid');
   if (!grid) return;
   let inp = null;
   try { inp = (typeof getInputs === 'function') ? getInputs() : null; } catch(e) {}
-  const autoSqft = inp ? Math.round(inp.living + inp.garageSqft + inp.shopSqft + inp.porchSqft) : 0;
+  const autoSqft = inp ? Math.round(inp.living + inp.garageSqft + inp.shopSqft) : 0;   // porches/sheds price on their own card below
   if (concreteCardState.sqftAuto !== false) concreteCardState.sqft = autoSqft;
   const s = concreteCardState;
   const total = (s.sqft || 0) * (s.rate || 0);
@@ -12845,7 +12905,41 @@ function renderConcreteGrid() {
         ${concreteQuoteAdded ? 'background:var(--copper) !important;color:var(--bg-deep) !important;border:1px solid var(--copper) !important;' : 'background:transparent !important;color:var(--copper) !important;border:1px solid var(--copper) !important;'}">
         ${concreteQuoteAdded ? '✓ Added to Quote' : '+ Add to Quote'}
       </button>
+    </div>
+    ${(function () {
+      const pc = (inp && inp.porchConcrete) || 'none';
+      const sc = (inp && inp.shedConcrete) || 'none';
+      const pArea = (pc !== 'none' && inp) ? Math.round(inp.porchSqft || 0) : 0;
+      const shedOn = !!(document.getElementById('shed_enabled') || {}).checked;
+      const sArea = (sc !== 'none' && shedOn && inp) ? Math.round((inp.shedW || parseFloat((document.getElementById('shed_width') || {}).value) || 0) * (parseFloat((document.getElementById('shed_length') || {}).value) || 0)) : 0;
+      const auto2 = pArea + sArea;
+      if (concretePorchState.sqftAuto !== false) concretePorchState.sqft = auto2;
+      const t2 = (concretePorchState.sqft || 0) * (concretePorchState.rate || 0);
+      concretePorchQuoteAmount = concretePorchQuoteAdded ? t2 : 0;
+      const mix = [pc !== 'none' && pArea ? 'PORCH ' + pc + '\u2033 (' + pArea + ' sqft)' : '', sc !== 'none' && sArea ? 'SHED ' + sc + '\u2033 (' + sArea + ' sqft)' : ''].filter(Boolean).join(' + ') || 'none selected — pick on the Porch / Side shed cards';
+      return `
+    <div style="background:var(--surface-2);border:1px solid var(--hairline);border-radius:8px;padding:14px;">
+      <div style="font-family:var(--font-headline);font-size:12px;font-weight:600;color:var(--copper);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Porch &amp; shed concrete</div>
+      <div style="font-size:10px;color:var(--text-3);margin-bottom:10px;">${mix}</div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block;font-family:var(--font-mono);font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Sqft ${concretePorchState.sqftAuto !== false ? '<span style=\"color:var(--text-3);font-size:9px;\">AUTO</span>' : ''}</label>
+        <input type="number" min="0" step="1" value="${concretePorchState.sqft || 0}" oninput="updateConcretePorchCard('sqft',this.value)" style="width:100%;box-sizing:border-box;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block;font-family:var(--font-mono);font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">$ / sqft</label>
+        <input type="number" min="0" step="0.10" value="${concretePorchState.rate || ''}" placeholder="0.00" oninput="updateConcretePorchCard('rate',this.value)" style="width:100%;box-sizing:border-box;">
+      </div>
+      <div style="border-top:1px solid var(--hairline);padding-top:10px;display:flex;justify-content:space-between;align-items:baseline;">
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;">Total</span>
+        <span id="conc-porch-total-val" style="font-family:var(--font-mono);font-size:16px;font-weight:600;color:var(--copper);">$${t2.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+      </div>
+      <button id="conc-porch-quote-btn" onclick="toggleConcretePorchToQuote()"
+        style="margin-top:10px;width:100%;padding:6px 0 !important;font-size:12px !important;font-weight:600;border-radius:4px !important;cursor:pointer;
+        ${concretePorchQuoteAdded ? 'background:var(--copper) !important;color:var(--bg-deep) !important;border:1px solid var(--copper) !important;' : 'background:transparent !important;color:var(--copper) !important;border:1px solid var(--copper) !important;'}">
+        ${concretePorchQuoteAdded ? '\u2713 Added to Quote' : '+ Add to Quote'}
+      </button>
     </div>`;
+    })()}`;
   const totalEl = document.getElementById('concrete-total');
   if (totalEl) totalEl.textContent = 'Total concrete: $' + total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 }
@@ -12864,6 +12958,29 @@ function updateConcreteCard(field, value) {
   recalc();
 }
 
+function updateConcretePorchCard(field, value) {
+  if (field === 'sqft') concretePorchState.sqftAuto = false;
+  concretePorchState[field] = parseFloat(value) || 0;
+  concretePorchQuoteAdded = false;
+  concretePorchQuoteAmount = 0;
+  const total = (concretePorchState.sqft || 0) * (concretePorchState.rate || 0);
+  const totalEl = document.getElementById('conc-porch-total-val');
+  if (totalEl) totalEl.textContent = '$' + total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  recalc();
+}
+function toggleConcretePorchToQuote() {
+  const total = (concretePorchState.sqft || 0) * (concretePorchState.rate || 0);
+  if (total <= 0) return;
+  concretePorchQuoteAdded = !concretePorchQuoteAdded;
+  concretePorchQuoteAmount = concretePorchQuoteAdded ? total : 0;
+  const btn = document.getElementById('conc-porch-quote-btn');
+  if (btn) {
+    btn.textContent = concretePorchQuoteAdded ? '\u2713 Added to Quote' : '+ Add to Quote';
+    btn.style.setProperty('background', concretePorchQuoteAdded ? 'var(--copper)' : 'transparent', 'important');
+    btn.style.setProperty('color', concretePorchQuoteAdded ? 'var(--bg-deep)' : 'var(--copper)', 'important');
+  }
+  recalc();
+}
 function toggleConcreteToQuote() {
   const total = (concreteCardState.sqft || 0) * (concreteCardState.rate || 0);
   if (total <= 0) return;
@@ -13918,6 +14035,9 @@ function getInputs() {
   const wpDepth = num('wp_depth') || 2;
   const wpCypress = !!((document.getElementById('wp_cypress') || {}).checked);
   const wpCount = wpMode === 'both' ? 2 : (wpMode === 'none' ? 0 : 1);
+  // Porch / side-shed concrete selections (none | 4 | 6)
+  const porchConcrete = ((document.getElementById('porch_concrete') || {}).value) || 'none';
+  const shedConcrete = ((document.getElementById('shed_concrete') || {}).value) || 'none';
   const span = W; // truss length = building width
   const run = span / 2;
   const rise = run * (pitch / 12); // heel height
@@ -14308,6 +14428,7 @@ function getInputs() {
     L, W, H, pitch,
     eaveOH, gableOH,
     wpMode, wpDepth, wpCypress, wpCount,
+    porchConcrete, shedConcrete,
     span, run, rise, topChord, slopeAngleDeg,
     roofArea, ceilingArea, gableTriangleArea, totalGableSidingArea, wallRectArea, wallArea,
     // Interior wall area: LF × wall height × 2 sides (both faces get sheetrock)
