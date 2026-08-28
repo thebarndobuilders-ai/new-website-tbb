@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v283</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v284</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3284,16 +3284,74 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
       </div>
     </div>
 
-    <div class="qbs-card">
-      <h3>Cupolas <span class="badge">Ridge accents · priced per unit on Pricing master</span></h3>
+    <div class="qbs-card" id="cupolas-card">
+      <h3>Cupolas <span class="badge">3 sections · base + mid + roof cap · per-unit pricing</span></h3>
       <div class="qbs-grid-3">
         <div class="qbs-field"><label>3' cupolas (qty)</label><input type="number" id="cupola_qty_3" value="0" min="0" step="1" oninput="recalc()" /></div>
         <div class="qbs-field"><label>4' cupolas (qty)</label><input type="number" id="cupola_qty_4" value="0" min="0" step="1" oninput="recalc()" /></div>
         <div class="qbs-field"><label>5' cupolas (qty)</label><input type="number" id="cupola_qty_5" value="0" min="0" step="1" oninput="recalc()" /></div>
+      </div>
+      <div class="qbs-grid-4">
         <div class="qbs-field">
-          <div class="qbs-note" style="margin-top:22px;">Louvered cupola with metal roof cap, set on the ridge. Edit the three per-size prices on the Pricing master tab.</div>
+          <label>Cupola roof color</label>
+          <select id="cupola_roof_color" onchange="recalc()"><option value="Copper">Copper</option></select>
+          <div class="qbs-note">Metal cap — copper or any building metal color.</div>
+        </div>
+        <div class="qbs-field">
+          <label>Mid section</label>
+          <select id="cupola_mid_style" onchange="recalc()">
+            <option value="louvered">Louvered — shiplap style</option>
+            <option value="glass">Glass panels — arched</option>
+          </select>
+        </div>
+        <div class="qbs-field">
+          <label>Mid section color</label>
+          <select id="cupola_mid_color" onchange="recalc()"><option value="">Match siding</option></select>
+        </div>
+        <div class="qbs-field">
+          <label>Base color</label>
+          <select id="cupola_base_color" onchange="recalc()"><option value="">Match trim</option></select>
         </div>
       </div>
+      <div class="qbs-grid-3">
+        <div class="qbs-field">
+          <label>Weathervane</label>
+          <select id="cupola_vane" onchange="recalc()">
+            <option value="">None</option>
+            <option>Rooster</option>
+            <option>Eagle</option>
+            <option>Horse</option>
+            <option>Horse &amp; carriage</option>
+            <option>Arrow — classic directional</option>
+            <option>Cow</option>
+            <option>Deer — buck</option>
+            <option>Duck — mallard</option>
+            <option>Pig</option>
+            <option>Black lab</option>
+            <option>Golden retriever</option>
+            <option>Pheasant</option>
+            <option>Bass — fish</option>
+            <option>Sailboat</option>
+            <option>Antique car</option>
+            <option>Tractor</option>
+          </select>
+          <div class="qbs-note">Standard cupola-vendor catalog figures with N-S-E-W directionals.</div>
+        </div>
+        <div class="qbs-field">
+          <label>Weathervane finish</label>
+          <select id="cupola_vane_finish" onchange="recalc()">
+            <option>Polished copper</option>
+            <option>Blue verde copper</option>
+            <option>Black aluminum</option>
+          </select>
+        </div>
+        <div class="qbs-field">
+          <label>Weathervanes (qty)</label>
+          <input type="number" id="cupola_vane_qty" value="0" min="0" step="1" oninput="recalc()" />
+          <div class="qbs-note">0 = one per cupola when a style is picked.</div>
+        </div>
+      </div>
+      <div class="qbs-note">All cupolas are 3 sections: base + mid (louvered shiplap or arched glass) + metal roof cap. Everything lists under its own <strong>Cupolas</strong> section on the Materials list. Per-size cupola and weathervane prices are editable on the Pricing master tab.</div>
     </div>
 
     <div class="qbs-card" id="concrete-select-card">
@@ -7060,16 +7118,28 @@ const MATERIALS = [
       return `Downspouts — ${count} @ ${(i.H + 2)}' (wall ht + 2' couplings)${i.gutterColor ? ' (' + i.gutterColor + ')' : ''}`;
     }},
 
-  // Cupolas — louvered w/ metal roof cap, priced per unit by size (edit on Pricing master).
-  { id: "cupola_3ft_ea", label: "Cupola 3' — louvered, metal cap", cat: "Roof skin", uom: "ea", packSize: null,
+  // Cupolas — 3-section units on their OWN materials category, priced per unit
+  // by size (edit on Pricing master). Label reflects the mid/cap selections.
+  { id: "cupola_3ft_ea", label: "Cupola 3' — 3-section", cat: "Cupolas", uom: "ea", packSize: null,
     priceCost: 795, priceSell: 1050, priceRetail: 1300,
+    labelFn: i => "Cupola 3' — 3-section, " + (i.cupolaMidStyle === 'glass' ? 'arched glass mid' : 'louvered shiplap mid') + ", " + (i.cupolaRoofColor || 'Copper').toLowerCase() + " cap",
     formula: i => Math.max(0, i.cupolaQty3 || 0) },
-  { id: "cupola_4ft_ea", label: "Cupola 4' — louvered, metal cap", cat: "Roof skin", uom: "ea", packSize: null,
+  { id: "cupola_4ft_ea", label: "Cupola 4' — 3-section", cat: "Cupolas", uom: "ea", packSize: null,
     priceCost: 1195, priceSell: 1550, priceRetail: 1950,
+    labelFn: i => "Cupola 4' — 3-section, " + (i.cupolaMidStyle === 'glass' ? 'arched glass mid' : 'louvered shiplap mid') + ", " + (i.cupolaRoofColor || 'Copper').toLowerCase() + " cap",
     formula: i => Math.max(0, i.cupolaQty4 || 0) },
-  { id: "cupola_5ft_ea", label: "Cupola 5' — louvered, metal cap", cat: "Roof skin", uom: "ea", packSize: null,
+  { id: "cupola_5ft_ea", label: "Cupola 5' — 3-section", cat: "Cupolas", uom: "ea", packSize: null,
     priceCost: 1695, priceSell: 2200, priceRetail: 2750,
+    labelFn: i => "Cupola 5' — 3-section, " + (i.cupolaMidStyle === 'glass' ? 'arched glass mid' : 'louvered shiplap mid') + ", " + (i.cupolaRoofColor || 'Copper').toLowerCase() + " cap",
     formula: i => Math.max(0, i.cupolaQty5 || 0) },
+  { id: "cupola_vane_ea", label: "Weathervane", cat: "Cupolas", uom: "ea", packSize: null,
+    priceCost: 265, priceSell: 350, priceRetail: 425,
+    labelFn: i => i.cupolaVane ? "Weathervane — " + i.cupolaVane + " (" + (i.cupolaVaneFinish || 'Polished copper').toLowerCase() + ")" : "Weathervane",
+    formula: i => {
+      if (!i.cupolaVane) return 0;
+      const tot = (i.cupolaQty3 || 0) + (i.cupolaQty4 || 0) + (i.cupolaQty5 || 0);
+      return (i.cupolaVaneQty || 0) > 0 ? i.cupolaVaneQty : tot;
+    } },
 
   // Metal B&B: breaks at eave-to-gable line. Rectangular pieces below, separate gable triangle pieces above.
   { id: "mbb_26_rect_lf", label: "Metal B&B 26 ga panel — rectangular walls", cat: "Siding skin", uom: "LF", packSize: null,
@@ -8367,6 +8437,20 @@ function bbPopulateExtColors() {
     el.innerHTML = '<option value="">Match main building</option>' + colors.map(c => `<option value="${c}">${c}</option>`).join('');
     if (colors.includes(current)) el.value = current;
   });
+  // Cupola color selects — copper cap option + the same metal palette
+  [
+    ['cupola_roof_color', (document.getElementById('roof_product') || {}).value, '<option value="Copper">Copper</option>'],
+    ['cupola_mid_color', (document.getElementById('siding_product') || {}).value, '<option value="">Match siding</option>'],
+    ['cupola_base_color', (document.getElementById('roof_product') || {}).value, '<option value="">Match trim</option>'],
+  ].forEach(([id, product, first]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const current = el.value;
+    let colors = [];
+    try { colors = colorsFor(product) || []; } catch (e) { colors = []; }
+    el.innerHTML = first + colors.map(c => `<option value="${c}">${c}</option>`).join('');
+    if (current && (colors.includes(current) || current === 'Copper')) el.value = current;
+  });
 }
 
 function onShedToggle() {
@@ -8948,7 +9032,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v283';
+const BB_VERSION = 'v284';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -14999,6 +15083,13 @@ function getInputs() {
     cupolaQty3: (function(){ const el = document.getElementById('cupola_qty_3'); return el ? (parseFloat(el.value) || 0) : 0; })(),
     cupolaQty4: (function(){ const el = document.getElementById('cupola_qty_4'); return el ? (parseFloat(el.value) || 0) : 0; })(),
     cupolaQty5: (function(){ const el = document.getElementById('cupola_qty_5'); return el ? (parseFloat(el.value) || 0) : 0; })(),
+    cupolaRoofColor: ((document.getElementById('cupola_roof_color') || {}).value) || 'Copper',
+    cupolaMidStyle: ((document.getElementById('cupola_mid_style') || {}).value) || 'louvered',
+    cupolaMidColor: ((document.getElementById('cupola_mid_color') || {}).value) || '',
+    cupolaBaseColor: ((document.getElementById('cupola_base_color') || {}).value) || '',
+    cupolaVane: ((document.getElementById('cupola_vane') || {}).value) || '',
+    cupolaVaneFinish: ((document.getElementById('cupola_vane_finish') || {}).value) || 'Polished copper',
+    cupolaVaneQty: (function(){ const el = document.getElementById('cupola_vane_qty'); return el ? (parseFloat(el.value) || 0) : 0; })(),
     sidingColor: document.getElementById('siding_color').value,
     markupMaterial: num('markup_material'),
     markupSub: num('markup_sub'),
@@ -16032,7 +16123,7 @@ function materialDetailText(m, i) {
   };
   
   // Cupolas are each-priced units — no stick/LF detail
-  if (m.id === 'cupola_3ft_ea' || m.id === 'cupola_4ft_ea' || m.id === 'cupola_5ft_ea') return '';
+  if (m.id === 'cupola_3ft_ea' || m.id === 'cupola_4ft_ea' || m.id === 'cupola_5ft_ea' || m.id === 'cupola_vane_ea') return '';
 
   // === WAINSCOT — piece count @ 3' tall ===
   if (m.id === 'wainscot_panel_lf') {
@@ -17151,6 +17242,16 @@ async function loadProject(key) {
     ['3', '4', '5'].forEach(sz => {
       const cq = document.getElementById('cupola_qty_' + sz);
       if (cq && i['cupolaQty' + sz] != null) cq.value = i['cupolaQty' + sz];
+    });
+    [['cupola_roof_color', 'cupolaRoofColor'], ['cupola_mid_style', 'cupolaMidStyle'], ['cupola_mid_color', 'cupolaMidColor'],
+     ['cupola_base_color', 'cupolaBaseColor'], ['cupola_vane', 'cupolaVane'], ['cupola_vane_finish', 'cupolaVaneFinish'],
+     ['cupola_vane_qty', 'cupolaVaneQty']].forEach(([id, key]) => {
+      const el = document.getElementById(id);
+      if (!el || i[key] == null) return;
+      if (el.tagName === 'SELECT' && i[key] !== '' && !Array.from(el.options).some(o => o.value === i[key])) {
+        const o = document.createElement('option'); o.value = i[key]; o.textContent = i[key]; el.appendChild(o);
+      }
+      el.value = i[key];
     });
     if (i.postFoundation) { const pf = document.getElementById('post_foundation'); if (pf) pf.value = i.postFoundation; }
     if (typeof onPostFoundationChange === 'function') onPostFoundationChange();
@@ -19869,6 +19970,7 @@ function makeTuffRibTexture(isRoof, hexColor) {
 // =============================================================================
 const CATEGORY_COLORS = {
   widows_peak:       { hex: 0xb0824d, label: "Widow's peak timbers", textHex: '#c9995f' },
+  cupola:            { hex: 0x8f4a14, label: 'Cupolas', textHex: '#b06a2e' },
   foundation:        { hex: 0xc7c7c1, label: 'Foundation / slab', textHex: '#9a9a92' },
   mudsill:           { hex: 0xd97706, label: 'Mudsill / PT plate', textHex: '#d97706' },
   wall_framing:      { hex: 0xa78a5e, label: 'Wall framing (studs)', textHex: '#a78a5e' },
@@ -19900,6 +20002,7 @@ function mapMaterialCategoryToVisual(cat, label) {
   const c = (cat || '').toLowerCase();
   const l = (label || '').toLowerCase();
   if (c.includes('foundation') || c.includes('concrete') || c.includes('footing')) return 'foundation';
+  if (c.includes('cupola') || l.includes('cupola') || l.includes('weathervane')) return 'cupola';
   if (l.includes('mudsill') || l.includes('sole plate') || (l.includes('pt') && l.includes('plate'))) return 'mudsill';
   if (c.includes('wall framing') || c.includes('post-frame wall') || l.includes('stud') || l.includes('top plate') || l.includes('header')) return 'wall_framing';
   if (c.includes('wall girts') || l.includes('wall girt') || l.includes('wall lath')) return 'wall_girts';
@@ -20452,7 +20555,9 @@ function generateModel() {
     });
   })();
 
-  // === CUPOLAS — square base, louvered mid, copper pyramid cap + finial (photo look) ===
+  // === CUPOLAS — 3 sections (base + mid + metal cap), styled from the Cupolas
+  // card: base/mid/cap colors, louvered shiplap OR arched glass mid, and an
+  // optional weathervane (rod + N-S-E-W directionals + arrow + figure).
   (function buildCupolas() {
     const list = [];
     [3, 4, 5].forEach(szv => {
@@ -20462,39 +20567,96 @@ function generateModel() {
     });
     const qty = list.length;
     if (qty <= 0) return;
+    const selV = id => ((document.getElementById(id) || {}).value) || '';
+    const colsC = bb3dSelectedColors();
+    const COPPER = 0x8f4a14;
+    const roofSel = selV('cupola_roof_color') || 'Copper';
+    const capHex = roofSel === 'Copper' ? COPPER : bb3dMetalHex(roofSel, COPPER);
+    const midStyle = selV('cupola_mid_style') || 'louvered';
+    const midHex = selV('cupola_mid_color') ? bb3dMetalHex(selV('cupola_mid_color'), colsC.siding) : colsC.siding;
+    const baseHex = selV('cupola_base_color') ? bb3dMetalHex(selV('cupola_base_color'), colsC.trim) : colsC.trim;
+    const vane = selV('cupola_vane');
+    const vaneFinish = selV('cupola_vane_finish') || 'Polished copper';
+    const vaneHex = /black/i.test(vaneFinish) ? 0x1a1a1a : (/verde/i.test(vaneFinish) ? 0x4e7d6b : COPPER);
+    const vaneQtyIn = parseInt(selV('cupola_vane_qty'), 10) || 0;
+    const vaneCount = vane ? (vaneQtyIn > 0 ? vaneQtyIn : qty) : 0;
+    const midShadow = new THREE.Color(midHex).multiplyScalar(0.45).getHex();
     const ridgeY = wallBase + H + rise;
+    const capMatC = () => new THREE.MeshStandardMaterial({ color: capHex, roughness: 0.35, metalness: 0.55 });
+    const vaneMat = () => new THREE.MeshStandardMaterial({ color: vaneHex, roughness: 0.3, metalness: 0.7 });
+    const glassMat = () => new THREE.MeshStandardMaterial({ color: 0x9fc0d4, roughness: 0.04, metalness: 0.75, transparent: true, opacity: 0.92, side: THREE.DoubleSide });
     for (let n = 0; n < qty; n++) {
       const sz = list[n];
-      const ud2 = { categoryKey: 'roof_skin', label: `Cupola ${sz}'` };
       const grpC = new THREE.Group();
       const cx = (qty === 1) ? 0 : (-L / 2 + (n + 1) * (L / (qty + 1)));
-      const s = sz;                                     // footprint (ft)
-      const add = m => { m.castShadow = m.receiveShadow = true; m.userData = ud2; grpC.add(m); allMeshes.push(m); };
-      // base box (tan like the photo)
+      const s = sz;
+      const add = (m, label) => { m.castShadow = m.receiveShadow = true; m.userData = { categoryKey: 'cupola', label: label || (`Cupola ${sz}'`) }; grpC.add(m); allMeshes.push(m); };
+      // BASE section
       const base = new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.5, s),
-        new THREE.MeshStandardMaterial({ color: 0x8a5730, roughness: 0.75 }));
-      base.position.set(0, s * 0.25, 0); add(base);
-      // louvered mid-section — slightly inset, darker slat texture feel
-      const mid = new THREE.Mesh(new THREE.BoxGeometry(s * 0.86, s * 0.45, s * 0.86),
-        new THREE.MeshStandardMaterial({ color: 0x74471f, roughness: 0.85 }));
-      mid.position.set(0, s * 0.5 + s * 0.225, 0); add(mid);
-      for (let sl = 0; sl < 4; sl++) {   // louver slat lines
-        const slat = new THREE.Mesh(new THREE.BoxGeometry(s * 0.87, 0.02 * s + 0.02, s * 0.87),
-          new THREE.MeshStandardMaterial({ color: 0x4e2f15, roughness: 0.9 }));
-        slat.position.set(0, s * 0.5 + s * 0.09 * (sl + 1), 0); add(slat);
+        new THREE.MeshStandardMaterial({ color: baseHex, roughness: 0.55, metalness: 0.3 }));
+      base.position.set(0, s * 0.25, 0); add(base, `Cupola ${sz}' base`);
+      // MID section
+      const midY0 = s * 0.5, midH = s * 0.45;
+      const mid = new THREE.Mesh(new THREE.BoxGeometry(s * 0.86, midH, s * 0.86),
+        new THREE.MeshStandardMaterial({ color: midStyle === 'glass' ? midHex : midShadow, roughness: 0.6, metalness: 0.25 }));
+      mid.position.set(0, midY0 + midH / 2, 0); add(mid, `Cupola ${sz}' mid`);
+      if (midStyle === 'glass') {
+        // arched glass panel on each of the 4 faces
+        const gw = s * 0.5, gh = midH * 0.52;
+        [0, Math.PI / 2, Math.PI, -Math.PI / 2].forEach(ry => {
+          const nx = Math.sin(ry), nz = Math.cos(ry);
+          const rect = new THREE.Mesh(new THREE.BoxGeometry(gw, gh, 0.04), glassMat());
+          rect.position.set(nx * s * 0.435, midY0 + midH * 0.34, nz * s * 0.435);
+          rect.rotation.y = ry;
+          add(rect, `Cupola ${sz}' glass panel`);
+          const arch = new THREE.Mesh(new THREE.CircleGeometry(gw / 2, 16, 0, Math.PI), glassMat());
+          arch.position.set(nx * s * 0.437, midY0 + midH * 0.34 + gh / 2, nz * s * 0.437);
+          arch.rotation.y = ry;
+          add(arch, `Cupola ${sz}' glass arch`);
+        });
+      } else {
+        // louvered shiplap-style boards with shadow gaps
+        const boards = 5;
+        for (let sl = 0; sl < boards; sl++) {
+          const b = new THREE.Mesh(new THREE.BoxGeometry(s * 0.88, (midH / boards) * 0.78, s * 0.88),
+            new THREE.MeshStandardMaterial({ color: midHex, roughness: 0.7, metalness: 0.2 }));
+          b.position.set(0, midY0 + (midH / boards) * (sl + 0.5), 0);
+          add(b, `Cupola ${sz}' louver`);
+        }
       }
-      // copper pyramid roof
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(s * 0.78, s * 0.5, 4),
-        new THREE.MeshStandardMaterial({ color: 0x8f4a14, roughness: 0.35, metalness: 0.55 }));
+      // ROOF CAP — pyramid + ball
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(s * 0.78, s * 0.5, 4), capMatC());
       cone.rotation.y = Math.PI / 4;
-      cone.position.set(0, s * 0.95 + s * 0.25, 0); add(cone);
-      // finial: ball + spike
-      const ball = new THREE.Mesh(new THREE.SphereGeometry(s * 0.06, 10, 10),
-        new THREE.MeshStandardMaterial({ color: 0x8f4a14, roughness: 0.35, metalness: 0.55 }));
-      ball.position.set(0, s * 1.24, 0); add(ball);
-      const spike = new THREE.Mesh(new THREE.ConeGeometry(s * 0.035, s * 0.3, 8),
-        new THREE.MeshStandardMaterial({ color: 0x8f4a14, roughness: 0.35, metalness: 0.55 }));
-      spike.position.set(0, s * 1.42, 0); add(spike);
+      cone.position.set(0, s * 0.95 + s * 0.25, 0); add(cone, `Cupola ${sz}' roof cap`);
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(s * 0.06, 10, 10), capMatC());
+      ball.position.set(0, s * 1.24, 0); add(ball, `Cupola ${sz}' roof cap`);
+      if (n < vaneCount) {
+        // WEATHERVANE — rod, directionals, arrow, figure silhouette
+        const vl = 'Weathervane — ' + vane;
+        const rodH = s * 0.72;
+        const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, rodH, 8), vaneMat());
+        rod.position.set(0, s * 1.24 + rodH / 2, 0); add(rod, vl);
+        const dirY = s * 1.24 + rodH * 0.32;
+        const barX = new THREE.Mesh(new THREE.BoxGeometry(s * 0.52, 0.022, 0.022), vaneMat());
+        barX.position.set(0, dirY, 0); add(barX, vl);
+        const barZ = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.022, s * 0.52), vaneMat());
+        barZ.position.set(0, dirY, 0); add(barZ, vl);
+        const arrY = s * 1.24 + rodH * 0.72;
+        const shaft = new THREE.Mesh(new THREE.BoxGeometry(s * 0.55, 0.026, 0.026), vaneMat());
+        shaft.position.set(0, arrY, 0); add(shaft, vl);
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.15, 6), vaneMat());
+        tip.rotation.z = -Math.PI / 2;
+        tip.position.set(s * 0.3, arrY, 0); add(tip, vl);
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.11, 0.022), vaneMat());
+        tail.position.set(-s * 0.26, arrY, 0); add(tail, vl);
+        const ball2 = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), vaneMat());
+        ball2.position.set(0, s * 1.24 + rodH * 0.52, 0); add(ball2, vl);
+        const fig = new THREE.Mesh(new THREE.BoxGeometry(s * 0.24, s * 0.15, 0.03), vaneMat());
+        fig.position.set(0, arrY + s * 0.11, 0); add(fig, 'Weathervane figure — ' + vane);
+      } else {
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(s * 0.035, s * 0.3, 8), capMatC());
+        spike.position.set(0, s * 1.42, 0); add(spike, `Cupola ${sz}' finial`);
+      }
       grpC.position.set(cx, ridgeY - 0.15, 0);
       buildingGroup.add(grpC);
     }
@@ -23392,7 +23554,7 @@ function applyVisibility() {
       const skinCats = {
         siding: 1, wall_sheathing: 1, roof_skin: 1, roof_sheathing: 1,
         ridge_cap: 1, roof_trim: 1, corner_trim: 1, fascia: 1, soffit: 1,
-        windows: 1, ext_doors: 1, garage_doors: 1, mudsill: 1,
+        windows: 1, ext_doors: 1, garage_doors: 1, mudsill: 1, cupola: 1,
       };
       // Porch / gable / shed metal and finish strips off too — frame view shows
       // ONLY the skeleton (posts, headers, rafters, braces, trusses, slab).
