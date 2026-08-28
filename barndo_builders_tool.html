@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v280</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v282</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2441,9 +2441,9 @@
 
     <div class="qbs-card">
       <h3>Building geometry &amp; areas <span class="badge">Wall LF · roof span · footprint &amp; area breakdown</span></h3>
-      <p class="qbs-sub" style="margin-bottom: 14px;">Enter total exterior wall LF from your measured plan. L and W shape the roof and footprint default.</p>
+      <p class="qbs-sub" style="margin-bottom: 14px;">L and W shape the roof, wall perimeter, and footprint default.</p>
       <div class="qbs-grid-4">
-        <div class="qbs-field"><label>Total exterior wall LF</label><input type="number" id="ext_wall_lf" value="0" oninput="recalc()" /><div class="qbs-note">Perimeter from Square Takeoff. 0 = auto from L × W (rectangle)</div></div>
+        <div class="qbs-field" style="display:none"><label>Total exterior wall LF</label><input type="number" id="ext_wall_lf" value="0" oninput="recalc()" /><div class="qbs-note">Perimeter from Square Takeoff. 0 = auto from L × W (rectangle)</div></div>
         <div class="qbs-field"><label>W (truss span, ft)</label><input type="number" id="width" value="0" oninput="onDimChange()" /></div>
         <div class="qbs-field"><label>L (longest dimension, ft)</label><input type="number" id="length" value="0" oninput="onDimChange()" /></div>
         <div class="qbs-field"><label>Wall height (ft)</label><input type="number" id="wall_height" value="9" step="0.5" oninput="updateStudLength(); recalc()" /></div>
@@ -2729,7 +2729,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
       </div>
     </div>
 
-    <div class="qbs-card">
+    <div class="qbs-card" id="measured-values-card">
       <h3>Measured values <span class="badge">From Square Takeoff · override the auto-calcs</span></h3>
       <p class="qbs-sub" style="margin-bottom: 14px;">For L-shapes, T-shapes, or any plan with valleys/hips. Leave at 0 (or default) to use the simple-rectangle math.</p>
       <div class="qbs-grid-4">
@@ -2745,7 +2745,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
       </div>
     </div>
 
-    <div class="qbs-card">
+    <div class="qbs-card" id="roof-area-calc-card">
       <h3>Roof area calculator <span class="badge">Plan area × pitch · handles pitch changes</span></h3>
       <p class="qbs-sub" style="margin-bottom: 12px;">Enter each roof section's plan (footprint) area and its pitch. Roof area = plan area × slope factor √(144 + pitch²) ⁄ 12. Add a row for every pitch change — main, porch, lean-to. Then push the total into the roof override above.</p>
       <table class="qbs-table" style="width:100%;">
@@ -2813,15 +2813,6 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         <div class="qbs-note">Check a tie and the two porches at that corner pull to the corner and their roofs join with a <strong>hip</strong> — hip framing auto-counts, corner posts merge. Both porches of the corner must be enabled.</div>
       </div>
       <div class="qbs-grid-3" style="margin-bottom: 12px;">
-        <div class="qbs-field">
-          <label>Concrete under porches</label>
-          <select id="porch_concrete" onchange="recalc(); try { renderConcreteGrid(); } catch (e) {}">
-            <option value="none">None — gravel / dirt</option>
-            <option value="4">4" slab</option>
-            <option value="6">6" slab — footing + rebar</option>
-          </select>
-          <div class="qbs-note">Applies to all enabled porch sides. Pushes to the Porch &amp; shed concrete card on Subs &amp; labor and onto the Foundation blueprint.</div>
-        </div>
         <div class="qbs-field" id="porch-spacing-field"><label>Post spacing (ft)</label><input type="number" id="porch_post_spacing" value="10" step="0.5" oninput="recalc()" /><div class="qbs-note">Stick porches. Cypress auto-figures even bays ≤ 12'.</div></div>
         <div class="qbs-field"><label>Roof pitch (X/12)</label><input type="number" id="porch_pitch" value="3" step="0.5" oninput="recalc()" /></div>
         <div class="qbs-field"><label>Post height (ft)</label><input type="number" id="porch_post_height" value="9" step="0.5" oninput="recalc()" /><div class="qbs-note">Height at the outboard posts</div></div>
@@ -3216,15 +3207,6 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
               <option value="right">Right (gable end)</option>
             </select>
           </div>
-          <div class="qbs-field">
-            <label>Concrete under shed</label>
-            <select id="shed_concrete" onchange="recalc(); try { renderConcreteGrid(); } catch (e) {}">
-              <option value="none">None — gravel / dirt</option>
-              <option value="4">4" slab</option>
-              <option value="6">6" slab — footing + rebar</option>
-            </select>
-            <div class="qbs-note">Pushes to the Porch &amp; shed concrete card (Subs &amp; labor) + Foundation blueprint.</div>
-          </div>
           <div class="qbs-field" style="grid-column: span 2;">
             <label>Enclosed walls <span style="text-transform:none; letter-spacing:0; color:var(--text-3);">(uncheck = open bay — posts only)</span></label>
             <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:13px; padding-top:4px;">
@@ -3313,6 +3295,43 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
         </div>
       </div>
     </div>
+
+    <div class="qbs-card" id="concrete-select-card">
+      <h3>Concrete <span class="badge">Rolls to Subs &amp; labor · concrete cards</span></h3>
+      <div class="qbs-grid-4">
+        <div class="qbs-field">
+          <label>Main building slab</label>
+          <select id="main_concrete" onchange="recalc(); try { renderConcreteGrid(); } catch (e) {}">
+            <option value="4">4" slab</option>
+            <option value="6">6" slab — footing + rebar</option>
+            <option value="none">None — gravel / dirt</option>
+          </select>
+          <div class="qbs-note">Living + garage + shop sqft auto-fills the Concrete card on Subs &amp; labor. None zeroes it out.</div>
+        </div>
+        <div class="qbs-field">
+          <label>Concrete under porches</label>
+          <select id="porch_concrete" onchange="recalc(); try { renderConcreteGrid(); } catch (e) {}">
+            <option value="none">None — gravel / dirt</option>
+            <option value="4">4" slab</option>
+            <option value="6">6" slab — footing + rebar</option>
+          </select>
+          <div class="qbs-note">All enabled porch sides. Pushes to the Porch &amp; shed concrete card.</div>
+        </div>
+        <div class="qbs-field">
+          <label>Concrete under side shed</label>
+          <select id="shed_concrete" onchange="recalc(); try { renderConcreteGrid(); } catch (e) {}">
+            <option value="none">None — gravel / dirt</option>
+            <option value="4">4" slab</option>
+            <option value="6">6" slab — footing + rebar</option>
+          </select>
+          <div class="qbs-note">Pushes to the Porch &amp; shed concrete card.</div>
+        </div>
+        <div class="qbs-field">
+          <div class="qbs-note" style="padding-top:22px;">Add each area to the quote from the concrete cards on <strong>Subs &amp; labor</strong> once your $/sqft is set. Selections also drive the Foundation blueprint (footing + rebar notes).</div>
+        </div>
+      </div>
+    </div>
+
 
     <div class="qbs-card" id="widows-peak-card">
       <h3>Widow's peak &amp; gable timbers <span class="badge">Stick-built roof extension · cypress crow's foot + corbels</span></h3>
@@ -4878,6 +4897,8 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
          flex-shrink:0 is load-bearing — overflow≠visible turns flex min-height to 0 and the
          column would otherwise squash every card to its header. */
       #ws-left .qbs-card { overflow-x: auto; flex-shrink: 0; }
+      /* Hidden from the 3D tool rail for now (builder request) — still available on the Takeoff tab rail */
+      #ws-left #side-shed-card, #ws-left #measured-values-card, #ws-left #roof-area-calc-card { display: none !important; }
       #ws-left .qbs-grid-4, #ws-left .qbs-grid-3 { grid-template-columns: 1fr 1fr; }
       #ws-left table { font-size: 11px; }
     </style>
@@ -8927,7 +8948,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v280';
+const BB_VERSION = 'v282';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -10754,7 +10775,7 @@ function bbTakeoffRailLeave() {
 const BB_TO_ACC_KEY = 'bb_to_acc_open_v1';
 function _toAccOpenMap() { try { return JSON.parse(localStorage.getItem(BB_TO_ACC_KEY) || '{}'); } catch (e) { return {}; } }
 function bbTakeoffAccordionize() { bbRailAccordionize('to-split-rail'); }
-const BB_ACC_DEFAULT_OPEN = { 'ws-client-save-card': 1, 'ws-nav-card': 1 };
+const BB_ACC_DEFAULT_OPEN = { 'ws-client-save-card': 1, 'ws-nav-card': 1, 'concrete-select-card': 1 };
 function bbRailAccordionize(railId) {
   const rail = document.getElementById(railId);
   if (!rail) return;
@@ -11125,7 +11146,10 @@ function bbBPSheets() {
     const oy = BBP_M + 150 + (availH - (pdT + W + pdB) * s) / 2;
     const mx = ox + pdL2 * s, my = oy + pdT * s;
     let o = bbpTxt(BBP_M + 40, BBP_M + 44, 'FOUNDATION PLAN', 22, 'start', true);
-    o += bbpTxt(BBP_M + 40, BBP_M + 70, '4" 4000 PSI CONCRETE SLAB — THICKENED EDGE FOOTING W/ (2) #4 REBAR CONT. — VERIFY SOILS & LOCAL CODE', 14);
+    const mConc = i.mainConcrete || '4';
+    o += bbpTxt(BBP_M + 40, BBP_M + 70, mConc === 'none'
+      ? 'MAIN BUILDING: NO CONCRETE — GRAVEL/GRADE FLOOR — VERIFY SOILS & LOCAL CODE'
+      : mConc + '" 4000 PSI CONCRETE SLAB — ' + (mConc === '6' ? '12"x12" TURNED-DOWN FOOTING' : 'THICKENED EDGE FOOTING') + ' W/ (2) #4 REBAR CONT. — VERIFY SOILS & LOCAL CODE', 14);
     // porch / shed slabs — thickness from the cards; hatch when concrete is on
     o += '<defs><pattern id="bbpHatch" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="14" stroke="#666" stroke-width="1"/></pattern></defs>';
     const pConc = i.porchConcrete || 'none';
@@ -13150,7 +13174,8 @@ function renderConcreteGrid() {
   if (!grid) return;
   let inp = null;
   try { inp = (typeof getInputs === 'function') ? getInputs() : null; } catch(e) {}
-  const autoSqft = inp ? Math.round(inp.living + inp.garageSqft + inp.shopSqft) : 0;   // porches/sheds price on their own card below
+  const mainC = (inp && inp.mainConcrete) || '4';
+  const autoSqft = (inp && mainC !== 'none') ? Math.round(inp.living + inp.garageSqft + inp.shopSqft) : 0;   // porches/sheds price on their own card below
   if (concreteCardState.sqftAuto !== false) concreteCardState.sqft = autoSqft;
   const s = concreteCardState;
   const total = (s.sqft || 0) * (s.rate || 0);
@@ -13158,7 +13183,8 @@ function renderConcreteGrid() {
   const autoTag = concreteCardState.sqftAuto !== false ? '<span style="color:var(--text-3);font-size:9px;margin-left:4px;">AUTO</span>' : '';
   grid.innerHTML = `
     <div style="background:var(--surface-2);border:1px solid var(--hairline);border-radius:8px;padding:14px;">
-      <div style="font-family:var(--font-headline);font-size:12px;font-weight:600;color:var(--copper);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:12px;">Concrete</div>
+      <div style="font-family:var(--font-headline);font-size:12px;font-weight:600;color:var(--copper);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Main building concrete</div>
+      <div style="font-size:10px;color:var(--text-3);margin-bottom:10px;">${mainC === 'none' ? 'NONE SELECTED — pick a slab on the Concrete card (3D Buildout / Takeoff)' : 'MAIN ' + mainC + '\u2033 SLAB (living + garage + shop)'}</div>
       <div style="margin-bottom:10px;">
         <label style="display:block;font-family:var(--font-mono);font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Sqft ${autoTag}</label>
         <input type="number" min="0" step="1" value="${s.sqft || 0}" oninput="updateConcreteCard('sqft',this.value)" style="width:100%;box-sizing:border-box;">
@@ -14377,6 +14403,7 @@ function getInputs() {
   // Porch / side-shed concrete selections (none | 4 | 6)
   const porchConcrete = ((document.getElementById('porch_concrete') || {}).value) || 'none';
   const shedConcrete = ((document.getElementById('shed_concrete') || {}).value) || 'none';
+  const mainConcrete = ((document.getElementById('main_concrete') || {}).value) || '4';
   const span = W; // truss length = building width
   const run = span / 2;
   const rise = run * (pitch / 12); // heel height
@@ -14767,7 +14794,7 @@ function getInputs() {
     L, W, H, pitch,
     eaveOH, gableOH,
     wpMode, wpDepth, wpMode2, wpDepth2, wpCypress, wpCount, wpCount10, wpCount12, wpFrontDepth, wpRearDepth, wpDepthCounts,
-    porchConcrete, shedConcrete,
+    porchConcrete, shedConcrete, mainConcrete,
     span, run, rise, topChord, slopeAngleDeg,
     roofArea, ceilingArea, gableTriangleArea, totalGableSidingArea, wallRectArea, wallArea,
     // Interior wall area: LF × wall height × 2 sides (both faces get sheetrock)
