@@ -2282,7 +2282,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builder Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="184" lengthAdjust="spacing" fill="#fff">BUILDER</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builder Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v279</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v280</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3335,9 +3335,26 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
             <option value="5">5' widow's peak — 12' wide</option>
           </select>
         </div>
+        <div class="qbs-field">
+          <label>Additional gable peak</label>
+          <select id="wp_mode2" onchange="recalc()">
+            <option value="none">None</option>
+            <option value="front">Front gable</option>
+            <option value="rear">Rear gable</option>
+          </select>
+        </div>
+        <div class="qbs-field">
+          <label>Additional roof extension</label>
+          <select id="wp_depth2" onchange="recalc()">
+            <option value="2">2' widow's peak — 6' wide</option>
+            <option value="3">3' widow's peak — 8' wide</option>
+            <option value="4">4' widow's peak — 10' wide</option>
+            <option value="5">5' widow's peak — 12' wide</option>
+          </select>
+        </div>
         <div class="qbs-field" style="grid-column: span 2;">
           <label style="display:flex; align-items:center; gap:6px; cursor:pointer; padding-top:6px;"><input type="checkbox" id="wp_cypress" checked onchange="recalc()" style="width:15px;height:15px;"> Cypress crow's foot + corbels</label>
-          <div class="qbs-note">Per gable: crow's foot = 3× 2×6 cypress · corbels = 3× 4×6 cypress (10' sticks on 2'/3', 12' on 4'/5'). Metal: 2× 10' large corner, 2× 10' fascia, 1 ridge cap, 2 roof panels at building panel length. <strong style="color:var(--copper);">Build labor added per gable: 2' = $1,900 · 3' = $2,300 · 4' = $2,700 · 5' = $3,500.</strong></div>
+          <div class="qbs-note">Per gable: crow's foot = 3× 2×6 cypress · corbels = 3× 4×6 cypress (10' sticks on 2'/3', 12' on 4'/5'). Metal: 2× 10' large corner, 2× 10' fascia, 1 ridge cap, 2 roof panels at building panel length. <strong style="color:var(--copper);">Build labor added per gable: 2' = $1,900 · 3' = $2,300 · 4' = $2,700 · 5' = $3,500.</strong> The additional bar puts a second peak on the other gable with its own size (if both bars pick the same gable, the first one wins).</div>
         </div>
       </div>
     </div>
@@ -5930,16 +5947,22 @@ const MATERIALS = [
     formula: i => 5 * (i.wpCount || 0) },
   // Timber length follows the peak size: 2'/3' peaks (6'/8' wide) use 10'
   // sticks; 4'/5' peaks (10'/12' wide) use 12' sticks. Priced per-LF.
-  { id: "wp_cyp_crow", label: "Cypress crow's foot — 2×6×10 (3 per gable)", cat: "Widow's peak", uom: "pc", packSize: null,
+  { id: "wp_cyp_crow", label: "Cypress crow's foot — 2×6×10 (3 per gable, 2'/3' peaks)", cat: "Widow's peak", uom: "pc", packSize: null,
     priceCost: 32.50, priceSell: 40.65, priceRetail: 48.75,
-    labelFn: i => "Cypress crow's foot — 2×6×" + ((i.wpDepth || 2) >= 4 ? 12 : 10) + " (3 per gable)",
-    customUnitPrice: i => (SHED_LF_COST.cypress['2x6'] || 3.25) * ((i.wpDepth || 2) >= 4 ? 12 : 10),
-    formula: i => i.wpCypress ? 3 * (i.wpCount || 0) : 0 },
-  { id: "wp_cyp_corbel", label: "Cypress corbels — 4×6×10 (3 per gable)", cat: "Widow's peak", uom: "pc", packSize: null,
+    customUnitPrice: i => (SHED_LF_COST.cypress['2x6'] || 3.25) * 10,
+    formula: i => i.wpCypress ? 3 * (i.wpCount10 || 0) : 0 },
+  { id: "wp_cyp_crow_12", label: "Cypress crow's foot — 2×6×12 (3 per gable, 4'/5' peaks)", cat: "Widow's peak", uom: "pc", packSize: null,
+    priceCost: 39.00, priceSell: 48.75, priceRetail: 58.50,
+    customUnitPrice: i => (SHED_LF_COST.cypress['2x6'] || 3.25) * 12,
+    formula: i => i.wpCypress ? 3 * (i.wpCount12 || 0) : 0 },
+  { id: "wp_cyp_corbel", label: "Cypress corbels — 4×6×10 (3 per gable, 2'/3' peaks)", cat: "Widow's peak", uom: "pc", packSize: null,
     priceCost: 65.00, priceSell: 81.25, priceRetail: 97.50,
-    labelFn: i => "Cypress corbels — 4×6×" + ((i.wpDepth || 2) >= 4 ? 12 : 10) + " (3 per gable)",
-    customUnitPrice: i => (SHED_LF_COST.cypress['4x6'] || 6.50) * ((i.wpDepth || 2) >= 4 ? 12 : 10),
-    formula: i => i.wpCypress ? 3 * (i.wpCount || 0) : 0 },
+    customUnitPrice: i => (SHED_LF_COST.cypress['4x6'] || 6.50) * 10,
+    formula: i => i.wpCypress ? 3 * (i.wpCount10 || 0) : 0 },
+  { id: "wp_cyp_corbel_12", label: "Cypress corbels — 4×6×12 (3 per gable, 4'/5' peaks)", cat: "Widow's peak", uom: "pc", packSize: null,
+    priceCost: 78.00, priceSell: 97.50, priceRetail: 117.00,
+    customUnitPrice: i => (SHED_LF_COST.cypress['4x6'] || 6.50) * 12,
+    formula: i => i.wpCypress ? 3 * (i.wpCount12 || 0) : 0 },
   { id: "wp_corner_trim", label: "Large corner trim 10' (2 per gable)", cat: "Widow's peak", uom: "pc", packSize: null,
     priceCost: 17.53, priceSell: 21.90, priceRetail: 26.30,
     formula: i => 2 * (i.wpCount || 0) },
@@ -5972,16 +5995,16 @@ const MATERIALS = [
   // TOP of the itemized materials above, which stay as the takeoff/orders.
   { id: "wp_labor_2", label: "Widow's peak build labor — 2' × 6' (per gable, markup baked in)", cat: "Widow's peak", uom: "ea", packSize: null, fixedSell: 1900,
     priceCost: 1900, priceSell: 1900, priceRetail: 1900,
-    formula: i => (Math.round(i.wpDepth || 2) === 2 ? (i.wpCount || 0) : 0) },
+    formula: i => ((i.wpDepthCounts || {})[2] || 0) },
   { id: "wp_labor_3", label: "Widow's peak build labor — 3' × 8' (per gable, markup baked in)", cat: "Widow's peak", uom: "ea", packSize: null, fixedSell: 2300,
     priceCost: 2300, priceSell: 2300, priceRetail: 2300,
-    formula: i => (Math.round(i.wpDepth || 2) === 3 ? (i.wpCount || 0) : 0) },
+    formula: i => ((i.wpDepthCounts || {})[3] || 0) },
   { id: "wp_labor_4", label: "Widow's peak build labor — 4' × 10' (per gable, markup baked in)", cat: "Widow's peak", uom: "ea", packSize: null, fixedSell: 2700,
     priceCost: 2700, priceSell: 2700, priceRetail: 2700,
-    formula: i => (Math.round(i.wpDepth || 2) === 4 ? (i.wpCount || 0) : 0) },
+    formula: i => ((i.wpDepthCounts || {})[4] || 0) },
   { id: "wp_labor_5", label: "Widow's peak build labor — 5' × 12' (per gable, markup baked in)", cat: "Widow's peak", uom: "ea", packSize: null, fixedSell: 3500,
     priceCost: 3500, priceSell: 3500, priceRetail: 3500,
-    formula: i => (Math.round(i.wpDepth || 2) === 5 ? (i.wpCount || 0) : 0) },
+    formula: i => ((i.wpDepthCounts || {})[5] || 0) },
 
   // ---------------- BLOCK FOUNDATION (CMU) ----------------
   // Stem wall + piers. Both feed into the same SKU lines when block size matches.
@@ -8904,7 +8927,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v279';
+const BB_VERSION = 'v280';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -10962,8 +10985,7 @@ function bbBPSheets() {
   const eaveOH = i.eaveOH || 1, gableOH = i.gableOH || 1;
   const col = bbBPCollect();
   const por = bbBPPorches();
-  const wpMode = i.wpMode || 'none', wpD = i.wpDepth || 2;
-  const wpHalf = ({ 2: 6, 3: 8, 4: 10, 5: 12 }[Math.round(wpD)] || 6) / 2;
+  const wpEnds = { right: i.wpFrontDepth || 0, left: i.wpRearDepth || 0 };   // wp 'front' = right wall, 'rear' = left
   const construction = (typeof currentConstruction !== 'undefined') ? currentConstruction : 'stick';
   const client = ((document.getElementById('client_name') || {}).value || '').trim();
   const proj = client ? client + ' BUILD' : 'BARNDO PROJECT';
@@ -11051,7 +11073,9 @@ function bbBPSheets() {
     o += bbpRibs(x0, wallTop, W * s, H * s, s);
     o += '<polygon points="' + (x0 - eaveOH * s) + ',' + wallTop + ' ' + (x0 + W * s / 2) + ',' + ridge + ' ' + (x1 + eaveOH * s) + ',' + wallTop + '" fill="#fff" stroke="#111" stroke-width="2.6"/>';
     // widow's peak on this gable? wp 'front' = right wall, wp 'rear' = left wall
-    const hasWP = wpMode === 'both' || (wpMode === 'front' && wall === 'right') || (wpMode === 'rear' && wall === 'left');
+    const wpD = wpEnds[wall] || 0;
+    const wpHalf = ({ 2: 6, 3: 8, 4: 10, 5: 12 }[Math.round(wpD)] || 6) / 2;
+    const hasWP = wpD > 0;
     if (hasWP) {
       const apX = x0 + W * s / 2, apY = ridge;
       const retY = wallTop + (rise - wpHalf * (pitch / 12)) * -1 * s + 0;  // y on the rake at wpHalf from center
@@ -11393,8 +11417,8 @@ function bbBPSheets() {
       o += bbpTxt(BBP_M + 60, ny, 'PORCH ROOF (' + wl.toUpperCase() + '): (' + ppcs + ') PANELS @ ' + bbpFtIn(pLen) + ' — ' + por.pitch + '/12', 15, 'start', true);
       ny += 28;
     });
-    if (wpMode !== 'none') {
-      const gables = wpMode === 'both' ? 2 : 1;
+    if ((i.wpCount || 0) > 0) {
+      const gables = i.wpCount;
       o += bbpTxt(BBP_M + 60, ny, "WIDOW'S PEAK: ADD (2) PANELS @ " + bbpFtIn(pieceLen) + ' PER GABLE — ' + gables + ' GABLE' + (gables > 1 ? 'S' : ''), 15, 'start', true);
       ny += 28;
     }
@@ -14334,8 +14358,22 @@ function getInputs() {
   // Widow's peak — stick-built peak extension + cypress gable timbers
   const wpMode = ((document.getElementById('wp_mode') || {}).value) || 'none';
   const wpDepth = num('wp_depth') || 2;
+  const wpMode2 = ((document.getElementById('wp_mode2') || {}).value) || 'none';
+  const wpDepth2 = num('wp_depth2') || 2;
   const wpCypress = !!((document.getElementById('wp_cypress') || {}).checked);
-  const wpCount = wpMode === 'both' ? 2 : (wpMode === 'none' ? 0 : 1);
+  // Per-end depths (0 = no peak on that end). Bar 1 wins its gable(s); the
+  // additional bar fills whichever gable bar 1 leaves open, at its own size.
+  let wpFrontDepth = 0, wpRearDepth = 0;
+  if (wpMode === 'front' || wpMode === 'both') wpFrontDepth = wpDepth;
+  if (wpMode === 'rear'  || wpMode === 'both') wpRearDepth = wpDepth;
+  if ((wpMode2 === 'front') && !wpFrontDepth) wpFrontDepth = wpDepth2;
+  if ((wpMode2 === 'rear')  && !wpRearDepth)  wpRearDepth = wpDepth2;
+  const wpDepthsAll = [wpFrontDepth, wpRearDepth].filter(d => d > 0);
+  const wpCount = wpDepthsAll.length;
+  const wpCount10 = wpDepthsAll.filter(d => d < 4).length;   // 2'/3' peaks -> 10' cypress sticks
+  const wpCount12 = wpDepthsAll.filter(d => d >= 4).length;  // 4'/5' peaks -> 12' sticks
+  const wpDepthCounts = { 2: 0, 3: 0, 4: 0, 5: 0 };
+  wpDepthsAll.forEach(d => { const k = Math.round(d); if (wpDepthCounts[k] != null) wpDepthCounts[k]++; });
   // Porch / side-shed concrete selections (none | 4 | 6)
   const porchConcrete = ((document.getElementById('porch_concrete') || {}).value) || 'none';
   const shedConcrete = ((document.getElementById('shed_concrete') || {}).value) || 'none';
@@ -14728,7 +14766,7 @@ function getInputs() {
     tier: currentTier,
     L, W, H, pitch,
     eaveOH, gableOH,
-    wpMode, wpDepth, wpCypress, wpCount,
+    wpMode, wpDepth, wpMode2, wpDepth2, wpCypress, wpCount, wpCount10, wpCount12, wpFrontDepth, wpRearDepth, wpDepthCounts,
     porchConcrete, shedConcrete,
     span, run, rise, topChord, slopeAngleDeg,
     roofArea, ceilingArea, gableTriangleArea, totalGableSidingArea, wallRectArea, wallArea,
@@ -21215,12 +21253,12 @@ function buildMetalTrim(dims, wallBase) {
   // --- RAKE (GABLE) TRIM — up the roof edge on each gable, both slopes.
   // On a gable with a widow's peak, the rake trim STOPS where the peak
   // meets the roof (the taper return point) instead of running to the ridge.
-  const wpModeT = ((document.getElementById('wp_mode') || {}).value) || 'none';
-  const wpDT = parseFloat((document.getElementById('wp_depth') || {}).value) || 2;
-  const wpHalf = ({ 2: 6, 3: 8, 4: 10, 5: 12 }[wpDT] || 6) / 2;
+  const wpEndsT = bbWpEndDepths();
   const zEave = W / 2 + eaveOH;
   [-1, 1].forEach(sx => [-1, 1].forEach(sz => {
-    const hasPeak = wpModeT === 'both' || (wpModeT === 'front' && sx > 0) || (wpModeT === 'rear' && sx < 0);
+    const wpDT = sx > 0 ? wpEndsT.front : wpEndsT.rear;
+    const hasPeak = wpDT > 0;
+    const wpHalf = ({ 2: 6, 3: 8, 4: 10, 5: 12 }[wpDT] || 6) / 2;
     const xR = sx * (L / 2 + gableOH + 0.02);
     const a = new THREE.Vector3(xR, wallTop - 0.05, sz * zEave);
     const b = hasPeak
@@ -21230,13 +21268,25 @@ function buildMetalTrim(dims, wallBase) {
   }));
 }
 
+// Per-end widow's peak depths from BOTH selector bars (0 = no peak that end).
+// Bar 1 wins its gable(s); the additional bar fills the gable bar 1 leaves open.
+function bbWpEndDepths() {
+  const v = id => ((document.getElementById(id) || {}).value) || 'none';
+  const d = id => parseFloat((document.getElementById(id) || {}).value) || 2;
+  const m1 = v('wp_mode'), m2 = v('wp_mode2');
+  let front = 0, rear = 0;
+  if (m1 === 'front' || m1 === 'both') front = d('wp_depth');
+  if (m1 === 'rear' || m1 === 'both') rear = d('wp_depth');
+  if (m2 === 'front' && !front) front = d('wp_depth2');
+  if (m2 === 'rear' && !rear) rear = d('wp_depth2');
+  return { front, rear };
+}
+
 function buildWidowsPeak(dims, wallBase) {
-  const modeEl = document.getElementById('wp_mode');
-  const mode = modeEl ? modeEl.value : 'none';
-  if (!mode || mode === 'none') return;
+  const wpEnds = bbWpEndDepths();
+  if (!(wpEnds.front > 0 || wpEnds.rear > 0)) return;
   const { L, W, H, pitch, eaveOH, gableOH } = dims;
   if (!(L > 0 && W > 0)) return;
-  const D = parseFloat((document.getElementById('wp_depth') || {}).value) || 2;
   const withCypress = !!((document.getElementById('wp_cypress') || {}).checked);
   const run = W / 2, rise = run * (pitch / 12);
   const wallTop = wallBase + H;
@@ -21247,7 +21297,9 @@ function buildWidowsPeak(dims, wallBase) {
     color: 0xffffff, map: makeTuffRibTexture(true, colors.roof), roughness: 0.3, metalness: 0.55, side: THREE.DoubleSide });
   const cypMat = () => new THREE.MeshStandardMaterial({ color: 0xb0824d, roughness: 0.7, metalness: 0.05 });
   const capMat = new THREE.MeshStandardMaterial({ color: colors.trim, roughness: 0.45, metalness: 0.4 });   // peak cap + edge trim follow the building's selected trim color
-  const sides = mode === 'both' ? [-1, 1] : [mode === 'rear' ? -1 : 1];
+  const sides = [];
+  if (wpEnds.rear > 0) sides.push(-1);
+  if (wpEnds.front > 0) sides.push(1);
   const tag = (mesh, label) => {
     mesh.userData = { categoryKey: 'widows_peak', label };
     mesh.castShadow = true; mesh.receiveShadow = true;
@@ -21263,6 +21315,7 @@ function buildWidowsPeak(dims, wallBase) {
   };
   sides.forEach(s => {
     const sideName = s < 0 ? 'rear' : 'front';
+    const D = s < 0 ? wpEnds.rear : wpEnds.front;
     const x0 = s * (L / 2 + gableOH);
     const xTip = s * (L / 2 + gableOH + D);
     const dropZ = ({ 2: 6, 3: 8, 4: 10, 5: 12 }[D] || 6) / 2;   // standard widths: 2'=6', 3'=8', 4'=10', 5'=12' wide (half each side)
