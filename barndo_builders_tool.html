@@ -2283,7 +2283,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v287</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v288</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2291,7 +2291,7 @@
         <button id="view-cost" class="active" onclick="setView('cost')">Cost</button>
         <button id="view-sell" onclick="setView('sell')">Sell</button>
       </span>
-      <button onclick="clearAllManual()" title="Clear all manual entries and start a blank quote">✦ New / Clear</button>
+      <button onclick="bbClearAllArm()" title="Wipe the whole working quote to $0 — click twice to confirm">✦ New / Clear</button>
       <button onclick="saveProject()">Save</button>
       <button onclick="exportCSV()">CSV</button>
       <button onclick="exportPDF()">Internal cost sheet</button>
@@ -2311,6 +2311,7 @@
   </div>
 
   <div class="qbs-tabs">
+    <div class="qbs-tab" id="bb-clearall-btn" onclick="bbClearAllArm()" style="color:#e05252; font-weight:700; border-right: 1px dashed var(--hairline); margin-right: 4px; padding-right: 12px;" title="Wipe the whole working quote to $0 — dimensions, openings, add-ons, subs, manual bids. Saved leads, projects, and models are NOT touched.">✦ Clear ALL</div>
     <div class="qbs-tab" data-tab="leads" onclick="switchTab('leads')">Leads</div>
     <div class="qbs-tab active" data-tab="takeoff" onclick="switchTab('takeoff')">1. Takeoff</div>
     <div class="qbs-tab" data-tab="barndos" onclick="switchTab('barndos')" style="color:var(--copper);">🏠 Barndos</div>
@@ -8403,6 +8404,79 @@ function clearAllManual() {
   if (typeof recalc === 'function') recalc();
 }
 
+// =============================================================
+// CLEAR ALL -> $0.00 — two-click confirm (toast, never a browser
+// dialog), then wipe every dollar source in the working quote.
+// Saved leads/projects/client versions/factory models/rates stay.
+// =============================================================
+let _bbClearArmT = null;
+function bbClearAllArm() {
+  const btn = document.getElementById('bb-clearall-btn');
+  if (_bbClearArmT) {
+    clearTimeout(_bbClearArmT); _bbClearArmT = null;
+    if (btn) { btn.textContent = '\u2726 Clear ALL'; btn.style.background = ''; }
+    bbClearAllToZero();
+    return;
+  }
+  if (btn) { btn.textContent = '\u26a0 Click again \u2192 wipe to $0'; btn.style.background = 'rgba(224,82,82,.16)'; }
+  if (typeof bbToast === 'function') bbToast('Click \u2726 Clear ALL again to wipe the whole quote to $0.00. Saved leads, projects, and models are NOT touched.');
+  _bbClearArmT = setTimeout(() => {
+    _bbClearArmT = null;
+    if (btn) { btn.textContent = '\u2726 Clear ALL'; btn.style.background = ''; }
+  }, 8000);
+}
+
+function bbClearAllToZero() {
+  try { bbClearQtyOverrides(); } catch (e) {}
+  window._takeoffOnlyQuote = false;
+  try { newQuoteReset(); } catch (e) {}
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  // trusses, roof calculator, takeoff measurements
+  try { if (typeof trussGroups !== 'undefined') { trussGroups.length = 0; window._trussCleared = false; renderTrussTable(); } } catch (e) {}
+  try { const rc = document.getElementById('roofcalc-rows'); if (rc) { rc.innerHTML = ''; roofCalcAddRow('Main', 0); } } catch (e) {}
+  try { if (typeof window.takeoffClearAll === 'function') window.takeoffClearAll({ silent: true }); } catch (e) {}
+  // add-ons off: porches (incl. corner ties), shed, extension, concrete picks
+  document.querySelectorAll('input[type="checkbox"][id^="porch_"]').forEach(el => { el.checked = false; });
+  ['shed_enabled', 'ext_enabled'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+  try { onShedToggle(); } catch (e) {}
+  try { onExtToggle(); } catch (e) {}
+  set('porch_concrete', 'none'); set('shed_concrete', 'none'); set('main_concrete', '4');
+  // widow's peaks + cupolas + weathervane
+  set('wp_mode', 'none'); set('wp_mode2', 'none');
+  set('cupola_qty_3', 0); set('cupola_qty_4', 0); set('cupola_qty_5', 0);
+  set('cupola_vane', ''); set('cupola_vane_qty', 0);
+  // manual dollar entries (electrical/meter, manual trims) + hidden labor carriers
+  document.querySelectorAll('input[id^="manual_"], input[id$="_manual"]').forEach(el => { el.value = 0; });
+  ['labor_framing', 'labor_roofing', 'labor_siding'].forEach(id => set(id, 0));
+  try { updateElecMeterTotal(); } catch (e) {}
+  // every Add-to-Quote flag off, every quoted amount zero
+  try { framingQuoteAdded = {}; framingQuoteAmounts = {}; } catch (e) {}
+  try { Object.values(framingLaborState || {}).forEach(s => { s.sqft = 0; s.sqftAuto = true; }); } catch (e) {}
+  try { plumbingQuoteAdded = {}; Object.values(plumbingState || {}).forEach(s => { s.qty = 0; }); } catch (e) {}
+  try { concreteQuoteAdded = false; concreteQuoteAmount = 0; concreteCardState.sqft = 0; concreteCardState.sqftAuto = true; } catch (e) {}
+  try { concretePorchQuoteAdded = false; concretePorchQuoteAmount = 0; concretePorchState.sqft = 0; concretePorchState.sqftAuto = true; } catch (e) {}
+  try { sidingLaborQuoteAdded = false; sidingLaborQuoteAmount = 0; sidingLaborCardState.sqft = 0; sidingLaborCardState.sqftAuto = true; } catch (e) {}
+  try { roofLaborQuoteAdded = false; roofLaborQuoteAmount = 0; roofLaborCardState.sqft = 0; roofLaborCardState.sqftAuto = true; } catch (e) {}
+  try { Object.values(subLineState || {}).forEach(s => { s.sqft = 0; s.added = false; }); document.querySelectorAll('input[id^="sub_"][id$="_sqft"]').forEach(el => { el.value = 0; }); } catch (e) {}
+  try { Object.values(inhouseLaborState || {}).forEach(s => { s.sqft = 0; s.added = false; }); } catch (e) {}
+  // sheetrock card off
+  try { if (_bbSrock) { _bbSrock.on = false; localStorage.setItem(BB_SROCK_KEY, JSON.stringify(_bbSrock)); } } catch (e) {}
+  // detach from any loaded model so the next save starts clean
+  try { window._bbModelSource = null; bbClientSaveCardRender(); } catch (e) {}
+  // re-render every money-bearing card
+  try { renderFramingLaborGrid(); } catch (e) {}
+  try { renderConcreteGrid(); } catch (e) {}
+  try { renderSidingLaborGrid(); } catch (e) {}
+  try { renderPlumbingGrid(); } catch (e) {}
+  try { renderInhouseLaborRows(); } catch (e) {}
+  try { bbSheetrockRender(); } catch (e) {}
+  try { renderOpeningsTable && ['window', 'extdoor', 'intdoor', 'garage'].forEach(t => renderOpeningsTable(t)); } catch (e) {}
+  try { recalc(); } catch (e) {}
+  try { if (window.bb3dRefresh) window.bb3dRefresh(); } catch (e) {}
+  const g = (window._lastCalc && window._lastCalc.grand) || 0;
+  if (typeof bbToast === 'function') bbToast(g < 0.005 ? 'Cleared \u2014 quote is $0.00.' : 'Cleared \u2014 remaining on quote: $' + g.toFixed(2));
+}
+
 // Toggle the side-shed detail card based on checkbox
 function onEnclosureChange() {
   const m = (document.getElementById('bldg_enclosure') || {}).value || 'full';
@@ -9033,7 +9107,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v287';
+const BB_VERSION = 'v288';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
