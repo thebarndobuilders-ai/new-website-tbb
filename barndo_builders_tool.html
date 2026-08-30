@@ -2283,7 +2283,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v288</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v289</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -9107,7 +9107,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v288';
+const BB_VERSION = 'v289';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -9861,6 +9861,20 @@ function barndoSaveModel() {
 }
 
 const BB_BUILTIN_OVR_KEY = 'bb_builtin_overrides_v1';
+// One-time heal (v289): High Country factory overrides saved before the
+// corrected build was baked into the file (pre 8/28/2026 18:00) came from a
+// snapshot bug that could store a broken roof-only build with missing fields.
+// Drop them so the card loads the corrected shipped version. Overrides saved
+// after that (on fixed versions) are kept. Client versions are untouched.
+try {
+  const _mo = JSON.parse(localStorage.getItem(BB_BUILTIN_OVR_KEY) || '{}');
+  const _ho = _mo['builtin_high_country'];
+  if (_ho && (!_ho.updatedDate || String(_ho.updatedDate) < '2026-08-28T18:00:00')) {
+    delete _mo['builtin_high_country'];
+    localStorage.setItem(BB_BUILTIN_OVR_KEY, JSON.stringify(_mo));
+    setTimeout(() => { try { bbToast('High Country factory card refreshed to the corrected shipped version. Your client versions are untouched.'); } catch (e) {} }, 1600);
+  }
+} catch (e) {}
 function bbBuiltinOverrides() { try { return JSON.parse(localStorage.getItem(BB_BUILTIN_OVR_KEY) || '{}'); } catch (e) { return {}; } }
 function barndoAllModels() {
   const ovr = bbBuiltinOverrides();
@@ -9869,6 +9883,13 @@ function barndoAllModels() {
       const o = ovr[m.id];
       if (!o) return m;
       const merged = Object.assign({}, m, o, { updated: true });
+      // heal partial snapshots: any field the override is missing falls back to
+      // the shipped cfg, so a save can never strip the build below the baked one
+      if (o.cfg && m.cfg) {
+        merged.cfg = Object.assign({}, o.cfg, { fields: Object.assign({}, m.cfg.fields || {}, o.cfg.fields || {}) });
+        if (!merged.cfg.openings && m.cfg.openings) merged.cfg.openings = m.cfg.openings;
+        if (!merged.cfg.trussGroups && m.cfg.trussGroups) merged.cfg.trussGroups = m.cfg.trussGroups;
+      }
       merged.metaLine = (o.footprint || m.footprint) + ' · ' + ((o.sqft || m.sqft) || 0).toLocaleString() + " sqft · factory model — updated " + String(o.updatedDate || '').slice(0, 10);
       return merged;
     });
@@ -9921,7 +9942,14 @@ function renderBarndoGrid() {
 function barndoLoad(id) {
   const m = barndoAllModels().find(x => x.id === id);
   if (!m) return;
-  barndoApply(m.cfg);
+  let _cfg = m.cfg;
+  try {
+    if (m.baseId && _cfg) {
+      const base = (window.BARNDO_BUILTIN_MODELS || []).find(b => b.id === m.baseId);
+      if (base && base.cfg) _cfg = Object.assign({}, _cfg, { fields: Object.assign({}, base.cfg.fields || {}, _cfg.fields || {}) });
+    }
+  } catch (e) {}
+  barndoApply(_cfg);
   window._bbModelSource = m.client
     ? { versionId: m.id, baseId: m.baseId || null, baseName: m.baseName || '', client: m.client }
     : { versionId: null, baseId: m.id, baseName: m.name, client: '' };
