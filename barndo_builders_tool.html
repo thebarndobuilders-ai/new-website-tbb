@@ -2283,7 +2283,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v291</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v292</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3125,6 +3125,35 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
           <div class="qbs-field"><label>Extension siding color</label><select id="ext_siding_color" onchange="recalc()"></select></div>
           <div class="qbs-field"><label>Extension trim color</label><select id="ext_trim_color" onchange="recalc()"></select></div>
         </div>
+      </div>
+    </div>
+
+    <div class="qbs-card" id="gable-wing-card">
+      <h3>T &amp; L footprint — gable wing <span class="badge">Homes · perpendicular wing over one end · its own ridge &amp; pitch</span></h3>
+      <p class="qbs-sub" style="margin-bottom: 14px;">Builds a cross-gable wing over one end of the house — the wing's ridge runs front-to-back and the wing can project past the front and/or back walls for a true L or T footprint. Footprint, living sqft, concrete and exterior wall LF follow automatically. Add a truss group for the wing span on the Trusses table so trusses, roof panels, ridge cap and gable metal figure per plan.</p>
+      <div class="qbs-field">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;">
+          <input type="checkbox" id="wing_enabled" onchange="onWingToggle()" style="width: 18px; height: 18px;">
+          <span>Include a gable wing on this build</span>
+        </label>
+      </div>
+      <div id="wing-details" style="display:none; margin-top: 16px;">
+        <div class="qbs-grid-4">
+          <div class="qbs-field">
+            <label>Wing on which end</label>
+            <select id="wing_end" onchange="onDimChange()">
+              <option value="left">Left end</option>
+              <option value="right">Right end</option>
+            </select>
+          </div>
+          <div class="qbs-field"><label>Wing width (ft)</label><input type="number" id="wing_width" value="24" step="1" oninput="onDimChange()" /><div class="qbs-note">Along the building length — the wing's truss span</div></div>
+          <div class="qbs-field"><label>Projects past FRONT wall (ft)</label><input type="number" id="wing_front_proj" value="0" step="0.5" oninput="onDimChange()" /><div class="qbs-note">0 = flush with the front wall</div></div>
+          <div class="qbs-field"><label>Projects past BACK wall (ft)</label><input type="number" id="wing_back_proj" value="0" step="0.5" oninput="onDimChange()" /><div class="qbs-note">0 = flush with the back wall</div></div>
+        </div>
+        <div class="qbs-grid-4">
+          <div class="qbs-field"><label>Wing roof pitch (X/12)</label><input type="number" id="wing_pitch" value="0" step="0.5" oninput="onDimChange()" /><div class="qbs-note">0 = match main building</div></div>
+        </div>
+        <div class="qbs-note" style="margin-top: 6px;">Walls, colors and wainscot match the main building. Openings placed on the front/back walls inside the wing span sit on the wing's projected face; the end wall (garage doors etc.) is shared with the wing.</div>
       </div>
     </div>
 
@@ -8442,6 +8471,13 @@ function bbClearAllToZero() {
   try { onExtToggle(); } catch (e) {}
   set('porch_concrete', 'none'); set('shed_concrete', 'none'); set('main_concrete', '4');
   try { if (typeof window.bb3dSetOpenWalls === 'function') window.bb3dSetOpenWalls({}); } catch (e) {}
+  try {
+    const wgEl = document.getElementById('wing_enabled');
+    if (wgEl) wgEl.checked = false;
+    const wgD = document.getElementById('wing-details');
+    if (wgD) wgD.style.display = 'none';
+  } catch (e) {}
+  set('wing_width', 24); set('wing_front_proj', 0); set('wing_back_proj', 0); set('wing_pitch', 0);
   // widow's peaks + cupolas + weathervane
   set('wp_mode', 'none'); set('wp_mode2', 'none');
   set('cupola_qty_3', 0); set('cupola_qty_4', 0); set('cupola_qty_5', 0);
@@ -8486,6 +8522,13 @@ function onEnclosureChange() {
   if (sk) sk.style.display = m === 'partial' ? '' : 'none';
   if (gb) gb.style.display = m === 'partial' ? '' : 'none';
   recalc();
+}
+
+function onWingToggle() {
+  const on = document.getElementById('wing_enabled').checked;
+  const det = document.getElementById('wing-details');
+  if (det) det.style.display = on ? '' : 'none';
+  onDimChange();
 }
 
 function onExtToggle() {
@@ -9108,7 +9151,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v291';
+const BB_VERSION = 'v292';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -9809,6 +9852,14 @@ function barndoApply(cfg) {
     try { renderTrussTable(); } catch (e) {}
   }
   try { if (typeof window.bb3dSetOpenWalls === 'function') window.bb3dSetOpenWalls(cfg.openWalls || {}); } catch (e) {}
+  try {
+    const wgEl = document.getElementById('wing_enabled');
+    // a save from before the wing card (or one without a wing) means wing OFF —
+    // never carry a wing over from the previously loaded model
+    if (wgEl && !(cfg.fields && ('wing_enabled' in cfg.fields))) wgEl.checked = false;
+    const wgD = document.getElementById('wing-details');
+    if (wgEl && wgD) wgD.style.display = wgEl.checked ? '' : 'none';
+  } catch (e) {}
   ['onShedToggle', 'onShedRoofFramingChange', 'updateWallSystemUI', 'onPostFoundationChange',
    'onRoofSystemChange', 'onRoofProductChange', 'updatePorchCardVisibility', 'updateAdditionsTabVisibility']
     .forEach(fn => { try { if (typeof window[fn] === 'function') window[fn](); } catch (e) {} });
@@ -12275,7 +12326,15 @@ function onDimChange() {
   if (window._takeoffOnlyQuote && (L > 0 || W > 0)) window._takeoffOnlyQuote = false;
   const fpEl = document.getElementById('footprint');
   if (fpEl && _footprintAutoUpdate) {
-    fpEl.value = Math.round(L * W);
+    let _fpV = L * W;
+    try {
+      const wgOn = document.getElementById('wing_enabled');
+      if (wgOn && wgOn.checked) {
+        const nn = id => parseFloat((document.getElementById(id) || {}).value) || 0;
+        _fpV += nn('wing_width') * (nn('wing_front_proj') + nn('wing_back_proj'));
+      }
+    } catch (e) {}
+    fpEl.value = Math.round(_fpV);
   }
   // Now sync the primary area (living or shop) based on tier
   syncAreasFromFootprint();
@@ -14655,8 +14714,18 @@ function getInputs() {
   // Wall area: rectangular + gables
   // PRIMARY: use total exterior wall LF from the measured input.
   // If left at 0, fall back to 2 × (L + W) for a simple rectangle.
+  // === T & L FOOTPRINT — GABLE WING ===
+  const wingActive = !!(document.getElementById('wing_enabled') && document.getElementById('wing_enabled').checked) && num('wing_width') > 0;
+  const wing = wingActive ? {
+    end: (document.getElementById('wing_end') || {}).value || 'left',
+    w: num('wing_width'),
+    fp: num('wing_front_proj'),
+    bp: num('wing_back_proj'),
+    pitch: num('wing_pitch') || pitch,
+  } : null;
+  if (wing) wing.extArea = wing.w * (wing.fp + wing.bp);
   const enteredWallLF = num('ext_wall_lf');
-  const extWallLF = (enteredWallLF > 0) ? enteredWallLF : (2 * (L + W));
+  const extWallLF = (enteredWallLF > 0) ? enteredWallLF : (2 * (L + W) + (wing ? 2 * (wing.fp + wing.bp) : 0));
   
   // === OPENINGS — derived from table state ===
   const windows = sumOpeningsCount('window');
@@ -14997,6 +15066,7 @@ function getInputs() {
     metalRoofPieces, metalRoofPieceLength, metalRoofTotalLF,
     eaveSoffitArea, gableSoffitArea, soffitArea, fasciaLF, fjLF, gableLadderLF,
     outsideCorners, insideCorners, valleyLF, hipLF, ridgeLF, gableCountActual,
+    wingActive, wing,
     footprint: numEff('footprint'),
     living: numEff('living_sqft'),
     garageSqft: numEff('garage_sqft'),
@@ -15101,6 +15171,11 @@ function getInputs() {
     cypressGableYBraceCount: num('cypress_ybrace_count'),
     cypressGableYBraceLength: num('cypress_ybrace_length') || 4,
     cypressTrussFan: (document.getElementById('cypress_truss_fan') || {}).value || 'apvgp812',
+    // how many crows-foot gables get built: front always + back when a back porch is on
+    get cypressGableCount() {
+      if (this.cypressStyle !== 'gable' || !this.cypressPorchActive) return 1;
+      return ((document.getElementById('porch_back_on') || {}).checked) ? 2 : 1;
+    },
     slabDepth: document.getElementById('slab_depth').value,
     footingSize: document.getElementById('footing_size').value,
     foundationType: currentFoundation,
@@ -15901,9 +15976,18 @@ function bbApplyQtyOverrides(lines) {
   return lines;
 }
 
+// Items in the cypress crows-foot block whose formulas figure ONE gable
+// (rafters, ledger, carrier, ridge cap, corbels, truss fan, tie-in framing,
+// valley metal). Porch-aggregate items (posts, beams, ceiling, screws) already
+// count every porch side and are NOT multiplied.
+function bbGablePerPorchItem(id) {
+  return /^(cypress_gable_|tiein_)/.test(id) || id === 'cypress_corbel_4x6' ||
+         id === 'cypress_truss_fan_812' || id === 'porch_valley_metal';
+}
 function calcMaterials(i) {
   const lines = MATERIALS.map(m => {
-    const qty = i.isEmpty ? 0 : Math.max(0, m.formula(i));
+    let qty = i.isEmpty ? 0 : Math.max(0, m.formula(i));
+    if (qty > 0 && (i.cypressGableCount || 1) > 1 && bbGablePerPorchItem(m.id)) qty *= i.cypressGableCount;
     if (qty === 0) return null;
     let price = getPrice(m.id);
     // Custom unit price override (for items like concrete package that calc price from inputs).
@@ -19997,6 +20081,17 @@ function bb3dMetalHex(name, fallback) {
   return (METAL_COLOR_HEX[k] != null) ? METAL_COLOR_HEX[k] : fallback;
 }
 // Colors currently selected on the Dimensions tab (fallback: white walls, black roof)
+function bb3dWing() {
+  const on = document.getElementById('wing_enabled');
+  if (!(on && on.checked)) return null;
+  const n = id => parseFloat((document.getElementById(id) || {}).value) || 0;
+  const w = n('wing_width');
+  if (!(w > 0)) return null;
+  return { end: ((document.getElementById('wing_end') || {}).value) || 'left',
+           w, fp: n('wing_front_proj'), bp: n('wing_back_proj'),
+           pitch: n('wing_pitch') || (n('pitch') || 6) };
+}
+
 function bb3dSelectedColors() {
   const rc = (document.getElementById('roof_color') || {}).value || '';
   const sc = (document.getElementById('siding_color') || {}).value || '';
@@ -20799,9 +20894,10 @@ function generateModel() {
       return mesh;
     }
     const _encG = bbEnclosure();
+    const _wgG = (typeof bb3dWing === 'function') ? bb3dWing() : null;
     if (_encG.mode === 'full') {
-      if (!openWalls.left) { const gL = makeGable('left', 'siding', 'Gable siding — left'); buildingGroup.add(gL); allMeshes.push(gL); }
-      if (!openWalls.right) { const gR = makeGable('right', 'siding', 'Gable siding — right'); buildingGroup.add(gR); allMeshes.push(gR); }
+      if (!openWalls.left && !(_wgG && _wgG.end === 'left')) { const gL = makeGable('left', 'siding', 'Gable siding — left'); buildingGroup.add(gL); allMeshes.push(gL); }
+      if (!openWalls.right && !(_wgG && _wgG.end === 'right')) { const gR = makeGable('right', 'siding', 'Gable siding — right'); buildingGroup.add(gR); allMeshes.push(gR); }
     } else if (_encG.mode === 'partial' && _encG.gableStyle === 'follow') {
       // Band following the roofline on each gable end — covers the truss, open below.
       // Built as a chevron quad per slope so the two sides meet clean at the peak,
@@ -20817,7 +20913,7 @@ function generateModel() {
       const yKB = wallTop + 0.25 * rise - bandD;    // straight-across bottom elevation
       const yTopAt = z => peakYb - Math.abs(z) * slopeK;
       ['left', 'right'].forEach(end => {
-        if (openWalls[end]) return;
+        if (openWalls[end] || (_wgG && _wgG.end === end)) return;
         const xs = end === 'left' ? -1 : 1;
         const xg = xs * (L / 2 + sheathThick + 0.02);
         const tris = [];
@@ -20883,6 +20979,7 @@ function generateModel() {
   try { buildMetalTrim(dims, wallBase); } catch (e) { console.warn('3D metal trim skipped:', e); }
   try { buildPorch3D(dims, wallBase); } catch (e) { console.warn('3D porch skipped:', e); }
   try { buildCrowsFoot3D(dims, wallBase); } catch (e) { console.warn('3D crows foot skipped:', e); }
+  try { buildWing3D(dims, wallBase); } catch (e) { console.warn('3D gable wing skipped:', e); }
   try { buildExtension3D(dims, wallBase); } catch (e) { console.warn('3D extension skipped:', e); }
 
   // Trim color from the selector — ridge cap, rake/roof trim, corners, fascia
@@ -20911,7 +21008,155 @@ function generateModel() {
 // No roof paneling under it — the gable structure IS the roof. Width = outside of
 // post to outside of post · depth = front of post to the building siding · height =
 // ground to top of posts.
+// T & L footprint — gable wing over one end of the house. Ridge runs
+// front-to-back; the wing can project past the front and/or back walls.
+// Walls/wainscot/colors match the main building.
+function buildWing3D(dims, wallBase) {
+  const wg = (typeof bb3dWing === 'function') ? bb3dWing() : null;
+  if (!wg) return;
+  const { L, W, eaveOH, gableOH } = dims;
+  const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+  const H = n('wall_height') || 9;
+  const wallTop = wallBase + H;
+  const s = wg.end === 'right' ? 1 : -1;
+  const x0 = s * (L / 2);              // outer end of the building
+  const x1 = s * (L / 2 - wg.w);       // inner wing line
+  const cxW = (x0 + x1) / 2;
+  const rise = (wg.w / 2) * (wg.pitch / 12);
+  const zF = W / 2 + wg.fp, zBk = -W / 2 - wg.bp;
+  const colors = bb3dSelectedColors();
+  const sidingThick = 0.06;
+  const grp = new THREE.Group();
+  const add = (m, lbl, key) => { m.castShadow = m.receiveShadow = true;
+    m.userData = { categoryKey: key || 'siding', label: lbl }; grp.add(m); allMeshes.push(m); };
+  const wallMat = width => {
+    const t = makeTuffRibTexture(false, colors.siding);
+    t.repeat.set(Math.max(1, width) / 3, 1);
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map: t, roughness: 0.38, metalness: 0.45 });
+  };
+  const wainMat = width => {
+    const t = makeTuffRibTexture(false, colors.wainscot);
+    t.repeat.set(Math.max(1, width) / 3, 1);
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map: t, roughness: 0.38, metalness: 0.45 });
+  };
+  const zBarMat = () => new THREE.MeshStandardMaterial({ color: 0x111114, roughness: 0.45, metalness: 0.5 });
+
+  // --- extension boxes past the front/back walls ---
+  [['front', wg.fp, 1], ['back', wg.bp, -1]].forEach(([sideN, proj, zs]) => {
+    if (!(proj > 0.15)) return;
+    const zOuter = zs * (W / 2 + proj);
+    const zMid = zs * (W / 2 + proj / 2);
+    // slab
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(wg.w, 0.4, proj),
+      new THREE.MeshStandardMaterial({ color: CATEGORY_COLORS.foundation.hex, roughness: 0.95 }));
+    slab.position.set(cxW, 0.2, zMid);
+    add(slab, 'Wing slab (' + sideN + ')', 'foundation');
+    // outer wall (faces front/back)
+    const wOut = new THREE.Mesh(new THREE.BoxGeometry(wg.w, H, sidingThick), wallMat(wg.w));
+    wOut.position.set(cxW, wallBase + H / 2, zOuter);
+    add(wOut, 'Wing wall — ' + sideN);
+    // side walls of the projection (end-side continues the end wall; inner side is exposed)
+    [[x0, 'end'], [x1, 'inner']].forEach(([xw, which]) => {
+      const wSide = new THREE.Mesh(new THREE.BoxGeometry(sidingThick, H, proj), wallMat(proj));
+      wSide.position.set(xw, wallBase + H / 2, zMid);
+      add(wSide, 'Wing wall — ' + which + ' (' + sideN + ')');
+    });
+    // wainscot band + Z bar on the projection walls
+    if (colors.wainscotOn) {
+      const bandH = 3, zH = 0.07;
+      const bOut = new THREE.Mesh(new THREE.BoxGeometry(wg.w, bandH, sidingThick + 0.04), wainMat(wg.w));
+      bOut.position.set(cxW, wallBase + bandH / 2, zOuter + zs * 0.01);
+      add(bOut, 'Wing wainscot — ' + sideN);
+      const zbOut = new THREE.Mesh(new THREE.BoxGeometry(wg.w, zH, sidingThick + 0.06), zBarMat());
+      zbOut.position.set(cxW, wallBase + bandH + zH / 2, zOuter + zs * 0.01);
+      add(zbOut, 'Wing wainscot Z bar — ' + sideN);
+      [[x0, s], [x1, -s]].forEach(([xw, xs2]) => {
+        const bS = new THREE.Mesh(new THREE.BoxGeometry(sidingThick + 0.04, bandH, proj), wainMat(proj));
+        bS.position.set(xw + xs2 * 0.01, wallBase + bandH / 2, zMid);
+        add(bS, 'Wing wainscot — side (' + sideN + ')');
+        const zbS = new THREE.Mesh(new THREE.BoxGeometry(sidingThick + 0.06, zH, proj), zBarMat());
+        zbS.position.set(xw + xs2 * 0.01, wallBase + bandH + zH / 2, zMid);
+        add(zbS, 'Wing wainscot Z bar — side (' + sideN + ')');
+      });
+    }
+  });
+
+  // --- wing gable triangles (front + back faces of the wing) ---
+  [[zF, 1], [zBk, -1]].forEach(([zPos, zs]) => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-wg.w / 2, 0);
+    shape.lineTo(wg.w / 2, 0);
+    shape.lineTo(0, rise);
+    shape.closePath();
+    const geom = new THREE.ExtrudeGeometry(shape, { depth: sidingThick, bevelEnabled: false });
+    const tex = makeTuffRibTexture(false, colors.siding);
+    tex.repeat.set(wg.w / 3, Math.max(1, rise) / 6);
+    const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({
+      color: 0xffffff, map: tex, roughness: 0.38, metalness: 0.45 }));
+    mesh.position.set(cxW, wallTop, zPos - (zs > 0 ? 0 : sidingThick));
+    add(mesh, 'Wing gable siding');
+  });
+
+  // --- wing roof: its own ridge front-to-back, two slopes + ridge cap ---
+  // Built in a group rotated 90° so the slope construction matches the main roof.
+  const depth = (zF - zBk) + 2 * gableOH;
+  const horiz = wg.w / 2 + eaveOH;
+  const slopeLen2 = Math.sqrt(horiz * horiz + rise * rise);
+  const ang2 = Math.atan(rise / horiz);
+  const rg = new THREE.Group();
+  rg.rotation.y = Math.PI / 2;
+  rg.position.set(cxW, 0, (zF + zBk) / 2);
+  const addR = (m, lbl, key) => { m.castShadow = m.receiveShadow = true;
+    m.userData = { categoryKey: key, label: lbl }; rg.add(m); allMeshes.push(m); };
+  ['front', 'back'].forEach(sideL => {
+    const sh = new THREE.Mesh(new THREE.BoxGeometry(depth, 0.08, slopeLen2),
+      new THREE.MeshStandardMaterial({ color: CATEGORY_COLORS.roof_sheathing.hex, roughness: 0.85 }));
+    sh.rotation.x = (sideL === 'front' ? 1 : -1) * ang2;
+    sh.position.set(0, wallTop + rise / 2, (sideL === 'front' ? 1 : -1) * (horiz / 2));
+    addR(sh, 'Wing roof sheathing', 'roof_sheathing');
+    const tex = makeTuffRibTexture(true, colors.roof);
+    tex.repeat.set(depth / 3, 1);
+    const sk = new THREE.Mesh(new THREE.BoxGeometry(depth, 0.05, slopeLen2),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, map: tex, roughness: 0.30, metalness: 0.55 }));
+    sk.rotation.x = (sideL === 'front' ? 1 : -1) * ang2;
+    sk.position.set(0, wallTop + rise / 2 + 0.06, (sideL === 'front' ? 1 : -1) * (horiz / 2));
+    addR(sk, 'Wing roof skin', 'roof_skin');
+  });
+  const rcap = new THREE.Mesh(new THREE.BoxGeometry(depth, 0.18, 0.6),
+    new THREE.MeshStandardMaterial({ color: CATEGORY_COLORS.ridge_cap.hex, roughness: 0.4, metalness: 0.5 }));
+  rcap.position.set(0, wallTop + rise + 0.1, 0);
+  addR(rcap, 'Wing ridge cap', 'ridge_cap');
+
+  // --- wing trim: rakes up both gable faces + fascia along the outer eave ---
+  const trimMatW = () => new THREE.MeshStandardMaterial({ color: colors.trim, roughness: 0.4, metalness: 0.5 });
+  [zF + 0.06, zBk - 0.06].forEach(zPos => {
+    [-1, 1].forEach(xs => {
+      const a = new THREE.Vector3(cxW + xs * (wg.w / 2 + eaveOH), wallTop - 0.05, zPos);
+      const b = new THREE.Vector3(cxW, wallTop + rise + 0.08, zPos);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.5, a.distanceTo(b)), trimMatW());
+      m.position.copy(a.clone().add(b).multiplyScalar(0.5));
+      m.lookAt(b);
+      add(m, 'Wing rake trim', 'roof_trim');
+    });
+  });
+  const fw = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.55, (zF - zBk) + 2 * gableOH), trimMatW());
+  fw.position.set(s * (L / 2 + eaveOH + 0.04), wallTop - 0.2, (zF + zBk) / 2);
+  add(fw, 'Wing eave fascia', 'fascia');
+
+  buildingGroup.add(grp);
+  buildingGroup.add(rg);
+}
+
 function buildCrowsFoot3D(dims, wallBase) {
+  // front gable always builds (a standalone gable is front-anchored);
+  // a second, mirrored gable builds on the back when a back porch is on
+  buildCrowsFootOne(dims, wallBase, 'front');
+  try {
+    const bp = document.getElementById('porch_back_on');
+    if (bp && bp.checked) buildCrowsFootOne(dims, wallBase, 'back');
+  } catch (e) {}
+}
+function buildCrowsFootOne(dims, wallBase, side) {
   const styleBtn = document.querySelector('[data-porchtype].active');
   if (!(styleBtn && styleBtn.dataset.porchtype === 'cypress')) return;
   const styleSel = document.querySelector('[data-cypressstyle].active');
@@ -20923,7 +21168,7 @@ function buildCrowsFoot3D(dims, wallBase) {
   const gp = n('cypress_gable_pitch') || 8;
   // When the gable ties into a front porch, its header sits at the SAME height as
   // the porch headers/rafter carriers — one continuous beam line across the front.
-  const frontPorchOn = !!(document.getElementById('porch_front_on') && document.getElementById('porch_front_on').checked);
+  const frontPorchOn = !!(document.getElementById('porch_' + side + '_on') && document.getElementById('porch_' + side + '_on').checked);
   const gh = frontPorchOn ? (n('porch_post_height') || 9) : (n('cypress_gable_height') || 9);
   const { W } = dims;
   const colors = bb3dSelectedColors();
@@ -20950,8 +21195,13 @@ function buildCrowsFoot3D(dims, wallBase) {
   const faceZ = gd - postT / 2;            // post/truss centerline (front face at z = gd)
   // Tied to a porch: the header stays on the porch carrier line but the gable ROOF
   // rises so its eave clears the porch roof plane (raised truss face, like the photo).
-  const roofLift = frontPorchOn
-    ? ((parseFloat((document.getElementById('porch_front_depth') || {}).value) || 8) * ((parseFloat((document.getElementById('porch_pitch') || {}).value) || 3) / 12) + 0.4)
+  // When the gable is as wide as the porch itself, the porch IS the gable —
+  // there's no shed roof plane to clear, so no raised/widened span.
+  const _pl = n('porch_' + side + '_len');
+  const _porchLen = (_pl > 0 && _pl < dims.L) ? _pl : dims.L;
+  const tiedToShed = frontPorchOn && gw < _porchLen - 0.1;
+  const roofLift = tiedToShed
+    ? ((parseFloat((document.getElementById('porch_' + side + '_depth') || {}).value) || 8) * ((parseFloat((document.getElementById('porch_pitch') || {}).value) || 3) / 12) + 0.4)
     : 0;
   // Widen the span so the raised ridge works at the same pitch: rafters run from the
   // ridge all the way DOWN to the header line — posts spread out to catch them.
@@ -20959,8 +21209,8 @@ function buildCrowsFoot3D(dims, wallBase) {
   const effRise = effHalf * (gp / 12);        // = rise + roofLift
   // Valley clipping when tied into the porch: over the porch, the gable roof and
   // rafters STOP at the valley (like a real house) instead of crossing the porch metal.
-  const pDepth = frontPorchOn ? (parseFloat((document.getElementById('porch_front_depth') || {}).value) || 8) : 0;
-  const pPitch = frontPorchOn ? (parseFloat((document.getElementById('porch_pitch') || {}).value) || 3) : 3;
+  const pDepth = tiedToShed ? (parseFloat((document.getElementById('porch_' + side + '_depth') || {}).value) || 8) : 0;
+  const pPitch = tiedToShed ? (parseFloat((document.getElementById('porch_pitch') || {}).value) || 3) : 3;
   const porchHighY = gh + pDepth * (pPitch / 12);           // porch plane at the building wall
   const gableRidgeY = gh + effRise;
   const xValley = z => Math.max(0.6, (gableRidgeY - (porchHighY - z * (pPitch / 12))) * 12 / gp);
@@ -21099,8 +21349,9 @@ function buildCrowsFoot3D(dims, wallBase) {
   cap.position.set(0, wallBase + gh + effRise + 0.34, (zB + zF) / 2);
   add(cap, 'Gable ridge cap — metal');
 
-  // Center on the front wall
-  grp.position.set(0, 0, W / 2);
+  // Center on the chosen wall — the back copy mirrors (rotate 180)
+  grp.rotation.y = (side === 'back') ? Math.PI : 0;
+  grp.position.set(0, 0, (side === 'back') ? -W / 2 : W / 2);
   buildingGroup.add(grp);
 }
 
@@ -21181,13 +21432,14 @@ function buildPorch3D(dims, wallBase) {
     addP(slab, 'Porch slab');
 
     const gableCut = (() => {
-      if (p.side !== 'front') return null;
+      if (p.side !== 'front' && p.side !== 'back') return null;
       const pt = document.querySelector('[data-porchtype].active');
       const st = document.querySelector('[data-cypressstyle].active');
       if (!(pt && pt.dataset.porchtype === 'cypress' && st && st.dataset.cypressstyle === 'gable')) return null;
       const gwv = parseFloat((document.getElementById('cypress_gable_width') || {}).value) || 0;
       const gdv = parseFloat((document.getElementById('cypress_gable_length') || {}).value) || 0;
       if (!(gwv > 0 && gdv > 0)) return null;
+      if (gwv >= p.len - 0.1) return { full: true };   // porch IS the gable
       const ghv = parseFloat((document.getElementById('cypress_gable_height') || {}).value) || 9;
       const gpv = parseFloat((document.getElementById('cypress_gable_pitch') || {}).value) || 8;
       const c = -(p.off || 0);                     // gable center in porch-local x
@@ -21197,6 +21449,7 @@ function buildPorch3D(dims, wallBase) {
       return { a: c - effGw / 2, b: c + effGw / 2, c, gw: effGw,
                ridgeH: (n2 => n2)(0) || ((parseFloat((document.getElementById('porch_post_height') || {}).value) || 9) + (effGw / 2) * (gpv / 12)), gp: gpv };
     })();
+    if (gableCut && gableCut.full) return;   // crows-foot builder owns this whole side
 
 
     // Posts + (cypress) knee braces — cypress auto-figures even bays ≤ 12'
@@ -21556,7 +21809,9 @@ function buildMetalTrim(dims, wallBase) {
   // meets the roof (the taper return point) instead of running to the ridge.
   const wpEndsT = bbWpEndDepths();
   const zEave = W / 2 + eaveOH;
+  const _wgRT = (typeof bb3dWing === 'function') ? bb3dWing() : null;
   [-1, 1].forEach(sx => [-1, 1].forEach(sz => {
+    if (_wgRT && ((_wgRT.end === 'left' && sx < 0) || (_wgRT.end === 'right' && sx > 0))) return;
     const wpDT = sx > 0 ? wpEndsT.front : wpEndsT.rear;
     const hasPeak = wpDT > 0;
     const wpHalf = ({ 2: 6, 3: 8, 4: 10, 5: 12 }[wpDT] || 6) / 2;
@@ -22086,9 +22341,13 @@ function buildRoof(shape, dims, wallTop, rise, topChord) {
   const verticalExtent = rise;                   // wallTop → ridge top
   const effectiveSlopeLen = Math.sqrt(horizontalExtent * horizontalExtent + verticalExtent * verticalExtent);
   const effectiveAngle = Math.atan(verticalExtent / horizontalExtent);
+  // Gable wing: the wing owns its end — the main roof stops at the wing line
+  const _wgR = (typeof bb3dWing === 'function') ? bb3dWing() : null;
+  const _xA = -L / 2 - gableOH + ((_wgR && _wgR.end === 'left') ? _wgR.w + gableOH : 0);
+  const _xB = L / 2 + gableOH - ((_wgR && _wgR.end === 'right') ? _wgR.w + gableOH : 0);
   
   function makeSlope(side, key, label, thickness, yOffset) {
-    const w = L + 2 * gableOH;
+    const w = _xB - _xA;
     const geom = new THREE.BoxGeometry(w, thickness, effectiveSlopeLen);
     let mat;
     if (key === 'roof_skin') {
@@ -22114,7 +22373,7 @@ function buildRoof(shape, dims, wallTop, rise, topChord) {
     // Back slope: opposite tilt
     mesh.rotation.x = (side === 'front' ? 1 : -1) * effectiveAngle;
     // Box center is at the horizontal+vertical midpoint of the slope
-    const cx = 0;
+    const cx = (_xA + _xB) / 2;
     const cy = wallTop + verticalExtent / 2 + yOffset;
     const cz = (side === 'front' ? 1 : -1) * (horizontalExtent / 2);
     mesh.position.set(cx, cy, cz);
@@ -22135,14 +22394,14 @@ function buildRoof(shape, dims, wallTop, rise, topChord) {
   // under the metal. Frame-view members (isFraming) so the skeleton shows what the
   // roof panels actually screw to.
   (function buildRoofLathing() {
-    const w = L + 2 * gableOH;
+    const w = _xB - _xA;
     const psEl = document.getElementById('purlin_spacing');
     const spacing = Math.max(0.5, parseFloat(psEl ? psEl.value : 2) || 2);
     const lathMat = () => new THREE.MeshStandardMaterial({ color: 0xb89770, roughness: 0.92 });
     ['front', 'back'].forEach(side => {
       const grpL = new THREE.Group();
       grpL.rotation.x = (side === 'front' ? 1 : -1) * effectiveAngle;
-      grpL.position.set(0, wallTop + verticalExtent / 2 - 0.12, (side === 'front' ? 1 : -1) * (horizontalExtent / 2));
+      grpL.position.set((_xA + _xB) / 2, wallTop + verticalExtent / 2 - 0.12, (side === 'front' ? 1 : -1) * (horizontalExtent / 2));
       for (let d = -effectiveSlopeLen / 2 + 0.25; d <= effectiveSlopeLen / 2 - 0.1; d += spacing) {
         const row = new THREE.Mesh(new THREE.BoxGeometry(w, 0.13, 0.3), lathMat());
         row.position.set(0, 0, d);
@@ -22186,10 +22445,10 @@ function buildRoof(shape, dims, wallTop, rise, topChord) {
   }
   
   // === RIDGE CAP — at the very top of the roof ===
-  const ridgeLength = L + 2 * gableOH;
+  const ridgeLength = _xB - _xA;
   const ridgeWidth = 0.6;
   const ridge = makeBox(ridgeLength, 0.18, ridgeWidth, 'ridge_cap', 'Ridge cap');
-  ridge.position.set(0, wallTop + rise + 0.1, 0);
+  ridge.position.set((_xA + _xB) / 2, wallTop + rise + 0.1, 0);
   buildingGroup.add(ridge);
   allMeshes.push(ridge);
   
@@ -22365,7 +22624,13 @@ function wallTransform(dims, wall, posFrac, y) {
   const outSign = (wall === 'front' || wall === 'right') ? 1 : -1;
   const along = -len / 2 + Math.max(0, Math.min(1, posFrac)) * len;
   if (isLong) {
-    return { x: along, y, z: outSign * (W / 2), rotY: (wall === 'front' ? 0 : Math.PI), len, along };
+    let zOut = W / 2;
+    const _wgT = (typeof bb3dWing === 'function') ? bb3dWing() : null;
+    if (_wgT) {
+      const inWing = _wgT.end === 'left' ? (along <= -len / 2 + _wgT.w) : (along >= len / 2 - _wgT.w);
+      if (inWing) zOut = W / 2 + (wall === 'front' ? _wgT.fp : _wgT.bp);
+    }
+    return { x: along, y, z: outSign * zOut, rotY: (wall === 'front' ? 0 : Math.PI), len, along };
   }
   return { x: outSign * (L / 2), y, z: along, rotY: (wall === 'left' ? -Math.PI / 2 : Math.PI / 2), len, along };
 }
@@ -22438,6 +22703,41 @@ function buildOpeningInstance(dims, wallBase, type, wall, posFrac, sill, w, h, m
     // lower sash side frames read a touch heavier (inset operating sash)
     wbar(wf * 0.7, gh / 2, -gw / 2 + wf + wf * 0.35, -gh / 4);
     wbar(wf * 0.7, gh / 2, gw / 2 - wf - wf * 0.35, -gh / 4);
+  } else if (type === 'garage' && /carriage|wood/i.test((((meta && typeof openingsState !== 'undefined' && openingsState[meta.type]) ? openingsState[meta.type][meta.idx] : null) || {}).style || '')) {
+    // CARRIAGE WOOD-LOOK DOOR — stained wood sections, dark rails, one row of
+    // square lites across the top section.
+    const dw = w * 0.94, dh = h * 0.94;
+    const cwTex = makeWoodTexture(0x6b4423);
+    const slab = new THREE.Mesh(new THREE.PlaneGeometry(dw, dh),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, map: cwTex, roughness: 0.6, side: THREE.DoubleSide }));
+    slab.position.set(0, 0, 0.14);
+    slab.userData = ud('Garage door (carriage wood-look)'); grp.add(slab); allMeshes.push(slab);
+    const cwM = () => new THREE.MeshStandardMaterial({ color: 0x3a2414, roughness: 0.7 });
+    const cwBar = (bw, bh, x, y) => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.04), cwM());
+      b.position.set(x, y, 0.16);
+      b.userData = ud('Garage door (carriage wood-look)');
+      grp.add(b); allMeshes.push(b);
+    };
+    const crt = 0.14;
+    cwBar(dw, crt, 0, dh / 2 - crt / 2);
+    cwBar(dw, crt, 0, -dh / 2 + crt / 2);
+    cwBar(crt, dh, -dw / 2 + crt / 2, 0);
+    cwBar(crt, dh, dw / 2 - crt / 2, 0);
+    const cwSections = Math.max(3, Math.round(h / 2));
+    for (let s2 = 1; s2 < cwSections; s2++) cwBar(dw, crt * 0.6, 0, -dh / 2 + (s2 / cwSections) * dh);
+    cwBar(crt * 0.6, dh, 0, 0);   // center stile
+    // square lites across the top section
+    const liteN = Math.max(2, Math.round(w / 2.2));
+    const liteW2 = dw / liteN * 0.62, liteH2 = Math.min(0.95, (dh / cwSections) * 0.55);
+    const liteY2 = dh / 2 - (dh / cwSections) / 2;
+    for (let li = 0; li < liteN; li++) {
+      const gl = new THREE.Mesh(new THREE.PlaneGeometry(liteW2, liteH2),
+        new THREE.MeshStandardMaterial({ color: 0xdfe9ee, roughness: 0.06, metalness: 0.35,
+          transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
+      gl.position.set(-dw / 2 + (li + 0.5) * (dw / liteN), liteY2, 0.165);
+      gl.userData = ud('Garage door lite'); grp.add(gl); allMeshes.push(gl);
+    }
   } else if (type === 'garage') {
     // FULL-VIEW GLASS DOOR — black aluminum frame grid with big glass lites
     // (reflects the scene's sky environment like real glass).
@@ -25379,5 +25679,25 @@ try {
     _hc.hero = "data:image/jpeg;base64,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";
     _hc.metaLine = '30\u2032 \u00d7 50\u2032 shop \u00b7 16\u2032 walls \u00b7 scissor vault \u00b7 mezzanine loft \u00b7 two 12\u2032 porches \u00b7 twin 12\u00d712 doors \u00b7 widow\u2019s peak \u00b7 3,284 sqft under roof';
   }
+} catch (e) {}
+// The Rustic Roots Farmhouse (9/1/2026): built from the builder's 35-page plan
+// set. T footprint \u2014 30\u00d774 main body with a 24' garage/master wing (8/12
+// ridge front-to-back) over the left end, black metal board & batten with
+// Burnished Slate wainscot, twin 18' cypress crows-foot gable porches, carriage
+// wood-look garage doors on the left gable end.
+try {
+  window.BARNDO_BUILTIN_MODELS.push({
+    id: 'builtin_rustic_roots', builtin: true,
+    name: 'The Rustic Roots Farmhouse', beds: 3, baths: 2,
+    footprint: 'T footprint \u2014 30\u00d774 + 24\u2032 wing + two 18\u2032 gable porches', sqft: 3170, startingAt: 83574,
+    metaLine: '30\u2032 \u00d7 74\u2032 T-footprint farmhouse \u00b7 24\u2032 garage/master wing 8/12 \u00b7 2,077 sqft living \u00b7 589 sqft garage \u00b7 twin 18\u2032 timber gable porches \u00b7 black board & batten \u00b7 3,170 sqft under roof',
+    hero: "data:image/jpeg;base64,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",
+    plan: null,
+    blueprints: [],
+    invoice: null,
+    cfg: {"v": 1, "fields": {"to-feet": "40", "to-scale-preset": "", "to-scale-preset-all": false, "to-clean-start": true, "to-lead": "", "bb-client-save-name": "", "bldg_enclosure": "full", "wall_skirt_height": "4", "gable_posts_mode": "auto", "gable_metal": "follow", "post_foundation": "in_ground", "post_spacing": "10", "post_depth": "4", "post_size": "6x6", "bags_per_post": "2", "purlin_spacing": "2", "truss_type": "wood", "ext_wall_lf": "0", "width": "30", "length": "74", "wall_height": "9", "pitch": "6", "eave_overhang": "16", "gable_overhang": "12", "truss_spacing": "2", "stud_length": "104-5/8\"", "footprint": "2760", "living_sqft": "2171", "garage_sqft": "589", "porch_sqft": "0", "shop_sqft": "0", "int_wall_lf": "0", "bulk-import-text": "", "bulk-import-replace": false, "roof_system": "sheathed", "wall_system": "auto", "pro_armor_scope": "roof", "lath_size": "2x6", "girt_spacing": "2", "roof_product": "tuffrib_29", "roof_color": "Black", "siding_product": "mbb_26", "siding_color": "Black", "soffit_product": "tr", "wainscot_on": "36", "wainscot_color": "Burnished Slate", "trim_color": "Black", "gutters_on": "none", "downspout_qty": "0", "gutter_color": "Arctic White", "override_roof_area": "0", "override_ridge_lf": "0", "valley_lf": "0", "hip_lf": "0", "outside_corners": "0", "inside_corners": "0", "gable_count": "0", "porch_front_on": true, "porch_front_depth": "14", "porch_front_len": "18", "porch_back_on": true, "porch_back_depth": "14", "porch_back_len": "18", "porch_left_on": false, "porch_left_depth": "8", "porch_left_len": "0", "porch_right_on": false, "porch_right_depth": "8", "porch_right_len": "0", "porch_tie_fl": false, "porch_tie_fr": false, "porch_tie_bl": false, "porch_tie_br": false, "porch_post_spacing": "9", "porch_pitch": "8", "porch_post_height": "9", "porch_rafter_size": "2x8", "porch_header_size": "dbl2x10", "porch_lath_size": "2x4", "porch_ybrace_stick": "yes", "porch_timber_post_size": "8x8", "porch_timber_post_type": "cypress", "porch_timber_header_size": "8x8", "porch_timber_header_type": "cypress", "porch_ybrace": "yes", "cypress_post_count": "0", "cypress_post_height": "10", "cypress_post_bases": "yes", "cypress_beam_count": "0", "cypress_beam_length": "10", "cypress_ceiling": "syp", "cypress_hip_count": "0", "cypress_hip_length": "14", "cypress_ridge_material": "match", "cypress_gable_width": "18", "cypress_gable_length": "14", "cypress_gable_pitch": "8", "cypress_gable_height": "9", "cypress_ybrace_count": "2", "cypress_ybrace_length": "4", "cypress_truss_fan": "apvgp812", "ext_enabled": false, "ext_end": "right", "ext_length": "0", "ext_width": "0", "ext_wall_height": "0", "ext_pitch": "0", "ext_construction": "post", "ext_enclosed": "open", "ext_slab": "yes", "ext_roof_color": "", "ext_siding_color": "", "ext_trim_color": "", "wing_enabled": true, "wing_end": "left", "wing_width": "24", "wing_front_proj": "8.5", "wing_back_proj": "14", "wing_pitch": "8", "shed_enabled": false, "standalone_shed": false, "shed_width": "12", "shed_length": "0", "shed_wall_height": "10", "shed_pitch": "3", "shed_eave_oh": "12", "shed_roof_framing": "stick", "shed_rafter_size": "auto", "shed_timber_size": "4x6", "shed_rafter_spacing": "16", "shed_wainscot": "none", "shed_window_qty": "0", "shed_window_w": "3", "shed_window_h": "3", "shed_attached_side": "back", "shed_wall_out": true, "shed_wall_left": true, "shed_wall_right": true, "shed_post_material": "pt", "shed_post_size": "6x6", "shed_post_spacing": "8", "shed_carrier_material": "lumber", "shed_carrier_size": "dbl2x10", "shed_ledger_material": "pt", "shed_ledger_size": "2x10", "cupola_qty_3": "0", "cupola_qty_4": "0", "cupola_qty_5": "0", "cupola_roof_color": "Copper", "cupola_mid_style": "louvered", "cupola_mid_color": "", "cupola_base_color": "", "cupola_vane": "", "cupola_vane_finish": "Polished copper", "cupola_vane_qty": "0", "main_concrete": "4", "porch_concrete": "4", "shed_concrete": "none", "wp_mode": "none", "wp_depth": "2", "wp_mode2": "none", "wp_depth2": "2", "wp_cypress": true, "manual_sidewall_flashing": "0", "manual_mini_corner": "0", "manual_post_cover": "0", "floor_system": "none", "floor_area_sqft": "0", "floor_span": "14", "floor_spacing": "16", "floor_lumber": "2x10", "floor_member_count": "0", "floor_rim_lf": "0", "subfloor_product": "osb_tg"}, "tier": "shell", "construction": "stick", "porchConstruction": "cypress", "cypressStyle": "gable", "openings": {"window": [{"qty": 1, "w": 3, "h": 5, "label": "W-A", "wall": "front", "pos": 0.1, "sill": 2.5}, {"qty": 1, "w": 3, "h": 5, "label": "W-B", "wall": "front", "pos": 0.2, "sill": 2.5}, {"qty": 1, "w": 3, "h": 5, "label": "W-C", "wall": "front", "pos": 0.41, "sill": 2.5}, {"qty": 1, "w": 3, "h": 5, "label": "W-D", "wall": "front", "pos": 0.59, "sill": 2.5}, {"qty": 1, "w": 6, "h": 5, "label": "W-E", "wall": "front", "pos": 0.86, "sill": 2.5}, {"qty": 1, "w": 4, "h": 4, "label": "W-F", "wall": "back", "pos": 0.12, "sill": 3}, {"qty": 1, "w": 3, "h": 5, "label": "W-G", "wall": "back", "pos": 0.41, "sill": 2.5}, {"qty": 1, "w": 3, "h": 5, "label": "W-H", "wall": "back", "pos": 0.59, "sill": 2.5}, {"qty": 1, "w": 3, "h": 3, "label": "W-I", "wall": "back", "pos": 0.72, "sill": 4}, {"qty": 1, "w": 6, "h": 5, "label": "W-J", "wall": "back", "pos": 0.88, "sill": 2.5}, {"qty": 1, "w": 3, "h": 5, "label": "W-K", "wall": "right", "pos": 0.3, "sill": 2.5}, {"qty": 1, "w": 3, "h": 5, "label": "W-L", "wall": "right", "pos": 0.7, "sill": 2.5}, {"qty": 1, "w": 3, "h": 3, "label": "W-M", "wall": "left", "pos": 0.13, "sill": 4.5}], "extdoor": [{"qty": 1, "w": 6, "h": 8, "style": "Double glass entry (E16) \u2014 two full-lite leaves", "costPerDoor": 2200, "sellPerDoor": 2860, "label": "D-A", "wall": "front", "pos": 0.5, "sill": 0}, {"qty": 1, "w": 6, "h": 8, "style": "Double glass entry (E16) \u2014 two full-lite leaves", "costPerDoor": 2200, "sellPerDoor": 2860, "label": "D-B", "wall": "back", "pos": 0.5, "sill": 0}, {"qty": 1, "w": 3, "h": 6.667, "style": "Steel insulated 3/0\u00d76/8", "catalogKey": "md_36x80_ins", "costPerDoor": 255, "sellPerDoor": 395, "label": "D-C", "wall": "left", "pos": 0.9299999999999999, "sill": 0}], "intdoor": [], "garage": [{"qty": 1, "w": 9, "h": 8, "style": "Carriage wood-look overhead", "catalogKey": "gd_9x8_ins", "costPerDoor": 1050, "sellPerDoor": 1525, "label": "G-A", "wall": "left", "pos": 0.37, "sill": 0}, {"qty": 1, "w": 9, "h": 8, "style": "Carriage wood-look overhead", "catalogKey": "gd_9x8_ins", "costPerDoor": 1050, "sellPerDoor": 1525, "label": "G-B", "wall": "left", "pos": 0.71, "sill": 0}]}, "openWalls": {"front": false, "back": false, "left": false, "right": false}, "trussGroups": [{"qty": 27, "type": "common", "span": 24, "pitch": 8, "eaveOH": 16, "spacing": 24, "label": "24' common 8/12 \u2014 garage/master wing", "autoQty": false}, {"qty": 26, "type": "common", "span": 30, "pitch": 6, "eaveOH": 16, "spacing": 24, "label": "30' common 6/12 \u2014 main house", "autoQty": false}]},
+    date: '2026-09-01T00:00:00.000Z',
+  });
+  if (document.getElementById('barndo-grid')) renderBarndoGrid();
 } catch (e) {}
 </script>
