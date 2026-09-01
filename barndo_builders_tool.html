@@ -2283,7 +2283,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v289</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v290</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -9107,7 +9107,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v289';
+const BB_VERSION = 'v290';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -11966,6 +11966,9 @@ function wsRenderLive() {
   }
   const box = document.getElementById('ws-mats');
   if (box) {
+    // always repaint the panel total — an empty list must show $0, not the last value
+    const t0 = document.getElementById('ws-mats-total');
+    if (t0) t0.textContent = c ? money(c.matSellTotal || 0) : '';
     if (!c || !c.mats || !c.mats.length) { box.innerHTML = '<div class="qbs-note">No material lines yet.</div>'; }
     else {
       const byCat = {};
@@ -11981,8 +11984,6 @@ function wsRenderLive() {
             <span style="font-family:var(--font-mono); white-space:nowrap;">×${(+m.qty).toLocaleString()} · ${money(m.sell)}</span></div>`).join('')}
         </div>`;
       }).join('');
-      const t = document.getElementById('ws-mats-total');
-      if (t) t.textContent = money(c.matSellTotal);
     }
   }
   // keep the center 3D shell tracking the inputs (debounced — recalc fires per keystroke)
