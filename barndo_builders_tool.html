@@ -2283,7 +2283,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v295</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v296</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -4605,6 +4605,31 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
   <div class="qbs-tab-content" id="tab-calcs" style="display:none">
     <div class="qbs-sub" style="margin-bottom:14px;">Standalone takeoff calculators — quick numbers without touching the current quote. More calculators get added here as needed.</div>
 
+    <!-- ── LVL Beam Sizing (2.0E design values) ─────────────────────── -->
+    <div class="qbs-card">
+      <h3>LVL beam sizing <span class="badge">2.0E LVL chart · ridge beams, headers, floor beams</span></h3>
+      <p class="qbs-sub" style="margin-bottom: 12px;">Sized from standard 2.0E LVL design values (Microllam / VersaLam class — Fb 2,600 psi, E 2.0M psi, Fv 285 psi) with bending, shear and deflection checks, same basis as the manufacturer span tables. Roof beams figure at 115% snow-load duration and L/240; floor beams at 100% and L/360 live. <strong style="color: var(--copper);">Verify final sizes against the plan's engineering.</strong></p>
+      <div class="qbs-grid-4">
+        <div class="qbs-field">
+          <label>Application</label>
+          <select id="lvl_app" onchange="lvlCalc()">
+            <option value="roof">Roof — ridge beam / header (snow)</option>
+            <option value="floor">Floor beam / header</option>
+          </select>
+        </div>
+        <div class="qbs-field"><label>(L) Beam span (ft)</label><input type="number" id="lvl_span" value="12" step="0.5" oninput="lvlCalc()" /></div>
+        <div class="qbs-field"><label>(T) Tributary width (ft)</label><input type="number" id="lvl_trib" value="15" step="0.5" oninput="lvlCalc()" /><div class="qbs-note">Ridge beam: half the rafter span each side. Header: half the span it carries.</div></div>
+        <div class="qbs-field"><label>Plies (1¾" each)</label>
+          <select id="lvl_plies" onchange="lvlCalc()"><option value="1">1 ply (1¾")</option><option value="2" selected>2 ply (3½")</option><option value="3">3 ply (5¼")</option></select>
+        </div>
+      </div>
+      <div class="qbs-grid-4">
+        <div class="qbs-field"><label>Live / snow load (psf)</label><input type="number" id="lvl_ll" value="30" step="5" oninput="lvlCalc()" /></div>
+        <div class="qbs-field"><label>Dead load (psf)</label><input type="number" id="lvl_dl" value="15" step="5" oninput="lvlCalc()" /></div>
+      </div>
+      <div id="lvl-calc-out" style="margin-top: 10px;"></div>
+    </div>
+
     <!-- ── Metal for Gable Roof (vCalc-style) ────────────────────────── -->
     <div class="qbs-card">
       <h3>Metal for Gable Roof <span class="badge">Reference calc — separate from the quote</span></h3>
@@ -5571,6 +5596,100 @@ function ftIn(len) {
 // =============================================================
 // Metal for Gable Roof (vCalc model): panels cut to slope + overhang, trim,
 // closures, snow guard, purlins, screws ≈ 0.75/ft².
+// =============================================================
+// LVL SIZING ENGINE — 2.0E LVL design values (industry standard for
+// Microllam / VersaLam class). Allowable uniform load from bending
+// (Fb 2,600 psi x depth factor (12/d)^0.136 x duration), shear
+// (Fv 285 psi), and deflection. Reproduces the manufacturer span charts
+// and extends to any span/tributary. Stock depths per supplier.
+// =============================================================
+window.BB_LVL = {
+  E: 2.0e6, Fb: 2600, Fv: 285,
+  depths: [9.5, 11.875, 14, 16, 18, 20, 24],
+  labels: { 9.5: '9\u00bd"', 11.875: '11\u215e"', 14: '14"', 16: '16"', 18: '18"', 20: '20"', 24: '24"' },
+  // $/LF per single 1\u00be" ply — anchored to the builder's 11\u215e LVL pricing,
+  // scaled by depth
+  costPerLFPly: function (d) { return 5.67 * (d / 11.875); },
+};
+function bbLvlDepthLabel(d) { return BB_LVL.labels[d] || (d + '"'); }
+// Takeoff: LVL depth for the gable-wing tie ridge — span = tie run, tributary
+// = half the main span, default roof loads 30 snow + 15 dead @ 115%/L240.
+function bbWingTieLvlDepth(i) {
+  try {
+    if (!i || !i.wing) return 11.875;
+    const trib = (i.W || 30) / 2;
+    return bbLvlPick(i.wing.tieRun, trib * 45, 2, 1.15, 240) || 24;
+  } catch (e) { return 11.875; }
+}
+// Allowable uniform load (PLF) for depth (in) x plies over span (ft).
+// cd = load duration (1.15 roof snow, 1.0 floor); deflDen = L/deflDen.
+function bbLvlAllowPLF(dIn, plies, spanFt, cd, deflDen) {
+  const b = 1.75 * plies, L = spanFt * 12;
+  if (!(L > 0)) return 1e9;
+  const S = b * dIn * dIn / 6;
+  const I = b * dIn * dIn * dIn / 12;
+  const fbp = BB_LVL.Fb * Math.pow(12 / dIn, 0.136) * cd;
+  const wBend = 8 * fbp * S / (L * L) * 12;
+  const wShear = (4 / 3) * BB_LVL.Fv * cd * b * dIn / L * 12;
+  const wDefl = (L / deflDen) * 384 * BB_LVL.E * I / (5 * Math.pow(L, 4)) * 12;
+  return Math.min(wBend, wShear, wDefl);
+}
+// Smallest stock depth that carries plf over the span (null = over chart)
+function bbLvlPick(spanFt, plf, plies, cd, deflDen) {
+  for (let k = 0; k < BB_LVL.depths.length; k++) {
+    if (bbLvlAllowPLF(BB_LVL.depths[k], plies, spanFt, cd, deflDen) >= plf) return BB_LVL.depths[k];
+  }
+  return null;
+}
+// Max span (ft) for a depth/plies at a demand plf
+function bbLvlMaxSpan(dIn, plies, plf, cd, deflDen) {
+  let lo = 2, hi = 60;
+  for (let k = 0; k < 40; k++) {
+    const mid = (lo + hi) / 2;
+    if (bbLvlAllowPLF(dIn, plies, mid, cd, deflDen) >= plf) lo = mid; else hi = mid;
+  }
+  return Math.floor(lo * 10) / 10;
+}
+function lvlCalc() {
+  const out = document.getElementById('lvl-calc-out');
+  if (!out) return;
+  const n = id => parseFloat((document.getElementById(id) || {}).value) || 0;
+  const app = (document.getElementById('lvl_app') || {}).value || 'roof';
+  const span = n('lvl_span'), trib = n('lvl_trib');
+  const ll = n('lvl_ll'), dl = n('lvl_dl');
+  const plies = parseInt((document.getElementById('lvl_plies') || {}).value) || 2;
+  const cd = app === 'roof' ? 1.15 : 1.0;
+  const deflDen = app === 'roof' ? 240 : 360;
+  const plf = Math.round((ll + dl) * trib);
+  const pick = bbLvlPick(span, plf, plies, cd, deflDen);
+  let html = `<div style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:10px;">
+    <div><div style="color: var(--text-3); font-size: 10px;">DEMAND</div><div style="color: var(--copper); font-size: 16px;">${plf.toLocaleString()} PLF</div></div>`;
+  if (pick) {
+    const lf = Math.ceil(span + 2);
+    const cost = BB_LVL.costPerLFPly(pick) * plies * lf;
+    html += `<div><div style="color: var(--text-3); font-size: 10px;">USE</div><div style="color: var(--copper); font-size: 16px;">${plies}-ply 1\u00be \u00d7 ${bbLvlDepthLabel(pick)} LVL</div></div>
+      <div><div style="color: var(--text-3); font-size: 10px;">ALLOWABLE</div><div style="color: var(--copper); font-size: 16px;">${Math.round(bbLvlAllowPLF(pick, plies, span, cd, deflDen)).toLocaleString()} PLF</div></div>
+      <div><div style="color: var(--text-3); font-size: 10px;">ORDER (span + 2' bearing)</div><div style="color: var(--copper); font-size: 16px;">${plies} \u00d7 ${lf}' \u00b7 \u2248 $${Math.round(cost).toLocaleString()} cost</div></div>`;
+  } else {
+    html += `<div style="color: #e05252; font-size: 14px; align-self: center;">Over the chart at ${plies} ply — add plies or get it engineered.</div>`;
+  }
+  html += `</div>`;
+  html += `<table class="qbs-table" style="font-size: 12px;"><thead><tr><th>Depth</th><th>Max span @ 1 ply</th><th>Max span @ 2 ply</th><th>Max span @ 3 ply</th></tr></thead><tbody>`;
+  BB_LVL.depths.forEach(d => {
+    html += `<tr><td>1\u00be \u00d7 ${bbLvlDepthLabel(d)}</td>`;
+    [1, 2, 3].forEach(p => {
+      const ms = bbLvlMaxSpan(d, p, plf, cd, deflDen);
+      const ok = p === plies && pick === d;
+      html += `<td style="${ok ? 'color: var(--copper); font-weight: 700;' : ''}">${ms}'${span > 0 && ms >= span ? ' \u2713' : ''}</td>`;
+    });
+    html += `</tr>`;
+  });
+  html += `</tbody></table>
+  <div class="qbs-note" style="margin-top: 8px;">Chart = max simple span at THIS demand (${plf} PLF). Checks: bending (Fb 2,600 \u00d7 (12/d)^0.136 \u00d7 ${cd}), shear (Fv 285), deflection L/${deflDen}. \u2713 = carries your span.</div>`;
+  out.innerHTML = html;
+}
+try { setTimeout(lvlCalc, 800); } catch (e) {}
+
 function grCalc() {
   const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
   const L = n('gr_ridge_len'), S = n('gr_span'), P = n('gr_pitch');
@@ -8007,9 +8126,13 @@ const MATERIALS = [
   // tie distance, and sheathing over the tie. Figured SQUARE — no valley
   // deduction — so the order always covers.
   // ============================================================
-  { id: "wingtie_ridge_lvl", label: "1\u00be\u00d711\u215e LVL ridge \u2014 main ridge into wing (doubled)", cat: "Roof structure", uom: "LF", packSize: null,
+  { id: "wingtie_ridge_lvl", label: "LVL ridge \u2014 main ridge into wing (doubled, sized from LVL chart)", cat: "Roof structure", uom: "LF", packSize: null,
     priceCost: 5.67, priceSell: 7.25, priceRetail: 9.00,
-    labelFn: i => `1\u00be\u00d711\u215e LVL ridge \u2014 main ridge into wing (DOUBLED \u00b7 2 \u00d7 ${i.wing ? Math.ceil(i.wing.tieRun + 2) : 0}' w/ 2' bearing)`,
+    labelFn: i => {
+      const d = bbWingTieLvlDepth(i);
+      return `1\u00be\u00d7${bbLvlDepthLabel(d)} LVL ridge \u2014 main ridge into wing (DOUBLED \u00b7 2 \u00d7 ${i.wing ? Math.ceil(i.wing.tieRun + 2) : 0}' w/ 2' bearing \u00b7 sized from LVL chart)`;
+    },
+    customUnitPrice: i => BB_LVL.costPerLFPly(bbWingTieLvlDepth(i)),
     formula: i => {
       if (!i.wingActive || !i.wing) return 0;
       return 2 * Math.ceil(i.wing.tieRun + 2);
@@ -9194,7 +9317,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v295';
+const BB_VERSION = 'v296';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
