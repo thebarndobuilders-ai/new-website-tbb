@@ -2283,7 +2283,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v298</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v299</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -4293,6 +4293,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
               <button onclick="bbUndoLayout()" title="Undo the last door/window move, add, or delete" style="padding: 5px 10px !important; font-size: 11px !important;">↩ Undo</button>
               <button onclick="bb3dCmd('toggleStructure')" id="audit3d-structure-btn" style="padding: 5px 10px !important; font-size: 11px !important;">◫ Frame view</button>
               <button onclick="bb3dCmd('screenshot')" style="padding: 5px 10px !important; font-size: 11px !important; background: var(--copper); color: var(--bg-deep); border-color: var(--copper);">📷 Screenshot</button>
+              <button onclick="bbPhotoRenderOpen()" style="padding: 5px 10px !important; font-size: 11px !important; background: #1c2b45; color: #cfe3ff; border-color: #2f4a75;">📸 Photo render (AI)</button>
             </div>
           </div>
           <div id="audit3d-status" style="position: absolute; bottom: 12px; left: 12px; right: 12px; pointer-events: none; z-index: 10;">
@@ -9472,7 +9473,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v298';
+const BB_VERSION = 'v299';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -12609,6 +12610,101 @@ function _drawProposalHTML() {
     }
     return h;
   } catch (e) { return ''; }
+}
+
+// =============================================================
+// AI PHOTO RENDER — image-to-image via OpenAI gpt-image-1 (ChatGPT's image
+// model) so the output keeps the EXACT massing and opening layout of the 3D
+// build and re-skins it photorealistically. Bring-your-own OpenAI API key,
+// stored in this browser only.
+// =============================================================
+function bbPhotoRenderPrompt() {
+  const v = id => (document.getElementById(id) || {}).value || '';
+  const on = id => { const el = document.getElementById(id); return !!(el && el.checked); };
+  const parts = [];
+  parts.push('Transform this 3D model screenshot into a photorealistic architectural photograph of the SAME building.');
+  parts.push('CRITICAL: keep the exact geometry — identical footprint, wall heights, roof pitches and ridge lines, porch positions and every window and door exactly where they are and the same size. Do not add, move, resize or remove any opening, roof plane, or structure.');
+  const sp = v('siding_product');
+  const sidingKind = sp === 'mbb_26' ? 'metal board-and-batten siding' : (sp === 'lp_bb' ? 'LP SmartSide board-and-batten siding' : 'ribbed metal panel siding');
+  parts.push('Materials: ' + sidingKind + ' in ' + (v('siding_color') || 'black') + ';');
+  if (v('wainscot_on') === '36') parts.push('a 36-inch ' + (v('wainscot_color') || 'contrasting') + ' metal wainscot band along the base of the walls;');
+  parts.push('a ribbed metal roof in ' + (v('roof_color') || 'black') + ' with ' + (v('trim_color') || 'matching') + ' trim.');
+  try {
+    const pt = document.querySelector('[data-porchtype].active');
+    if (pt && pt.dataset.porchtype === 'cypress') parts.push('The porches are cypress timber-frame with exposed warm-toned heavy timbers, decorative gable trusses and 8x8 posts — keep their exact position and size.');
+  } catch (e) {}
+  if (on('wing_enabled')) parts.push('The cross-gable wing keeps its exact ridge direction and height.');
+  parts.push('Windows are black-framed; doors match the model.');
+  parts.push('Set it on a realistic rural property: mowed lawn, concrete or gravel drive, mature trees in the far background, clear sky, soft golden-hour daylight, professional real-estate photography, DSLR, crisp detail, no people, no text.');
+  return parts.join(' ');
+}
+function bbPhotoRenderOpen() {
+  let p = document.getElementById('bb-photo-panel');
+  if (!p) {
+    p = document.createElement('div');
+    p.id = 'bb-photo-panel';
+    p.style.cssText = 'position:fixed; inset:0; z-index:10050; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.6);';
+    p.innerHTML = `
+      <div style="background:var(--bg-deep); border:1px solid var(--hairline); border-radius:12px; width:min(720px, 94vw); max-height:92vh; overflow:auto; padding:20px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <div style="font-family:var(--font-headline); font-size:16px; color:var(--copper); text-transform:uppercase; letter-spacing:0.05em;">📸 AI photo render</div>
+          <button onclick="document.getElementById('bb-photo-panel').style.display='none'" style="padding:4px 10px !important;">✕ Close</button>
+        </div>
+        <p class="qbs-sub" style="margin:0 0 10px 0;">Sends the current 3D view to ChatGPT's image model (gpt-image-1) image-to-image — the photo keeps this exact shape, size and opening layout. Needs internet and your own OpenAI API key (platform.openai.com → API keys). The key stays on this device only. Typical cost 10–25¢ per render.</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+          <input type="password" id="bb-photo-key" placeholder="OpenAI API key — sk-…" autocomplete="off" style="flex:1; min-width:240px; font-size:13px;">
+          <select id="bb-photo-quality" style="font-size:13px;"><option value="medium">Medium (~10¢)</option><option value="high">High (~25¢)</option></select>
+          <button id="bb-photo-go" onclick="bbPhotoRenderGo()" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); padding:6px 14px !important;">Render photo</button>
+        </div>
+        <div id="bb-photo-status" style="font-size:12px; color:var(--text-2); min-height:16px; margin-bottom:8px;"></div>
+        <div id="bb-photo-result" style="text-align:center;"></div>
+      </div>`;
+    document.body.appendChild(p);
+    const k = document.getElementById('bb-photo-key');
+    try { k.value = localStorage.getItem('bb_openai_key') || ''; } catch (e) {}
+    k.addEventListener('input', () => { try { localStorage.setItem('bb_openai_key', k.value.trim()); } catch (e) {} });
+  }
+  p.style.display = 'flex';
+}
+async function bbPhotoRenderGo() {
+  const st = document.getElementById('bb-photo-status');
+  const res = document.getElementById('bb-photo-result');
+  const btn = document.getElementById('bb-photo-go');
+  const key = ((document.getElementById('bb-photo-key') || {}).value || '').trim();
+  const setSt = (t, bad) => { if (st) { st.textContent = t; st.style.color = bad ? '#e05252' : 'var(--text-2)'; } };
+  if (!key) { setSt('Enter your OpenAI API key first (platform.openai.com → API keys).', true); return; }
+  const dataUrl = (typeof window.bb3dSnapshotView === 'function') ? window.bb3dSnapshotView() : null;
+  if (!dataUrl) { setSt('Could not capture the 3D view — open the 3D tab with a build on screen first.', true); return; }
+  try {
+    btn.disabled = true;
+    setSt('Rendering… this takes 20–60 seconds. Keep this window open.');
+    const blob = await (await fetch(dataUrl)).blob();
+    const fd = new FormData();
+    fd.append('model', 'gpt-image-1');
+    fd.append('image[]', blob, 'view.png');
+    fd.append('prompt', bbPhotoRenderPrompt());
+    fd.append('size', '1536x1024');
+    fd.append('quality', (document.getElementById('bb-photo-quality') || {}).value || 'medium');
+    const r = await fetch('https://api.openai.com/v1/images/edits', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + key },
+      body: fd,
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((j && j.error && j.error.message) || ('OpenAI returned HTTP ' + r.status));
+    const d0 = j && j.data && j.data[0];
+    const b64 = d0 && d0.b64_json;
+    const url = d0 && d0.url;
+    if (!b64 && !url) throw new Error('No image in the response.');
+    const srcUrl = b64 ? ('data:image/png;base64,' + b64) : url;
+    res.innerHTML = `<img src="${srcUrl}" style="max-width:100%; border-radius:8px; border:1px solid var(--hairline);">
+      <div style="margin-top:8px;"><a href="${srcUrl}" download="photo_render_${Date.now()}.png"><button style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); padding:6px 14px !important;">⬇ Save photo</button></a></div>`;
+    setSt('Done — save it or render another angle.');
+  } catch (e) {
+    setSt('Render failed: ' + (e && e.message ? e.message : e) + ' — check the key, internet connection, and that your OpenAI account has billing enabled.', true);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 // 3D mode: 'shop' (Shops & Barns — straight-wall extensions) or 'barndo'
@@ -24254,6 +24350,13 @@ window.deleteSelectedOpening = deleteSelectedOpening;
 window.bb3dOpenWalls = function () { return Object.assign({}, openWalls); };
 window.bb3dSetOpenWalls = function (o) {
   ['front', 'back', 'left', 'right'].forEach(k => { openWalls[k] = !!(o && o[k]); });
+};
+// Capture the CURRENT camera view as a PNG data URL (for AI photo renders)
+window.bb3dSnapshotView = function () {
+  if (!renderer || !scene || !camera) return null;
+  try { bbHideOpeningDims(); } catch (e) {}
+  renderer.render(scene, camera);
+  try { return renderer.domElement.toDataURL('image/png'); } catch (e) { return null; }
 };
 // QA hook: state of the live placement-dimension overlay
 window.bb3dDimInfo = function() { return { group: !!_bbDimGroup, kids: _bbDimGroup ? _bbDimGroup.children.length : 0 }; };
