@@ -2283,7 +2283,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v301</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v302</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8022,6 +8022,17 @@ const MATERIALS = [
       return (Math.ceil(D / 4) + 1) * 2;
     }},
   
+  // Drip edge along both eave edges of the gable porch roof (covers the
+  // rafter tails at the metal edge) — 10' sticks, per gable
+  { id: "cypress_gable_drip_edge", label: "Drip edge — gable porch eaves (10' sticks)", cat: "Cypress timber porch", uom: "ea (10')", packSize: null,
+    priceCost: 10.19, priceSell: 13, priceRetail: 16,
+    formula: i => {
+      if (!i.cypressPorchActive || i.cypressStyle !== 'gable') return 0;
+      const D = i.cypressGableLength;
+      if (D <= 0) return 0;
+      return Math.ceil(2 * (D + 1.5) * 1.05 / 10.25);
+    }},
+
   // 4×6 cypress Y-brace / corbel — count from input, ordered as 4×6×10 (2 corbels per stick).
   // Manual count input lets user override default of 2 per porch.
   { id: "cypress_corbel_4x6", label: "4×6 cypress Y-brace / corbel (cut from 4×6×10 stock, 2 per stick)", cat: "Cypress timber porch", uom: "ea", packSize: null,
@@ -9552,7 +9563,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v301';
+const BB_VERSION = 'v302';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -21662,10 +21673,15 @@ function buildWing3D(dims, wallBase) {
     const wOut = new THREE.Mesh(new THREE.BoxGeometry(wg.w, H, sidingThick), wallMat(wg.w));
     wOut.position.set(cxW, wallBase + H / 2, zOuter);
     add(wOut, 'Wing wall — ' + sideN);
-    // side walls of the projection (end-side continues the end wall; inner side is exposed)
-    [[x0, 'end'], [x1, 'inner']].forEach(([xw, which]) => {
-      const wSide = new THREE.Mesh(new THREE.BoxGeometry(sidingThick, H, proj), wallMat(proj));
-      wSide.position.set(xw, wallBase + H / 2, zMid);
+    // side walls of the projection (end-side continues the end wall; inner side
+    // is exposed). The end-side wall face aligns FLUSH with the main building's
+    // end-wall siding plane so the junction shows no step/seam line.
+    [[s * (L / 2 + 0.095), 'end'], [x1, 'inner']].forEach(([xw, which]) => {
+      // end-side strips run 0.2 INTO the main wall so the junction shows no
+      // gap or seam line (tiny x offset avoids z-fighting with the main skin)
+      const dEx = which === 'end' ? 0.2 : 0;
+      const wSide = new THREE.Mesh(new THREE.BoxGeometry(sidingThick, H, proj + dEx), wallMat(proj));
+      wSide.position.set(xw, wallBase + H / 2, zMid - zs * dEx / 2);
       add(wSide, 'Wing wall — ' + which + ' (' + sideN + ')');
     });
     // wainscot band + Z bar on the projection walls
@@ -21677,12 +21693,13 @@ function buildWing3D(dims, wallBase) {
       const zbOut = new THREE.Mesh(new THREE.BoxGeometry(wg.w, zH, sidingThick + 0.06), zBarMat());
       zbOut.position.set(cxW, wallBase + bandH + zH / 2, zOuter + zs * 0.01);
       add(zbOut, 'Wing wainscot Z bar — ' + sideN);
-      [[x0, s], [x1, -s]].forEach(([xw, xs2]) => {
-        const bS = new THREE.Mesh(new THREE.BoxGeometry(sidingThick + 0.04, bandH, proj), wainMat(proj));
-        bS.position.set(xw + xs2 * 0.01, wallBase + bandH / 2, zMid);
+      [[s * (L / 2 + 0.115), s], [x1, -s]].forEach(([xw, xs2], wi) => {
+        const dEx2 = wi === 0 ? 0.2 : 0;
+        const bS = new THREE.Mesh(new THREE.BoxGeometry(sidingThick + 0.04, bandH, proj + dEx2), wainMat(proj));
+        bS.position.set(xw + xs2 * 0.01, wallBase + bandH / 2, zMid - zs * dEx2 / 2);
         add(bS, 'Wing wainscot — side (' + sideN + ')');
-        const zbS = new THREE.Mesh(new THREE.BoxGeometry(sidingThick + 0.06, zH, proj), zBarMat());
-        zbS.position.set(xw + xs2 * 0.01, wallBase + bandH + zH / 2, zMid);
+        const zbS = new THREE.Mesh(new THREE.BoxGeometry(sidingThick + 0.06, zH, proj + dEx2), zBarMat());
+        zbS.position.set(xw + xs2 * 0.01, wallBase + bandH + zH / 2, zMid - zs * dEx2 / 2);
         add(zbS, 'Wing wainscot Z bar — side (' + sideN + ')');
       });
     }
@@ -21746,13 +21763,13 @@ function buildWing3D(dims, wallBase) {
       add(m, 'Wing rake trim', 'roof_trim');
     });
   });
-  const fw = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.55, (zF - zBk) + 2 * gableOH), trimMatW());
-  fw.position.set(s * (L / 2 + eaveOH + 0.06), wallTop - eaveOH * (wg.pitch / 12) - 0.18, (zF + zBk) / 2);
+  const fw = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.45, (zF - zBk) + 2 * gableOH), trimMatW());
+  fw.position.set(s * (L / 2 + eaveOH + 0.03), wallTop - 0.245, (zF + zBk) / 2);
   add(fw, 'Wing eave fascia', 'fascia');
-  const wSofD = eaveOH + 0.10;
-  const wSof = new THREE.Mesh(new THREE.BoxGeometry(wSofD, 0.14, (zF - zBk) + 2 * gableOH),
+  const wSofD = eaveOH - 0.02;
+  const wSof = new THREE.Mesh(new THREE.BoxGeometry(wSofD, 0.10, (zF - zBk) + 2 * gableOH),
     new THREE.MeshStandardMaterial({ color: (CATEGORY_COLORS.soffit ? CATEGORY_COLORS.soffit.hex : 0xe8e4da), roughness: 0.7 }));
-  wSof.position.set(s * (L / 2 + wSofD / 2 - 0.05), wallTop - eaveOH * (wg.pitch / 12) - 0.10, (zF + zBk) / 2);
+  wSof.position.set(s * (L / 2 + wSofD / 2), wallTop - 0.35, (zF + zBk) / 2);
   add(wSof, 'Wing soffit', 'soffit');
 
   buildingGroup.add(grp);
@@ -21914,6 +21931,15 @@ function buildCrowsFootOne(dims, wallBase, side) {
   // slope like real metal — the gable never crosses the porch metal.
   const zB = -tExt, zF = gd + 0.8;
   const yOnSlope = x => wallBase + gh + effRise + 0.25 - Math.abs(x) * (gp / 12);
+  // Drip edge along both eave edges of the gable roof — covers the rafter
+  // tail ends like the real metal edge does
+  [-1, 1].forEach(s => {
+    const xe = effHalf + eaveOH;
+    const de = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.62, zF - zB),
+      new THREE.MeshStandardMaterial({ color: bb3dSelectedColors().trim, roughness: 0.35, metalness: 0.55 }));
+    de.position.set(s * (xe + 0.04), yOnSlope(xe) - 0.03, (zB + zF) / 2);
+    add(de, 'Gable porch drip edge');
+  });
   [-1, 1].forEach(s => {
     const xw = frontPorchOn ? Math.min(effHalf + eaveOH, xValley(0.1)) : (effHalf + eaveOH);
     const xf = effHalf + eaveOH;
@@ -22411,9 +22437,16 @@ function buildMetalTrim(dims, wallBase) {
 
   // --- LARGE CORNER TRIM — 4 wall corners (only when walls are enclosed) ---
   if (enc.mode === 'full') {
+    // With a gable wing, that end's corners move OUT to the wing's true
+    // outside corners (the old rectangle corners are mid-wall there).
+    const _wgC = (typeof bb3dWing === 'function') ? bb3dWing() : null;
     [-1, 1].forEach(sx => [-1, 1].forEach(sz => {
+      let zC = W / 2 + 0.02;
+      if (_wgC && ((_wgC.end === 'left' && sx < 0) || (_wgC.end === 'right' && sx > 0))) {
+        zC = W / 2 + (sz > 0 ? _wgC.fp : _wgC.bp) + 0.02;
+      }
       const c = new THREE.Mesh(new THREE.BoxGeometry(0.38, H, 0.38), trimMat());
-      c.position.set(sx * (L / 2 + 0.02), wallBase + H / 2, sz * (W / 2 + 0.02));
+      c.position.set(sx * (L / 2 + 0.02), wallBase + H / 2, sz * zC);
       put(c, 'corner_trim', 'Corner trim — ' + (sx < 0 ? 'rear' : 'front') + '/' + (sz < 0 ? 'back' : 'front'));
     }));
     // --- RAT GUARD — base band around the walls ---
@@ -22431,8 +22464,8 @@ function buildMetalTrim(dims, wallBase) {
   // --- EAVE FASCIA — along both eave edges, hung from the eave-edge roof
   // height (wall top minus overhang x pitch) so it tucks under the roof ---
   [-1, 1].forEach(sz => {
-    const f = new THREE.Mesh(new THREE.BoxGeometry(L + 2 * gableOH, 0.55, 0.14), trimMat());
-    f.position.set(0, wallTop - eaveOH * (rise / (W / 2)) - 0.18, sz * (W / 2 + eaveOH + 0.06));
+    const f = new THREE.Mesh(new THREE.BoxGeometry(L + 2 * gableOH, 0.45, 0.14), trimMat());
+    f.position.set(0, wallTop - 0.245, sz * (W / 2 + eaveOH + 0.03));
     put(f, 'fascia', 'Eave fascia — ' + (sz < 0 ? 'back' : 'front'));
   });
 
@@ -23890,12 +23923,14 @@ function buildEaveDetails(dims, wallTop, rise) {
   // (the ONE fascia board per eave lives in the trim builder)
   
   // Soffit panels — horizontal strips under the eaves
-  const soffitD = eaveOH + 0.10;
-  const soffitF = makeBox(L + 2 * gableOH, 0.14, soffitD, 'soffit', 'Soffit — front');
-  soffitF.position.set(0, eaveEdgeY - 0.10, W / 2 + soffitD / 2 - 0.05);
+  // Real eave assembly: fascia top meets the roof edge; the level soffit
+  // tucks into the BACK of the fascia. Nothing pokes above the roof surface.
+  const soffitD = eaveOH - 0.02;
+  const soffitF = makeBox(L + 2 * gableOH, 0.10, soffitD, 'soffit', 'Soffit — front');
+  soffitF.position.set(0, wallTop - 0.35, W / 2 + soffitD / 2);
   buildingGroup.add(soffitF); allMeshes.push(soffitF);
-  const soffitB = makeBox(L + 2 * gableOH, 0.14, soffitD, 'soffit', 'Soffit — back');
-  soffitB.position.set(0, eaveEdgeY - 0.10, -W / 2 - soffitD / 2 + 0.05);
+  const soffitB = makeBox(L + 2 * gableOH, 0.10, soffitD, 'soffit', 'Soffit — back');
+  soffitB.position.set(0, wallTop - 0.35, -W / 2 - soffitD / 2);
   buildingGroup.add(soffitB); allMeshes.push(soffitB);
 }
 
