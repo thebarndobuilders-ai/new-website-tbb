@@ -2283,7 +2283,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v296</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v297</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -4605,6 +4605,18 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
   <div class="qbs-tab-content" id="tab-calcs" style="display:none">
     <div class="qbs-sub" style="margin-bottom:14px;">Standalone takeoff calculators — quick numbers without touching the current quote. More calculators get added here as needed.</div>
 
+    <!-- ── Calculator search / jump bar (sticky) ────────────────────── -->
+    <div class="qbs-card" id="calc-search-card" style="position: sticky; top: 8px; z-index: 20; margin-bottom: 16px;">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <input type="text" id="calc_search" placeholder="Search calculators — 'lvl', 'metal', 'roof'…" autocomplete="off"
+               oninput="bbCalcSearch()" style="flex: 1; min-width: 220px; font-size: 14px;" />
+        <button onclick="const q=document.getElementById('calc_search'); if(q){q.value=''; bbCalcSearch();}"
+                style="padding: 6px 12px !important; font-size: 12px !important; background: transparent; color: var(--text-2); border: 1px solid var(--hairline);">Clear</button>
+      </div>
+      <div id="calc-search-chips" style="display:flex; gap:8px; flex-wrap:wrap; margin-top: 10px;"></div>
+      <div id="calc-search-none" style="display:none; color: var(--text-3); font-size: 12px; margin-top: 8px;">No calculator matches — clear the search to see them all.</div>
+    </div>
+
     <!-- ── LVL Beam Sizing (2.0E design values) ─────────────────────── -->
     <div class="qbs-card">
       <h3>LVL beam sizing <span class="badge">2.0E LVL chart · ridge beams, headers, floor beams</span></h3>
@@ -5003,6 +5015,15 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
         <span id="barndo-save-status" style="margin-left:10px; font-size:12px; color:var(--text-2);"></span>
       </div>
     </div>
+    <div class="qbs-card" id="barndo-search-card" style="position: sticky; top: 8px; z-index: 20; margin-bottom: 14px;">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <input type="text" id="barndo_search" placeholder="Search models — name, client, size, 'wing', 'porch', 'black'…" autocomplete="off"
+               oninput="bbBarndoSearch()" style="flex: 1; min-width: 220px; font-size: 14px;" />
+        <button onclick="const q=document.getElementById('barndo_search'); if(q){q.value=''; bbBarndoSearch();}"
+                style="padding: 6px 12px !important; font-size: 12px !important; background: transparent; color: var(--text-2); border: 1px solid var(--hairline);">Clear</button>
+        <span id="barndo-search-count" style="font-size: 12px; color: var(--text-3);"></span>
+      </div>
+    </div>
     <div id="barndo-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:14px;"></div>
   </div>
 
@@ -5136,6 +5157,8 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
     <div class="qbs-card">
       <h3>Saved projects</h3>
       <p class="qbs-sub">Projects persist locally between sessions.</p>
+      <input type="text" id="saved_search" placeholder="Search saved projects — name, client, date…" autocomplete="off"
+             oninput="bbSavedSearch()" style="width: 100%; font-size: 14px; margin: 4px 0 12px 0;" />
       <div id="saved-list"></div>
     </div>
   </div>
@@ -5650,6 +5673,133 @@ function bbLvlMaxSpan(dIn, plies, plf, cd, deflDen) {
   }
   return Math.floor(lo * 10) / 10;
 }
+// =============================================================
+// CALCULATOR SEARCH — live filter + jump chips (top of Calculators tab)
+// =============================================================
+function bbCalcCards() {
+  return Array.from(document.querySelectorAll('#tab-calcs .qbs-card'))
+    .filter(c => c.id !== 'calc-search-card');
+}
+// Key search words per calculator — hits even when the word isn't printed on
+// the card (builder slang included: tin, sheetrock, cinder block, bags...)
+const BB_CALC_KEYS = {
+  'LVL beam sizing': 'lvl beam header ridge span load chart plf engineered microllam versalam sizing carry',
+  'Metal for Gable Roof': 'roof metal tin panels tuff rib sheets ridge lengths gable house',
+  'Metal Siding for Gable Ends': 'siding gable triangle end wall metal tin panels stepped rake peak',
+  'Metal Panels for Shed Roof': 'shed lean-to porch roof metal tin panels single slope mono',
+  'Sheathing for a Wall': 'osb zip plywood sheets wall sheathing 7/16 decking',
+  'Studs for a Wall': 'studs framing 2x4 2x6 16 oc wall lumber plates stick',
+  'Concrete Slab': 'concrete slab yards cubic pour crete floor 4 inch',
+  'Post Hole Concrete — embedded posts': 'post holes sakrete bags embedded footing concrete crete pole',
+  'Rafter Length': 'rafter length pitch run rise slope hypotenuse roof cut',
+  'Gravel / Stone Pad': 'gravel stone pad base rock tons yards crusher dirt',
+  'Drywall': 'drywall sheetrock rock mud tape screws board interior hang finish',
+  'Board Feet': 'board feet bf bdft lumber pricing timber',
+  'Concrete Block Wall — 8" / 10" / 12"': 'cmu cinder block masonry courses wall mortar',
+  'Block Core Fill — grout': 'grout core fill cmu cinder block masonry yards rebar',
+  'Roof Squares — metal & shingles': 'roof squares shingles bundles area sq tin metal',
+  'Wall Squares — metal': 'wall squares siding area sq tin metal',
+};
+function bbCalcKeysFor(c) {
+  const h = c.querySelector('h3');
+  const name = h && h.childNodes.length ? String(h.childNodes[0].textContent || '').trim() : '';
+  return BB_CALC_KEYS[name] || '';
+}
+function bbCalcSearch() {
+  const q = ((document.getElementById('calc_search') || {}).value || '').trim().toLowerCase();
+  const terms = q.split(/\s+/).filter(Boolean);
+  let shown = 0;
+  bbCalcCards().forEach(c => {
+    const hay = (c.textContent + ' ' + bbCalcKeysFor(c)).toLowerCase();
+    const hit = !terms.length || terms.every(t => hay.indexOf(t) !== -1);
+    c.style.display = hit ? '' : 'none';
+    if (hit) shown++;
+  });
+  const none = document.getElementById('calc-search-none');
+  if (none) none.style.display = shown ? 'none' : '';
+  // chips highlight the matches while filtering
+  const wrap = document.getElementById('calc-search-chips');
+  if (wrap) Array.from(wrap.children).forEach((b, k) => {
+    const c = bbCalcCards()[k];
+    b.style.opacity = (c && c.style.display === 'none') ? '0.35' : '1';
+  });
+}
+function bbCalcJump(k) {
+  const q = document.getElementById('calc_search');
+  if (q && q.value) { q.value = ''; bbCalcSearch(); }
+  const c = bbCalcCards()[k];
+  if (!c) return;
+  c.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  c.style.outline = '2px solid var(--copper)';
+  c.style.outlineOffset = '3px';
+  setTimeout(() => { c.style.outline = ''; c.style.outlineOffset = ''; }, 1800);
+}
+function bbCalcChips() {
+  const wrap = document.getElementById('calc-search-chips');
+  if (!wrap) return;
+  wrap.innerHTML = bbCalcCards().map((c, k) => {
+    const h = c.querySelector('h3');
+    const name = h && h.childNodes.length ? String(h.childNodes[0].textContent || '').trim() : ('Calculator ' + (k + 1));
+    const keys = bbCalcKeysFor(c);
+    return `<button onclick="bbCalcJump(${k})" title="${keys ? 'Also finds: ' + keys : ''}" style="padding: 5px 12px !important; font-size: 12px !important; background: transparent; color: var(--copper); border: 1px solid var(--copper); border-radius: 999px; cursor: pointer;">${name}</button>`;
+  }).join('');
+}
+try { setTimeout(bbCalcChips, 900); } catch (e) {}
+
+// =============================================================
+// MODEL + SAVED-PROJECT SEARCH — same idea on the Barndos tab and the
+// Saved tab: type to filter the cards, live. Filters re-apply whenever
+// the lists re-render (save/delete/import).
+// =============================================================
+function bbBarndoSearch() {
+  const grid = document.getElementById('barndo-grid');
+  if (!grid) return;
+  const q = ((document.getElementById('barndo_search') || {}).value || '').trim().toLowerCase();
+  const terms = q.split(/\s+/).filter(Boolean);
+  let shown = 0, total = 0;
+  Array.from(grid.children).forEach(card => {
+    total++;
+    const hay = card.textContent.toLowerCase();
+    const hit = !terms.length || terms.every(t => hay.indexOf(t) !== -1);
+    card.style.display = hit ? '' : 'none';
+    if (hit) shown++;
+  });
+  const cnt = document.getElementById('barndo-search-count');
+  if (cnt) cnt.textContent = total ? (terms.length ? shown + ' of ' + total + ' models' : total + ' models') : '';
+}
+function bbSavedSearch() {
+  const list = document.getElementById('saved-list');
+  if (!list) return;
+  const q = ((document.getElementById('saved_search') || {}).value || '').trim().toLowerCase();
+  const terms = q.split(/\s+/).filter(Boolean);
+  Array.from(list.children).forEach(item => {
+    const hit = !terms.length || terms.every(t => item.textContent.toLowerCase().indexOf(t) !== -1);
+    item.style.display = hit ? '' : 'none';
+  });
+}
+// Re-apply the filters after the lists re-render
+try {
+  setTimeout(function () {
+    const _rg = window.renderBarndoGrid;
+    if (typeof _rg === 'function' && !_rg._bbWrapped) {
+      const w = function () { const r = _rg.apply(this, arguments); try { bbBarndoSearch(); } catch (e) {} return r; };
+      w._bbWrapped = true;
+      window.renderBarndoGrid = w;
+      try { bbBarndoSearch(); } catch (e) {}
+    }
+    const _rs = window.renderSavedList;
+    if (typeof _rs === 'function' && !_rs._bbWrapped) {
+      const w2 = function () {
+        const r = _rs.apply(this, arguments);
+        if (r && typeof r.then === 'function') r.then(function () { try { bbSavedSearch(); } catch (e) {} });
+        return r;
+      };
+      w2._bbWrapped = true;
+      window.renderSavedList = w2;
+    }
+  }, 600);
+} catch (e) {}
+
 function lvlCalc() {
   const out = document.getElementById('lvl-calc-out');
   if (!out) return;
@@ -9317,7 +9467,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v296';
+const BB_VERSION = 'v297';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
