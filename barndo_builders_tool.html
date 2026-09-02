@@ -2283,7 +2283,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v297</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v298</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2317,7 +2317,8 @@
     <div class="qbs-tab" data-tab="barndos" onclick="switchTab('barndos')" style="color:var(--copper);">🏠 Barndos</div>
     <div class="qbs-tab" data-tab="framing" onclick="switchTab('framing')">📐 Framing pages</div>
     <div class="qbs-tab" data-tab="blueprints" onclick="switchTab('blueprints')">📃 Blueprints</div>
-    <div class="qbs-tab" data-tab="workspace" onclick="switchTab('workspace')" style="color:var(--copper); font-weight:700;">⚡ 3D Buildout</div>
+    <div class="qbs-tab" data-tab="workspace" id="tab-btn-shop3d" onclick="switchTab('workspace'); bb3dSetMode('shop');" style="color:var(--copper); font-weight:700;">⚡ 3D Shops &amp; Barns</div>
+    <div class="qbs-tab" data-tab="workspace" id="tab-btn-barndo3d" onclick="switchTab('workspace'); bb3dSetMode('barndo');" style="color:var(--copper); font-weight:700;">🏠 3D Barndos</div>
     <div class="qbs-tab" data-tab="inputs" onclick="switchTab('inputs')" style="display:none">2. Dimensions</div>
     <div class="qbs-tab" data-tab="foundation" onclick="switchTab('foundation')">3. Foundation</div>
     <div class="qbs-tab" data-tab="materials" onclick="switchTab('materials')">4. Materials</div>
@@ -3138,6 +3139,7 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
       </div>
     </div>
 
+    <input type="hidden" id="bb3d_mode" value="shop">
     <div class="qbs-card" id="gable-wing-card">
       <h3>T &amp; L footprint — gable wing <span class="badge">Homes · perpendicular wing over one end · its own ridge &amp; pitch</span></h3>
       <p class="qbs-sub" style="margin-bottom: 14px;">Builds a cross-gable wing over one end of the house — the wing's ridge runs front-to-back and the wing can project past the front and/or back walls for a true L or T footprint. Footprint, living sqft, concrete and exterior wall LF follow automatically. Add a truss group for the wing span on the Trusses table so trusses, roof panels, ridge cap and gable metal figure per plan.</p>
@@ -5044,6 +5046,9 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
       #ws-left .qbs-card { overflow-x: auto; flex-shrink: 0; }
       /* Hidden from the 3D tool rail for now (builder request) — still available on the Takeoff tab rail */
       #ws-left #measured-values-card, #ws-left #roof-area-calc-card { display: none !important; }
+      /* 3D mode split: Shops & Barns = straight-wall extension; Barndos = T & L gable wing */
+      body.bb-mode-shop #gable-wing-card { display: none !important; }
+      body.bb-mode-barndo #building-extension-card { display: none !important; }
       #ws-left .qbs-grid-4, #ws-left .qbs-grid-3 { grid-template-columns: 1fr 1fr; }
       #ws-left table { font-size: 11px; }
     </style>
@@ -9467,7 +9472,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v297';
+const BB_VERSION = 'v298';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -10185,6 +10190,11 @@ function barndoApply(cfg) {
         if (oe3) oe3.value = '';
       }
     });
+    // 3D mode follows the model: saved mode wins; older saves = barndo when
+    // the wing is on, shops & barns otherwise
+    const _mv = (cfg.fields && cfg.fields.bb3d_mode) ||
+                ((cfg.fields && cfg.fields.wing_enabled) ? 'barndo' : 'shop');
+    if (typeof bb3dSetMode === 'function') bb3dSetMode(_mv);
     const wgD = document.getElementById('wing-details');
     if (wgEl && wgD) wgD.style.display = wgEl.checked ? '' : 'none';
   } catch (e) {}
@@ -12600,6 +12610,22 @@ function _drawProposalHTML() {
     return h;
   } catch (e) { return ''; }
 }
+
+// 3D mode: 'shop' (Shops & Barns — straight-wall extensions) or 'barndo'
+// (homes — T & L gable wing, plan-exact layout). Saved with every model.
+function bb3dSetMode(m) {
+  m = m === 'barndo' ? 'barndo' : 'shop';
+  window._bb3dMode = m;
+  const inp = document.getElementById('bb3d_mode');
+  if (inp) inp.value = m;
+  document.body.classList.toggle('bb-mode-shop', m === 'shop');
+  document.body.classList.toggle('bb-mode-barndo', m === 'barndo');
+  // only the matching 3D tab stays lit
+  const wsTabs = document.querySelectorAll('.qbs-tab[data-tab="workspace"]');
+  const anyActive = Array.from(wsTabs).some(t => t.classList.contains('active'));
+  if (anyActive) wsTabs.forEach(t => t.classList.toggle('active', (t.id === 'tab-btn-barndo3d') === (m === 'barndo')));
+}
+try { setTimeout(function () { bb3dSetMode((document.getElementById('bb3d_mode') || {}).value || 'shop'); }, 400); } catch (e) {}
 
 function switchTab(name) {
   window._userTabbed = true;
