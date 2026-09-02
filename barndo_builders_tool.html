@@ -2283,7 +2283,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v302</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v303</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -5052,6 +5052,8 @@ QB-ZIP-7-16, ZIP SYSTEM 7/16 OSB, 30, 26.28" style="width: 100%; min-height: 160
       /* 3D mode split: Shops & Barns = straight-wall extension; Barndos = T & L gable wing */
       body.bb-mode-shop #gable-wing-card { display: none !important; }
       body.bb-mode-barndo #building-extension-card { display: none !important; }
+      /* Dealer edition: the materials tab shows ONLY the kit-package card */
+      body.bb-dealer #tab-materials > *:not(#dealer-kit-card) { display: none !important; }
       #ws-left .qbs-grid-4, #ws-left .qbs-grid-3 { grid-template-columns: 1fr 1fr; }
       #ws-left table { font-size: 11px; }
     </style>
@@ -9563,7 +9565,8 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v302';
+const BB_VERSION = 'v303';
+window.BB_EDITION = window.BB_EDITION || 'house';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
 // Trades broken into steps: plumbing = under-slab rough-in / above-slab
@@ -12307,7 +12310,8 @@ function bbBPRender() {
   const host = document.getElementById('bbp-sheets');
   if (!host) return;
   try { recalc(); } catch (e) {}
-  const sheets = bbBPSheets();
+  let sheets = bbBPSheets();
+  if (window.BB_EDITION === 'dealer') sheets = sheets.filter(sh => !/metal layout|wall framing layout/i.test(sh.title));
   host.innerHTML = sheets.map(sh =>
     '<div class="qbs-card" style="margin:0; padding:10px; background:#3a3d42;">' +
     '<div style="font-family:var(--font-mono); font-size:11px; color:var(--copper); margin:0 0 8px 4px; text-transform:uppercase;">' + bbpEsc(sh.no + ' — ' + sh.title) + '</div>' +
@@ -12316,7 +12320,8 @@ function bbBPRender() {
 }
 
 function bbBPPrint() {
-  const sheets = bbBPSheets();
+  let sheets = bbBPSheets();
+  if (window.BB_EDITION === 'dealer') sheets = sheets.filter(sh => !/metal layout|wall framing layout/i.test(sh.title));
   const w = window.open('', '_blank');
   if (!w) { bbToast('Pop-up blocked — allow pop-ups to print the blueprint set.'); return; }
   w.document.write('<!DOCTYPE html><html><head><title>Blueprints — The Barndo Builders</title><style>' +
@@ -12443,8 +12448,8 @@ function wsRenderLive() {
     if (!c) { tot.innerHTML = '<div class="qbs-note">Enter dimensions to see live pricing.</div>'; }
     else {
       tot.innerHTML =
-        tile('Materials cost', money(c.matCostTotal))
-        + tile('Materials sell', money(c.matSellTotal))
+        (window.BB_EDITION === 'dealer' ? '' : tile('Materials cost', money(c.matCostTotal)))
+        + tile(window.BB_EDITION === 'dealer' ? 'Kit package' : 'Materials sell', money(c.matSellTotal))
         + tile('Subs & labor', money(c.subSellTotal + c.laborSell))
         + tile('O+P+C', money(c.overhead + c.profit + c.contingency))
         + tile('$ / sqft', c.sqftCost ? '$' + c.sqftCost.toFixed(2) : '—')
@@ -12466,7 +12471,7 @@ function wsRenderLive() {
         return `<div style="margin-bottom:10px;">
           <div style="display:flex; justify-content:space-between; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--copper); border-bottom:1px solid var(--hairline); padding-bottom:2px; margin-bottom:4px;">
             <span>${cat}</span><span style="font-family:var(--font-mono);">${money(sub)}</span></div>
-          ${rows.map(m => `<div style="display:flex; justify-content:space-between; gap:8px; font-size:11px; padding:2px 0; color:var(--text-2);">
+          ${window.BB_EDITION === 'dealer' ? '' : rows.map(m => `<div style="display:flex; justify-content:space-between; gap:8px; font-size:11px; padding:2px 0; color:var(--text-2);">
             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${m.label}</span>
             <span style="font-family:var(--font-mono); white-space:nowrap;">×${(+m.qty).toLocaleString()} · ${money(m.sell)}</span></div>`).join('')}
         </div>`;
@@ -12800,6 +12805,74 @@ async function bbPhotoRenderGo() {
     if (btn) btn.disabled = false;
   }
 }
+
+// =============================================================
+// DEALER EDITION — package pricing for dealer eyes; itemized takeoffs stay
+// in-house. Everything below is a no-op in the house edition.
+// =============================================================
+function bbDealerKitRender() {
+  const host = document.getElementById('dealer-kit-summary');
+  if (!host) return;
+  const c = window._lastCalc;
+  const money = v => '$' + Math.round(v || 0).toLocaleString('en-US');
+  if (!c || !c.catMap) { host.innerHTML = '<p class="qbs-sub">Enter building dimensions to price the kit.</p>'; return; }
+  const cats = [], subs = [];
+  Object.keys(c.catMap).forEach(k => {
+    const v = Math.round(c.catMap[k].sell || c.catMap[k].cost || 0);
+    if (v <= 0) return;
+    (k.indexOf('Sub — ') === 0 ? subs : cats).push([k.replace('Sub — ', ''), v]);
+  });
+  const row = (l, v, strong) => '<div style="display:flex; justify-content:space-between; gap:12px; padding:9px 2px; border-bottom:1px solid var(--hairline);' +
+    (strong ? ' font-weight:700; color:var(--copper); font-size:17px; border-bottom:none; margin-top:4px;' : '') +
+    '"><span>' + l + '</span><span style="font-family:var(--font-mono); white-space:nowrap;">' + money(v) + '</span></div>';
+  host.innerHTML =
+    cats.map(x => row(x[0], x[1])).join('') +
+    row('KIT PACKAGE TOTAL', c.matSellTotal || 0, true) +
+    (subs.length
+      ? '<div style="margin-top:18px; font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-3); border-bottom:1px solid var(--hairline); padding-bottom:4px;">Your subs &amp; labor — quoted on the Subs tab</div>' +
+        subs.map(x => row(x[0], x[1])).join('')
+      : '') +
+    '<p class="qbs-sub" style="margin-top:14px;">Package pricing by build phase. The complete itemized material list ships labeled with your kit.</p>';
+}
+function bbDealerInit() {
+  if (window.BB_EDITION !== 'dealer') return;
+  document.body.classList.add('bb-dealer');
+  const OFF_TABS = ['framing', 'counter', 'jobcost', 'flitch', 'vendors', 'settings'];
+  OFF_TABS.forEach(t => document.querySelectorAll('.qbs-tab[data-tab="' + t + '"]').forEach(el => el.remove()));
+  ['exportCSV()', 'exportPDF()', 'printCutList()', 'exportCutListCSV()', 'printOrderSheets()'].forEach(fn =>
+    document.querySelectorAll('button[onclick="' + fn + '"]').forEach(b => b.remove()));
+  const na = () => { try { bbToast('Not in the dealer edition — your kit ships fully itemized and labeled.'); } catch (e) {} };
+  ['exportCSV', 'exportPDF', 'printCutList', 'exportCutListCSV', 'printOrderSheets'].forEach(f => { try { window[f] = na; } catch (e) {} });
+  const _st = window.switchTab;
+  window.switchTab = function (name) {
+    if (OFF_TABS.indexOf(name) !== -1) { na(); return; }
+    return _st.apply(this, arguments);
+  };
+  // cost view = our wholesale basis — dealers run in SELL view only
+  try {
+    const vc = document.getElementById('view-cost');
+    if (vc && vc.parentNode) vc.parentNode.remove();
+    if (typeof setView === 'function') setView('sell');
+  } catch (e) {}
+  const mt = document.querySelector('.qbs-tab[data-tab="materials"]');
+  if (mt) mt.textContent = '4. Kit package';
+  const mc = document.getElementById('tab-materials');
+  if (mc) {
+    const card = document.createElement('div');
+    card.className = 'qbs-card';
+    card.id = 'dealer-kit-card';
+    card.innerHTML = '<h3>Kit package <span class="badge">Package pricing by build phase · itemized list ships with the kit</span></h3><div id="dealer-kit-summary"></div>';
+    mc.insertBefore(card, mc.firstChild);
+  }
+  const _rc = window.recalc;
+  window.recalc = function () {
+    const r = _rc.apply(this, arguments);
+    try { bbDealerKitRender(); } catch (e) {}
+    return r;
+  };
+  try { bbDealerKitRender(); } catch (e) {}
+}
+try { setTimeout(bbDealerInit, 350); } catch (e) {}
 
 // 3D mode: 'shop' (Shops & Barns — straight-wall extensions) or 'barndo'
 // (homes — T & L gable wing, plan-exact layout). Saved with every model.
