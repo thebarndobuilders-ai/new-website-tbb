@@ -9,9 +9,11 @@
     --panel: #16171a;
     --panel-2: #1c1d21;
     --hairline: #292b30;
-    --copper: #c9803d;
-    --copper-bright: #e09a52;
-    --copper-soft: rgba(201, 128, 61, 0.12);
+    --copper: #d3c7a8;
+    --copper-bright: #e9e0c6;
+    --copper-soft: rgba(211, 199, 168, 0.12);
+    --barnred: #9c4433;
+    --barnred-bright: #b2543f;
     --bone: #ece7de;
     --muted: #9a948a;
     --faint: #6d6860;
@@ -106,11 +108,11 @@
   .btn {
     display: inline-block; font-family: var(--font-display); font-weight: 600;
     text-transform: uppercase; letter-spacing: 0.06em; font-size: 18px;
-    padding: 13px 26px; border-radius: 4px; border: 1px solid var(--copper);
+    padding: 13px 26px; border-radius: 4px; border: 1px solid var(--barnred);
   }
-  .btn.solid { background: var(--copper); color: #17110a; }
-  .btn.solid:hover { background: var(--copper-bright); text-decoration: none; }
-  .btn.ghost { color: var(--copper-bright); }
+  .btn.solid { background: var(--barnred); color: #f3ecd9; }
+  .btn.solid:hover { background: var(--barnred-bright); text-decoration: none; }
+  .btn.ghost { color: var(--copper-bright); border-color: var(--hairline); }
   .btn.ghost:hover { background: var(--copper-soft); text-decoration: none; }
 
   .statstrip {
