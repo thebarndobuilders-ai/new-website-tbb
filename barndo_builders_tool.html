@@ -2284,7 +2284,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v311</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v312</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -2701,6 +2701,18 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
             <option value="lp">LP SmartSide — 16' pieces</option>
           </select>
           <div class="qbs-note">Run = eaves (incl. gable overhangs) + rakes, split by the piece coverage, +9' waste.</div>
+        </div>
+        <div class="qbs-field">
+          <label>Soffit type</label>
+          <select id="soffit_type" onchange="recalc()">
+            <option value="vented">Vented</option>
+            <option value="solid">Solid</option>
+          </select>
+        </div>
+        <div class="qbs-field">
+          <label>Soffit color</label>
+          <select id="soffit_color"></select>
+          <div class="qbs-note">Shown on the 3D model under all eave and gable overhangs.</div>
         </div>
         <div class="qbs-field">
           <label>Wainscot</label>
@@ -8636,6 +8648,7 @@ function onRoofProductChange() {
   try { bbPopulateExtColors(); } catch (e) {}
   populateColors('trim_color', document.getElementById('roof_product').value);
   populateColors('gutter_color', document.getElementById('roof_product').value);
+  populateColors('soffit_color', document.getElementById('roof_product').value);
 }
 function onSidingProductChange() {
   populateColors('siding_color', document.getElementById('siding_product').value);
@@ -9586,7 +9599,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v311';
+const BB_VERSION = 'v312';
 window.BB_EDITION = window.BB_EDITION || 'house';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
@@ -10313,6 +10326,10 @@ function barndoApply(cfg) {
     if (!(cfg.fields && ('wainscot_lf' in cfg.fields))) {
       const wl3 = document.getElementById('wainscot_lf');
       if (wl3) wl3.value = '';
+    }
+    if (!(cfg.fields && ('soffit_color' in cfg.fields))) {
+      try { const sc3 = document.getElementById('soffit_color'); if (sc3 && sc3.options.length) sc3.selectedIndex = 0; } catch (e) {}
+      try { const st3 = document.getElementById('soffit_type'); if (st3) st3.value = 'vented'; } catch (e) {}
     }
     // 3D mode follows the model: saved mode wins; older saves = barndo when
     // the wing is on, shops & barns otherwise
@@ -15933,6 +15950,8 @@ function getInputs() {
     wainscotColor: (document.getElementById('wainscot_color') || {}).value || '',
     trimColor: (document.getElementById('trim_color') || {}).value || '',
     soffitProduct: (document.getElementById('soffit_product') || {}).value || 'tr',
+    soffitColor: (document.getElementById('soffit_color') || {}).value || '',
+    soffitType: (document.getElementById('soffit_type') || {}).value || 'vented',
     guttersOn: ((document.getElementById('gutters_on') || {}).value === 'yes'),
     gutterColor: (document.getElementById('gutter_color') || {}).value || '',
     downspoutQty: (function(){ const el = document.getElementById('downspout_qty'); return el ? (parseFloat(el.value) || 0) : 0; })(),
@@ -20877,6 +20896,7 @@ function bb3dSelectedColors() {
     siding: bb3dMetalHex(sc, 0xeae6dc),
     wainscot: bb3dMetalHex(wc, 0x4a3f33),
     trim: bb3dMetalHex(tc, 0x1a1a1a),
+    soffit: bb3dMetalHex((document.getElementById('soffit_color') || {}).value || '', 0xe8e4da),
     wainscotOn: ['36', 'stone36'].indexOf((document.getElementById('wainscot_on') || {}).value) !== -1,
     wainscotStone: ((document.getElementById('wainscot_on') || {}).value === 'stone36'),
   };
@@ -21891,11 +21911,15 @@ function generateModel() {
 
   // Trim color from the selector — ridge cap, rake/roof trim, corners, fascia
   try {
-    const trimHex = bb3dSelectedColors().trim;
+    const _selC = bb3dSelectedColors();
+    const trimHex = _selC.trim;
+    const soffitHex = _selC.soffit;
     buildingGroup.traverse(o => {
-      if (o.isMesh && o.userData &&
-          ['ridge_cap', 'roof_trim', 'corner_trim', 'fascia'].indexOf(o.userData.categoryKey) !== -1) {
+      if (!(o.isMesh && o.userData)) return;
+      if (['ridge_cap', 'roof_trim', 'corner_trim', 'fascia'].indexOf(o.userData.categoryKey) !== -1) {
         o.material.color.setHex(trimHex);
+      } else if (o.userData.categoryKey === 'soffit') {
+        o.material.color.setHex(soffitHex);
       }
     });
   } catch (e) {}
@@ -22052,22 +22076,15 @@ function buildWing3D(dims, wallBase) {
     gs.position.set(xe * (depth / 2 - gableOH / 2), wallTop + rise / 2 - 0.10, (sideL === 'front' ? 1 : -1) * (horiz / 2));
     addR(gs, 'Wing gable overhang soffit', 'soffit');
   }));
-  // dark cover strips over the wing panels' raw rake ends
-  [-1, 1].forEach(xe => ['front', 'back'].forEach(sideL => {
-    const pl = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, slopeLen2 + 0.08),
-      new THREE.MeshStandardMaterial({ color: colors.roof, roughness: 0.5, metalness: 0.3 }));
-    pl.rotation.x = (sideL === 'front' ? 1 : -1) * ang2;
-    pl.position.set(xe * depth / 2, wallTop + rise / 2 - 0.025, (sideL === 'front' ? 1 : -1) * (horiz / 2));
-    addR(pl, 'Wing roof panel end flashing', 'roof_skin');
-  }));
+
 
   // --- wing trim: rakes up both gable faces + fascia along the outer eave ---
   const trimMatW = () => new THREE.MeshStandardMaterial({ color: colors.trim, roughness: 0.8, metalness: 0.05, envMapIntensity: 0.3 });
-  [zF + 0.06, zBk - 0.06].forEach(zPos => {
+  [zF + gableOH + 0.04, zBk - gableOH - 0.04].forEach(zPos => {
     [-1, 1].forEach(xs => {
-      const a = new THREE.Vector3(cxW + xs * (wg.w / 2 + eaveOH), wallTop - 0.05, zPos);
-      const b = new THREE.Vector3(cxW, wallTop + rise + 0.08, zPos);
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.5, a.distanceTo(b)), trimMatW());
+      const a = new THREE.Vector3(cxW + xs * (wg.w / 2 + eaveOH), wallTop - 0.02, zPos);
+      const b = new THREE.Vector3(cxW, wallTop + rise - 0.02, zPos);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.42, a.distanceTo(b)), trimMatW());
       m.position.copy(a.clone().add(b).multiplyScalar(0.5));
       m.lookAt(b);
       add(m, 'Wing rake trim', 'roof_trim');
@@ -22076,6 +22093,12 @@ function buildWing3D(dims, wallBase) {
   const fw = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.58, (zF - zBk) + 2 * gableOH), trimMatW());
   fw.position.set(s * (L / 2 + eaveOH + 0.02), wallTop - 0.19, (zF + zBk) / 2);
   add(fw, 'Wing eave fascia', 'fascia');
+  // bird boxes — boxed closures at both ends of the wing eave
+  [[zF + gableOH, 1], [zBk - gableOH, -1]].forEach(([zC, zdir]) => {
+    const bb = new THREE.Mesh(new THREE.BoxGeometry(eaveOH + 0.12, 0.44, 0.55), trimMatW());
+    bb.position.set(s * (L / 2 + eaveOH / 2), wallTop - 0.2, zC - zdir * 0.27);
+    add(bb, 'Wing bird box', 'fascia');
+  });
   const wSofD = eaveOH - 0.02;
   const wSof = new THREE.Mesh(new THREE.BoxGeometry(wSofD, 0.10, (zF - zBk) + 2 * gableOH),
     new THREE.MeshStandardMaterial({ color: (CATEGORY_COLORS.soffit ? CATEGORY_COLORS.soffit.hex : 0xe8e4da), roughness: 0.7 }));
@@ -22842,6 +22865,18 @@ function buildMetalTrim(dims, wallBase) {
       put(f, 'fascia', 'Eave fascia — ' + sideF);
     });
   });
+  // bird boxes — closed corners where each eave meets a gable rake
+  {
+    const _wgBB = (typeof bb3dWing === 'function') ? bb3dWing() : null;
+    [-1, 1].forEach(sxB => {
+      if (_wgBB && ((_wgBB.end === 'left' && sxB < 0) || (_wgBB.end === 'right' && sxB > 0))) return;
+      [-1, 1].forEach(szB => {
+        const bb = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.44, eaveOH + 0.12), trimMat());
+        bb.position.set(sxB * (L / 2 + gableOH - 0.27), wallTop - 0.2, szB * (W / 2 + eaveOH / 2));
+        put(bb, 'fascia', 'Bird box — ' + (sxB < 0 ? 'rear' : 'front') + '/' + (szB < 0 ? 'back' : 'front'));
+      });
+    });
+  }
 
   // --- RAKE (GABLE) TRIM — up the roof edge on each gable, both slopes.
   // On a gable with a widow's peak, the rake trim STOPS where the peak
@@ -22855,11 +22890,11 @@ function buildMetalTrim(dims, wallBase) {
     const hasPeak = wpDT > 0;
     const wpHalf = ({ 2: 6, 3: 8, 4: 10, 5: 12 }[wpDT] || 6) / 2;
     const xR = sx * (L / 2 + gableOH + 0.02);
-    const a = new THREE.Vector3(xR, wallTop - 0.12, sz * zEave);
+    const a = new THREE.Vector3(xR, wallTop - 0.02, sz * zEave);
     const b = hasPeak
-      ? new THREE.Vector3(xR, wallTop + rise * (1 - wpHalf / zEave) + 0.0, sz * wpHalf)
-      : new THREE.Vector3(xR, wallTop + rise + 0.02, 0);
-    angled(a, b, 0.14, 0.5, 'roof_trim', 'Rake trim — ' + (sx < 0 ? 'rear' : 'front') + ' gable');
+      ? new THREE.Vector3(xR, wallTop + rise * (1 - wpHalf / zEave) - 0.02, sz * wpHalf)
+      : new THREE.Vector3(xR, wallTop + rise - 0.02, 0);
+    angled(a, b, 0.14, 0.42, 'roof_trim', 'Rake trim — ' + (sx < 0 ? 'rear' : 'front') + ' gable');
   }));
 }
 
@@ -23447,7 +23482,8 @@ function buildRoof(shape, dims, wallTop, rise, topChord) {
   // Panel-end cover strips: the raw box ends of the roof panels (gable rakes
   // and the wing-junction cut) show pale stretched texture — cover every end
   // with a dark strip in the roof color, like real rake/valley flashing.
-  [_xA, _xB].forEach(xEnd => {
+  if (_wgR) {
+    const xEnd = (_wgR.end === 'left') ? _xA : _xB;
     ['front', 'back'].forEach(sideF => {
       const pl = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, effectiveSlopeLen + 0.1),
         new THREE.MeshStandardMaterial({ color: bb3dSelectedColors().roof, roughness: 0.5, metalness: 0.3 }));
@@ -23457,7 +23493,7 @@ function buildRoof(shape, dims, wallTop, rise, topChord) {
       pl.castShadow = pl.receiveShadow = true;
       buildingGroup.add(pl); allMeshes.push(pl);
     });
-  });
+  }
 
   // ROOF LATHING / PURLINS — rows across each slope at purlin spacing, sitting just
   // under the metal. Frame-view members (isFraming) so the skeleton shows what the
