@@ -2284,7 +2284,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v308</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v309</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -8892,6 +8892,7 @@ function bbClearAllToZero() {
   try { if (typeof trussGroups !== 'undefined') { trussGroups.length = 0; window._trussCleared = false; renderTrussTable(); } } catch (e) {}
   try { const rc = document.getElementById('roofcalc-rows'); if (rc) { rc.innerHTML = ''; roofCalcAddRow('Main', 0); } } catch (e) {}
   try { if (typeof window.takeoffClearAll === 'function') window.takeoffClearAll({ silent: true }); } catch (e) {}
+  window._takeoffOnlyQuote = false;   // takeoff clear flips this on — a cleared page is a NORMAL blank quote
   // add-ons off: porches (incl. corner ties), shed, extension, concrete picks
   document.querySelectorAll('input[type="checkbox"][id^="porch_"]').forEach(el => { el.checked = false; });
   ['shed_enabled', 'ext_enabled'].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
@@ -8909,6 +8910,9 @@ function bbClearAllToZero() {
   try { const wl0 = document.getElementById('wainscot_lf'); if (wl0) wl0.value = ''; } catch (e) {}
   ['front', 'back', 'left', 'right'].forEach(sd => { const oe = document.getElementById('porch_' + sd + '_off'); if (oe) oe.value = ''; });
   try { const pe2 = document.getElementById('openings_plan_exact'); if (pe2) pe2.checked = false; } catch (e) {}
+  // dims are 0 and the wing/porches are OFF now — re-derive footprint and
+  // areas so nothing (like the wing's footprint driving nail boxes) survives
+  try { if (typeof onDimChange === 'function') onDimChange(); } catch (e) {}
   // widow's peaks + cupolas + weathervane
   set('wp_mode', 'none'); set('wp_mode2', 'none');
   set('cupola_qty_3', 0); set('cupola_qty_4', 0); set('cupola_qty_5', 0);
@@ -9582,7 +9586,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v308';
+const BB_VERSION = 'v309';
 window.BB_EDITION = window.BB_EDITION || 'house';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
@@ -10265,6 +10269,7 @@ function barndoSnapshot() {
 }
 
 function barndoApply(cfg) {
+  window._takeoffOnlyQuote = false;   // a loaded model is a full quote — margins apply
   try { setTier(cfg.tier || 'shell'); } catch (e) {}
   try { setConstruction(cfg.construction || 'stick'); } catch (e) {}
   Object.entries(cfg.fields || {}).forEach(([id, v]) => {
@@ -21400,6 +21405,12 @@ function generateModel() {
   scene.add(buildingGroup);
   
   const dims = getBuildingDims();
+  // No building = empty field. The old model is already removed above, so a
+  // cleared quote renders nothing instead of zero-size scraps and porches.
+  if (!(dims.L > 0 && dims.W > 0)) {
+    try { renderLegend(); } catch (e) {}
+    return;
+  }
   const { L, W, H, pitch, eaveOH, gableOH } = dims;
   const run = W / 2;
   const rise = run * (pitch / 12);
