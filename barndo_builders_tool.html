@@ -2284,7 +2284,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v312</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v313</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -9599,7 +9599,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v312';
+const BB_VERSION = 'v313';
 window.BB_EDITION = window.BB_EDITION || 'house';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
@@ -19845,7 +19845,7 @@ const FRAMING_PAGES = [
       ['Wall area', `${Math.round(i.wallArea || 0).toLocaleString()} sq ft`],
       ['Openings', `${(openingsState.window || []).reduce((s, r) => s + (+r.qty || 0), 0)} windows · ${(openingsState.extdoor || []).reduce((s, r) => s + (+r.qty || 0), 0)} ext doors · ${(openingsState.garage || []).reduce((s, r) => s + (+r.qty || 0), 0)} garage doors`],
     ],
-    svgs: ['buildStudSection', 'buildPlateSection', 'buildHeaderSection'] },
+    svgs: ['bbFrWallElevBack', 'buildStudSection', 'buildPlateSection', 'buildHeaderSection'] },
   { key: 'trusses', num: 2, title: 'Trusses & roof structure',
     sub: 'Trusses, rafters, ridge, purlins/lathing',
     cats: ['Roof structure'],
@@ -19887,7 +19887,7 @@ const FRAMING_PAGES = [
       ['Siding color', (document.getElementById('siding_color') || {}).value || '—'],
       ['Wainscot', ((document.getElementById('wainscot_on') || {}).value === '36') ? '36" wainscot' : 'None'],
     ],
-    svgs: ['buildWallSheathingSection'] },
+    svgs: ['bbFrWallElevFront', 'buildWallSheathingSection'] },
   { key: 'roof', num: 6, title: 'Roof',
     sub: 'Roof skin — panels, ridge cap, rake/eave trim, soffit & fascia, moisture barrier',
     cats: ['Roof skin', 'Soffit & fascia', 'Moisture barrier'], excludeRe: /gable/i,
@@ -19898,7 +19898,7 @@ const FRAMING_PAGES = [
       ['Roofing', ((document.getElementById('roof_product') || {}).selectedOptions || [{ textContent: '—' }])[0].textContent],
       ['Roof color', (document.getElementById('roof_color') || {}).value || '—'],
     ],
-    svgs: ['buildRoofSheathingSection', 'buildTrimSection'] },
+    svgs: ['bbFrRoofPlanX', 'buildRoofSheathingSection', 'buildTrimSection'] },
 ];
 let _framingPage = 'walls';
 
@@ -20103,6 +20103,260 @@ function drawTakeoffVerify() {
 }
 
 // --- Common building section card ---
+// ============================================================
+// PROOF SHEETS — every piece drawn, counts cited from the live
+// material list (the numbers beside the drawing ARE the takeoff).
+// ============================================================
+function _bbFrSvgKit() {
+  const S = [];
+  const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  return {
+    S,
+    ln: (x1, y1, x2, y2, w, c, dash) => S.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + (c || '#2a3540') + '" stroke-width="' + (w || 1) + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>'),
+    rc: (x, y, w, h, fill, sc, sw, dash) => S.push('<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="' + (fill || 'none') + '" stroke="' + (sc || 'none') + '" stroke-width="' + (sw || 0) + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>'),
+    tx: (x, y, t, sz, anchor, b, c) => S.push('<text x="' + x + '" y="' + y + '" font-size="' + (sz || 11) + '" text-anchor="' + (anchor || 'start') + '" fill="' + (c || '#1d2730') + '" font-family="IBM Plex Mono, monospace"' + (b ? ' font-weight="700"' : '') + '>' + esc(t) + '</text>'),
+    wrap: (w, h) => '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;background:#f7f6f2;border-radius:8px;border:1px solid var(--hairline);">' + S.join('') + '</svg>'
+  };
+}
+function _bbFrWallOpenings(wall, i) {
+  const out = [];
+  ['garage', 'extdoor', 'window'].forEach(t => {
+    ((typeof openingsState !== 'undefined' && openingsState[t]) || []).forEach(r => {
+      if (r.wall !== wall || r.pos == null) return;
+      const sill = (r.sill != null) ? r.sill : openingDefault(t, 'sill');
+      if (sill >= (i.H || 9) - 0.3) return;   // porch-gable units — not in this wall
+      out.push({ t, w: r.w || openingDefault(t, 'w'), h: r.h || openingDefault(t, 'h'),
+                 sill, pos: r.pos, label: r.label || '', style: r.style || '' });
+    });
+  });
+  return out.sort((a, b) => a.pos - b.pos);
+}
+function _bbFrWallLen(wall, i) {
+  const wg = (typeof bb3dWing === 'function') ? bb3dWing() : null;
+  if ((wall === 'left' || wall === 'right') && wg && wg.end === wall) return i.W + wg.fp + wg.bp;
+  return (wall === 'front' || wall === 'back') ? i.L : i.W;
+}
+
+window.bbFrWallElevBack = function (i, mats) {
+  const card = makeVerifyCard('Wall elevations — FRAMING side (inside face)',
+    'PT bottom plate (green) · 2×6 studs @ 16" OC · double top plate · 3-stud corners · king + jack studs · headers (LVL on wide spans) · sills & cripples');
+  const wg = (typeof bb3dWing === 'function') ? bb3dWing() : null;
+  const hasOSB = mats.some(m => m.cat === 'Wall sheathing' && (m.qty || 0) > 0);
+  const K = _bbFrSvgKit();
+  const H = i.H, rise = (i.W / 2) * (i.pitch / 12);
+  let y0 = 26;
+  const step = 16 / 12;
+  ['front', 'back', 'left', 'right'].forEach(wall => {
+    const len = _bbFrWallLen(wall, i);
+    if (!(len > 0 && H > 0)) return;
+    const gable = (wall === 'left' || wall === 'right') && !(wg && wg.end === wall);
+    const s = Math.min(820 / len, 9);
+    const hs = Math.min(6.2, s) * 1.0;
+    const wallHpx = H * hs, risePx = gable ? rise * hs : 0;
+    const ox = 40, oy = y0 + 16 + risePx;
+    const base = oy + wallHpx;
+    const ops = _bbFrWallOpenings(wall, i);
+    K.tx(ox, y0 + 6, wall.toUpperCase() + ' WALL — ' + len.toFixed(1) + "' × " + H + "'", 13, 'start', true);
+    // PT bottom plate — GREEN
+    K.rc(ox, base, len * s, 5, '#3f8f3f');
+    // double top plate
+    K.rc(ox, oy - 8, len * s, 3.4, '#b98d54');
+    K.rc(ox, oy - 4, len * s, 3.4, '#b98d54');
+    // gable rake + gable studs
+    if (gable) {
+      K.ln(ox, oy - 8, ox + (len / 2) * s, oy - 8 - risePx, 2, '#2a3540');
+      K.ln(ox + (len / 2) * s, oy - 8 - risePx, ox + len * s, oy - 8, 2, '#2a3540');
+      for (let d = step * 2; d < len; d += step * 2) {
+        const gh = risePx * (1 - Math.abs(d - len / 2) / (len / 2));
+        if (gh > 3) K.rc(ox + d * s - 1, oy - 8 - gh, 2, gh, '#d9b787');
+      }
+    }
+    // stud field (skips opening spans), kings/jacks/headers
+    const inOpening = x => ops.some(o => { const c = o.pos * len; return x > c - o.w / 2 - 0.05 && x < c + o.w / 2 + 0.05; });
+    let studCount = 0;
+    for (let d = 0; d <= len + 0.01; d += step) {
+      const x = Math.min(d, len);
+      if (inOpening(x)) continue;
+      K.rc(ox + x * s - 1.4, oy, 2.8, wallHpx, '#e2bd8b');
+      studCount++;
+    }
+    // 3-stud corners
+    [0, len].forEach(cx => { [-1, 0, 1].forEach(k => K.rc(ox + cx * s - 1.6 + k * 3.4, oy, 3.2, wallHpx, '#c99a5f')); });
+    let kings = 0, jacks = 0; const hdrNotes = [];
+    ops.forEach(o => {
+      const c = o.pos * len;
+      const x0 = ox + (c - o.w / 2) * s, x1 = ox + (c + o.w / 2) * s;
+      const topY = base - (o.sill + o.h) * hs, botY = base - o.sill * hs;
+      // kings (outside) + jacks (inside)
+      [x0 - 4.6, x1 + 1.6].forEach(x => K.rc(x, oy, 3, wallHpx, '#a5764a')); kings += 2;
+      [x0 - 1.4, x1 - 1.4].forEach(x => K.rc(x, Math.max(oy, topY - 6), 2.8, base - Math.max(oy, topY - 6), '#8b5f37')); jacks += 2;
+      // opening + header
+      K.rc(x0, topY, x1 - x0, botY - topY, 'none', '#2a3540', 1.2, '5 4');
+      const isLVL = o.w >= 8;
+      K.rc(x0 - 2, Math.max(oy + 2, topY - 7), (x1 - x0) + 4, 6, isLVL ? '#7a4dbd' : '#8f6a3f');
+      const hdrTxt = (isLVL ? 'LVL ' : 'HDR ') + Math.ceil(o.w + 1) + "'";
+      K.tx((x0 + x1) / 2, Math.max(oy + 2, topY - 7) - 3, hdrTxt + (o.label ? ' · ' + o.label : ''), 9.5, 'middle', true, isLVL ? '#5a2fa0' : '#6b4a24');
+      hdrNotes.push(hdrTxt);
+      // window sill + cripples
+      if (o.t === 'window' && o.sill > 0.3) {
+        K.rc(x0, botY, x1 - x0, 3, '#b98d54');
+        for (let d = c - o.w / 2 + step / 2; d < c + o.w / 2; d += step) K.rc(ox + d * s - 1, botY + 3, 2, base - botY - 3, '#d9b787');
+      }
+    });
+    // sheathing grid
+    if (hasOSB) for (let d = 4; d < len; d += 4) K.ln(ox + d * s, oy, ox + d * s, base, 0.7, '#7d8b96', '3 5');
+    const sheets = hasOSB ? Math.ceil(len * H / 32) : 0;
+    const hdrShort = hdrNotes.length > 5 ? hdrNotes.slice(0, 5).join(', ') + ' +' + (hdrNotes.length - 5) + ' more' : hdrNotes.join(', ');
+    K.tx(ox, base + 20, '(' + studCount + ') field studs @ 16" OC · (6) corner studs · (' + kings + ') kings · (' + jacks + ') jacks' +
+      (hdrNotes.length ? ' · headers: ' + hdrShort : '') +
+      (hasOSB ? ' · (' + sheets + ') 4×8 sheathing' : ' · no wall OSB (purlin wall)'), 10.5);
+    y0 = base + 40;
+  });
+  const holder = document.createElement('div');
+  holder.innerHTML = K.wrap(900, y0 + 8);
+  card.appendChild(holder.firstChild);
+  return card;
+};
+
+window.bbFrWallElevFront = function (i, mats) {
+  const card = makeVerifyCard('Wall elevations — FINISH side (outside face)',
+    'Panels on coverage · wainscot · rat guard in 10\' sticks · F&J at the roofline · corner trim · J-channel at openings · drip edge at heads · garage door trim');
+  const wg = (typeof bb3dWing === 'function') ? bb3dWing() : null;
+  const K = _bbFrSvgKit();
+  const H = i.H, rise = (i.W / 2) * (i.pitch / 12);
+  const cov = (i.sidingProduct === 'mbb_26') ? 1 : 3;
+  const wainsOn = i.wainscotOn || i.wainscotStone;
+  let y0 = 26;
+  ['front', 'back', 'left', 'right'].forEach(wall => {
+    const len = _bbFrWallLen(wall, i);
+    if (!(len > 0 && H > 0)) return;
+    const gable = (wall === 'left' || wall === 'right') && !(wg && wg.end === wall);
+    const s = Math.min(820 / len, 9);
+    const hs = Math.min(6.2, s);
+    const wallHpx = H * hs, risePx = gable ? rise * hs : 0;
+    const ox = 40, oy = y0 + 16 + risePx;
+    const base = oy + wallHpx;
+    const ops = _bbFrWallOpenings(wall, i);
+    K.tx(ox, y0 + 6, wall.toUpperCase() + ' WALL — FINISH — ' + len.toFixed(1) + "'", 13, 'start', true);
+    K.rc(ox, oy, len * s, wallHpx, '#dfe4e8', '#2a3540', 1.6);
+    // panel lines
+    const nPan = Math.ceil(len / cov);
+    for (let k = 1; k < nPan; k++) K.ln(ox + Math.min(k * cov, len) * s, oy, ox + Math.min(k * cov, len) * s, base, 0.6, '#9aa6af');
+    // F&J at the top (raked on gables)
+    if (gable) {
+      K.ln(ox, oy, ox + (len / 2) * s, oy - risePx, 2.6, '#c9803d');
+      K.ln(ox + (len / 2) * s, oy - risePx, ox + len * s, oy, 2.6, '#c9803d');
+      K.tx(ox + (len / 2) * s, oy - risePx - 6, 'F&J TRIM — FOLLOWS ROOFLINE', 10, 'middle', true, '#8a5520');
+    } else {
+      K.ln(ox, oy, ox + len * s, oy, 2.6, '#c9803d');
+      K.tx(ox + 4, oy - 5, 'F&J TRIM (SOFFIT + WALL METAL LAND HERE) — FASCIA + SOFFIT ABOVE', 9.5, 'start', true, '#8a5520');
+    }
+    // wainscot band, cut at floor-level openings
+    if (wainsOn) {
+      const bandTop = base - 3 * hs;
+      let px = 0;
+      const cuts = ops.filter(o => o.sill < 1).map(o => [o.pos * len - o.w / 2, o.pos * len + o.w / 2]).sort((a, b) => a[0] - b[0]);
+      cuts.concat([[len, len]]).forEach(([a, b]) => {
+        if (a > px) K.rc(ox + px * s, bandTop, (a - px) * s, 3 * hs, i.wainscotStone ? '#cfc9bd' : '#b9bfc6');
+        px = Math.max(px, b);
+      });
+      K.tx(ox + 4, bandTop + 12, (i.wainscotStone ? 'STONE' : 'METAL') + ' WAINSCOT 36"', 9.5, 'start', true, '#555');
+    }
+    // rat guard in 10' sticks
+    let stickX = 0, sticks = 0;
+    while (stickX < len - 0.01) {
+      const e = Math.min(len, stickX + 10);
+      K.ln(ox + stickX * s + 1, base + 4, ox + e * s - 1, base + 4, 3, sticks % 2 ? '#4a5560' : '#2a3540');
+      stickX = e; sticks++;
+    }
+    K.tx(ox + len * s + 8, base + 8, 'RAT GUARD (' + sticks + ") × 10' STICKS", 9.5);
+    // corner trim
+    [0, len].forEach(cx => K.rc(ox + cx * s - 2.4, oy, 4.8, wallHpx, '#6f7d88'));
+    // openings: J-channel, drip edge, garage trim
+    ops.forEach(o => {
+      const c = o.pos * len;
+      const x0 = ox + (c - o.w / 2) * s, x1 = ox + (c + o.w / 2) * s;
+      const topY = base - (o.sill + o.h) * hs, botY = base - Math.max(0, o.sill) * hs;
+      K.rc(x0, topY, x1 - x0, botY - topY, '#f2f4f6', '#2a3540', 1);
+      K.rc(x0 - 2.5, topY - 2.5, (x1 - x0) + 5, (botY - topY) + (o.sill < 1 ? 2.5 : 5), 'none', o.t === 'garage' ? '#8a5520' : '#3d6ea5', 2);
+      K.ln(x0 - 4, topY - 4.5, x1 + 4, topY - 4.5, 2.4, '#1d2730');
+      K.tx((x0 + x1) / 2, topY - 7.5, 'DRIP EDGE', 8.5, 'middle', false, '#1d2730');
+      K.tx((x0 + x1) / 2, (topY + botY) / 2, o.t === 'garage' ? 'GARAGE DOOR TRIM' : 'J-CHANNEL', 8.8, 'middle', true, o.t === 'garage' ? '#8a5520' : '#3d6ea5');
+    });
+    K.tx(ox, base + 24, '(' + nPan + ') PANELS @ ' + (gable ? 'RAKE CUTS' : (H + "'")) + ' · CORNER TRIM ×2 · J-CHANNEL AT ' + ops.length + ' OPENING' + (ops.length === 1 ? '' : 'S'), 10.5);
+    y0 = base + 44;
+  });
+  const holder = document.createElement('div');
+  holder.innerHTML = K.wrap(900, y0 + 8);
+  card.appendChild(holder.firstChild);
+  return card;
+};
+
+window.bbFrRoofPlanX = function (i, mats) {
+  const card = makeVerifyCard('Roof plan — structure & skin, counted',
+    'Trusses at spacing · ridge · wing valleys (boards + metal) · panel courses · ridge cap · eave + vented ridge closures · screws');
+  const K = _bbFrSvgKit();
+  const wg = (typeof bb3dWing === 'function') ? bb3dWing() : null;
+  const gOH = i.gableOH || 1, eOH = i.eaveOH || 1.33;
+  const roofL = i.L + 2 * gOH;
+  const slopeProj = i.W / 2 + eOH;
+  const s = Math.min(800 / roofL, 340 / (2 * slopeProj));
+  const ox = 50, oy = 40;
+  const midY = oy + slopeProj * s;
+  // outline + ridge
+  K.rc(ox, oy, roofL * s, 2 * slopeProj * s, '#e8ebee', '#2a3540', 2);
+  K.ln(ox, midY, ox + roofL * s, midY, 2.4, '#1d2730', '12 6');
+  K.tx(ox + roofL * s / 2, midY - 6, 'RIDGE — CAP ' + Math.ceil(roofL) + ' LF · VENTED CLOSURE BOTH SIDES', 11, 'middle', true);
+  // trusses
+  const tg = (typeof trussGroups !== 'undefined' && trussGroups.length) ? trussGroups : [];
+  const trussQty = tg.reduce((t, g) => t + (+g.qty || 0), 0);
+  const spacingFt = (i.trussSpacing || 24) / 12;
+  for (let d = gOH; d <= roofL - gOH + 0.01; d += spacingFt) {
+    K.ln(ox + d * s, oy + 3, ox + d * s, oy + 2 * slopeProj * s - 3, 0.9, '#b98d54');
+  }
+  K.tx(ox, oy - 8, 'TRUSSES: ' + (trussQty ? '(' + trussQty + ') PER TRUSS TABLE' : '@ ' + spacingFt + "' OC") +
+    ' · ' + (i.roofSystem === 'sheathed' ? 'SHEATHING + UNDERLAYMENT' : 'PURLINS @ ' + (i.purlinSpacing || 2) + "' OC"), 11, 'start', true);
+  // panels
+  const nPan = Math.ceil(roofL / 3);
+  for (let k = 1; k < nPan; k++) K.ln(ox + Math.min(k * 3, roofL) * s, oy, ox + Math.min(k * 3, roofL) * s, oy + 2 * slopeProj * s, 0.5, '#8ea0af');
+  // eaves
+  K.tx(ox + roofL * s / 2, oy + 2 * slopeProj * s + 16, 'EAVES: OUTSIDE CLOSURE + DRIP — FASCIA + SOFFIT BELOW (SOFFIT: ' + ((document.getElementById('soffit_color') || {}).value || '—') + ')', 10.5, 'middle');
+  // wing valleys
+  if (wg && wg.w > 0) {
+    const wx = (wg.end === 'left') ? ox : ox + (roofL - wg.w) * s;
+    K.rc(wx, oy - 26, wg.w * s, 20, '#dfe4e8', '#2a3540', 1.4);
+    K.tx(wx + wg.w * s / 2, oy - 12, 'WING ' + wg.w + "' — RIDGE ⊥ — VALLEYS BOTH SIDES", 9.5, 'middle', true);
+    const vx = (wg.end === 'left') ? ox + wg.w * s / 2 : ox + (roofL - wg.w / 2) * s;
+    [[-1], [1]].forEach(([sgn]) => {
+      K.ln(vx, midY, vx + sgn * (wg.w / 2) * s, oy + 2, 3.4, '#a03a2a');
+      K.ln(vx, midY, vx + sgn * (wg.w / 2) * s, oy + 2 * slopeProj * s - 2, 3.4, '#a03a2a');
+    });
+    K.tx(vx + wg.w * s * 0.6, midY + 20, 'VALLEYS ×4 — VALLEY BOARDS + VALLEY METAL', 10.5, 'start', true, '#a03a2a');
+  }
+  // counted callouts straight from the material list
+  const find = re => mats.find(m => re.test(m.label || ''));
+  const rows = [];
+  const add = (name, m) => { if (m && (m.qty || 0) > 0) rows.push(name + ': (' + m.qty + ') ' + m.uom); };
+  add('ROOF PANELS', find(/tuff ?rib.*roof|roof panel(?!s? end)|roof.*29/i));
+  add('RIDGE CAP', find(/ridge cap(?! trim)/i) || find(/ridge cap/i));
+  add('SCREWS', find(/screw/i));
+  add('OUTSIDE CLOSURE', find(/outside closure/i));
+  add('VENTED CLOSURE', find(/vented|inside closure/i));
+  add('VALLEY METAL', find(/valley metal/i));
+  add('VALLEY BOARDS', find(/valley board/i));
+  add('LVL RIDGE (STICK SECTIONS)', find(/lvl.*ridge|ridge.*lvl/i));
+  add('RAFTERS (STICK SECTIONS)', find(/stick.*rafter|rafter.*2x8/i));
+  add('SHEATHING', find(/roof.*(osb|sheath)/i));
+  let ty = oy + 2 * slopeProj * s + 40;
+  K.tx(ox, ty, 'FROM THE MATERIAL LIST (same numbers as the Materials tab):', 11, 'start', true);
+  rows.forEach(r => { ty += 16; K.tx(ox + 12, ty, r, 10.5); });
+  if (!rows.length) { ty += 16; K.tx(ox + 12, ty, 'Enter dimensions to figure the roof.', 10.5); }
+  const holder = document.createElement('div');
+  holder.innerHTML = K.wrap(900, ty + 24);
+  card.appendChild(holder.firstChild);
+  return card;
+};
+
 function makeVerifyCard(title, subtitle) {
   const card = document.createElement('div');
   card.style.cssText = 'background: var(--surface); border: 1px solid var(--hairline); border-radius: 12px; padding: 1.5rem 1.75rem; margin-bottom: 1rem;';
