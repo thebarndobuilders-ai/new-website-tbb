@@ -2284,7 +2284,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v313</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v314</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -9599,7 +9599,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v313';
+const BB_VERSION = 'v314';
 window.BB_EDITION = window.BB_EDITION || 'house';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
@@ -19869,7 +19869,7 @@ const FRAMING_PAGES = [
         ['Both gables', `${Math.round(i.W * rise)} sq ft`],
       ];
     },
-    svgs: [] },
+    svgs: ['bbFrGableMetal'] },
   { key: 'floor', num: 4, title: 'Floor',
     sub: 'Floor system — joists/trusses, rim, subfloor',
     cats: ['Floor system'],
@@ -20107,6 +20107,15 @@ function drawTakeoffVerify() {
 // PROOF SHEETS — every piece drawn, counts cited from the live
 // material list (the numbers beside the drawing ARE the takeoff).
 // ============================================================
+function _bbFrWing() {
+  const on = document.getElementById('wing_enabled');
+  if (!(on && on.checked)) return null;
+  const n = id => parseFloat((document.getElementById(id) || {}).value) || 0;
+  const w = n('wing_width');
+  if (!(w > 0)) return null;
+  return { end: ((document.getElementById('wing_end') || {}).value) || 'left',
+           w, fp: n('wing_front_proj'), bp: n('wing_back_proj'), pitch: n('wing_pitch') };
+}
 function _bbFrSvgKit() {
   const S = [];
   const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -20132,7 +20141,7 @@ function _bbFrWallOpenings(wall, i) {
   return out.sort((a, b) => a.pos - b.pos);
 }
 function _bbFrWallLen(wall, i) {
-  const wg = (typeof bb3dWing === 'function') ? bb3dWing() : null;
+  const wg = _bbFrWing();
   if ((wall === 'left' || wall === 'right') && wg && wg.end === wall) return i.W + wg.fp + wg.bp;
   return (wall === 'front' || wall === 'back') ? i.L : i.W;
 }
@@ -20140,7 +20149,7 @@ function _bbFrWallLen(wall, i) {
 window.bbFrWallElevBack = function (i, mats) {
   const card = makeVerifyCard('Wall elevations — FRAMING side (inside face)',
     'PT bottom plate (green) · 2×6 studs @ 16" OC · double top plate · 3-stud corners · king + jack studs · headers (LVL on wide spans) · sills & cripples');
-  const wg = (typeof bb3dWing === 'function') ? bb3dWing() : null;
+  const wg = _bbFrWing();
   const hasOSB = mats.some(m => m.cat === 'Wall sheathing' && (m.qty || 0) > 0);
   const K = _bbFrSvgKit();
   const H = i.H, rise = (i.W / 2) * (i.pitch / 12);
@@ -20221,7 +20230,7 @@ window.bbFrWallElevBack = function (i, mats) {
 window.bbFrWallElevFront = function (i, mats) {
   const card = makeVerifyCard('Wall elevations — FINISH side (outside face)',
     'Panels on coverage · wainscot · rat guard in 10\' sticks · F&J at the roofline · corner trim · J-channel at openings · drip edge at heads · garage door trim');
-  const wg = (typeof bb3dWing === 'function') ? bb3dWing() : null;
+  const wg = _bbFrWing();
   const K = _bbFrSvgKit();
   const H = i.H, rise = (i.W / 2) * (i.pitch / 12);
   const cov = (i.sidingProduct === 'mbb_26') ? 1 : 3;
@@ -20292,11 +20301,71 @@ window.bbFrWallElevFront = function (i, mats) {
   return card;
 };
 
+window.bbFrGableMetal = function (i, mats) {
+  const card = makeVerifyCard('Gable metal panels — stepped rake cuts',
+    'Panels on coverage across each gable · every course cut to the rake · cut schedule matches the material list');
+  const K = _bbFrSvgKit();
+  const wg = _bbFrWing();
+  const cov = (i.sidingProduct === 'mbb_26') ? 1 : 3;
+  let y0 = 26;
+  const drawGable = (name, spanFt, riseFt, baseHFt) => {
+    if (!(spanFt > 0 && riseFt > 0)) return;
+    const s = Math.min(700 / spanFt, 12);
+    const hs = Math.min(7, s);
+    const ox = 40, peakY = y0 + 18;
+    const wallTopY = peakY + riseFt * hs;
+    const baseY = wallTopY + (baseHFt > 0 ? Math.min(2.2, baseHFt) * hs * 0.4 : 0) + 2;
+    K.tx(ox, y0 + 6, name + ' — ' + spanFt.toFixed(0) + "' span · " + riseFt.toFixed(1) + "' rise", 13, 'start', true);
+    const rakeH = x => riseFt * (1 - Math.abs(x - spanFt / 2) / (spanFt / 2));
+    const n = Math.ceil(spanFt / cov);
+    const cuts = [];
+    for (let k = 0; k < n; k++) {
+      const x0 = k * cov, x1 = Math.min(spanFt, x0 + cov);
+      const cutFt = Math.ceil(Math.max(rakeH(x0), rakeH(x1)) * 2) / 2;
+      cuts.push(cutFt);
+      const hpx = Math.min(riseFt, cutFt) * hs;
+      K.rc(ox + x0 * s, wallTopY - hpx, (x1 - x0) * s, hpx, '#dfe4e8', '#7a8894', 0.8);
+    }
+    // rake outline over the steps
+    K.ln(ox, wallTopY, ox + (spanFt / 2) * s, peakY, 2.2, '#1d2730');
+    K.ln(ox + (spanFt / 2) * s, peakY, ox + spanFt * s, wallTopY, 2.2, '#1d2730');
+    K.ln(ox, wallTopY, ox + spanFt * s, wallTopY, 2, '#1d2730');
+    // cut schedule (grouped)
+    const groups = {};
+    cuts.forEach(c2 => { groups[c2] = (groups[c2] || 0) + 1; });
+    const sched = Object.keys(groups).map(Number).sort((a, b) => b - a)
+      .map(len => '(' + groups[len] + ') @ ' + len + "'").join(' · ');
+    K.tx(ox, wallTopY + 20, '(' + n + ') PANELS @ ' + cov + "' COVERAGE — CUT SCHEDULE: " + sched + ' — CUT ON SITE TO THE RAKE', 10.5);
+    y0 = wallTopY + 44;
+  };
+  const rise = (i.W / 2) * (i.pitch / 12);
+  ['left', 'right'].forEach(end => {
+    if (wg && wg.end === end) return;
+    drawGable((end === 'left' ? 'LEFT' : 'RIGHT') + ' GABLE END', i.W, rise, i.H);
+  });
+  if (wg && wg.w > 0) {
+    const wp = (parseFloat((document.getElementById('wing_pitch') || {}).value) || 0) || i.pitch;
+    const wRise = (wg.w / 2) * (wp / 12);
+    drawGable('WING GABLE — FRONT FACE', wg.w, wRise, i.H);
+    drawGable('WING GABLE — BACK FACE', wg.w, wRise, i.H);
+  }
+  // porch gable metal note (crows-foot gables sheet their backdrop + slopes)
+  const cw2 = parseFloat((document.getElementById('cypress_gable_width') || {}).value) || 0;
+  if (cw2 > 0) {
+    K.tx(40, y0 + 4, 'PORCH GABLES: cypress crows-foot — gable roof panels + drip edge on the Cypress timber porch lines.', 10.5, 'start', true, '#555');
+    y0 += 22;
+  }
+  const holder = document.createElement('div');
+  holder.innerHTML = K.wrap(900, y0 + 10);
+  card.appendChild(holder.firstChild);
+  return card;
+};
+
 window.bbFrRoofPlanX = function (i, mats) {
   const card = makeVerifyCard('Roof plan — structure & skin, counted',
     'Trusses at spacing · ridge · wing valleys (boards + metal) · panel courses · ridge cap · eave + vented ridge closures · screws');
   const K = _bbFrSvgKit();
-  const wg = (typeof bb3dWing === 'function') ? bb3dWing() : null;
+  const wg = _bbFrWing();
   const gOH = i.gableOH || 1, eOH = i.eaveOH || 1.33;
   const roofL = i.L + 2 * gOH;
   const slopeProj = i.W / 2 + eOH;
