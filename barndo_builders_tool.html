@@ -2284,7 +2284,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v310</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v311</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -9586,7 +9586,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v310';
+const BB_VERSION = 'v311';
 window.BB_EDITION = window.BB_EDITION || 'house';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
@@ -21776,12 +21776,12 @@ function generateModel() {
       // The roof plane lands its eave AT wall top with a shallow angle, so at
       // the wall corners it sits ABOVE wall top — the gable wall rises to
       // meet it (5 points, no daylight wedge along the rakes).
-      const cRise = rise * (eaveOH / (W / 2 + eaveOH));
+      const cRise = Math.max(0.05, rise * (eaveOH / (W / 2 + eaveOH)) - 0.03);
       const shape = new THREE.Shape();
       shape.moveTo(-W / 2, 0);
       shape.lineTo(W / 2, 0);
       shape.lineTo(W / 2, cRise);
-      shape.lineTo(0, rise + 0.06);
+      shape.lineTo(0, rise - 0.02);
       shape.lineTo(-W / 2, cRise);
       shape.closePath();
       const geom = new THREE.ExtrudeGeometry(shape, { depth: sidingThick, bevelEnabled: false });
@@ -21998,12 +21998,12 @@ function buildWing3D(dims, wallBase) {
 
   // --- wing gable faces — corners rise to meet the wing roof plane ---
   [[zF, 1], [zBk, -1]].forEach(([zPos, zs]) => {
-    const cRiseW = rise * (eaveOH / (wg.w / 2 + eaveOH));
+    const cRiseW = Math.max(0.05, rise * (eaveOH / (wg.w / 2 + eaveOH)) - 0.03);
     const shape = new THREE.Shape();
     shape.moveTo(-wg.w / 2, 0);
     shape.lineTo(wg.w / 2, 0);
     shape.lineTo(wg.w / 2, cRiseW);
-    shape.lineTo(0, rise + 0.06);
+    shape.lineTo(0, rise - 0.02);
     shape.lineTo(-wg.w / 2, cRiseW);
     shape.closePath();
     const geom = new THREE.ExtrudeGeometry(shape, { depth: sidingThick, bevelEnabled: false });
@@ -22044,12 +22044,20 @@ function buildWing3D(dims, wallBase) {
     new THREE.MeshStandardMaterial({ color: CATEGORY_COLORS.ridge_cap.hex, roughness: 0.4, metalness: 0.5 }));
   rcap.position.set(0, wallTop + rise + 0.1, 0);
   addR(rcap, 'Wing ridge cap', 'ridge_cap');
+  // gable-overhang soffit under the wing's rake overhangs
+  [-1, 1].forEach(xe => ['front', 'back'].forEach(sideL => {
+    const gs = new THREE.Mesh(new THREE.BoxGeometry(gableOH + 0.15, 0.06, slopeLen2),
+      new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.7 }));
+    gs.rotation.x = (sideL === 'front' ? 1 : -1) * ang2;
+    gs.position.set(xe * (depth / 2 - gableOH / 2), wallTop + rise / 2 - 0.10, (sideL === 'front' ? 1 : -1) * (horiz / 2));
+    addR(gs, 'Wing gable overhang soffit', 'soffit');
+  }));
   // dark cover strips over the wing panels' raw rake ends
   [-1, 1].forEach(xe => ['front', 'back'].forEach(sideL => {
-    const pl = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.30, slopeLen2 + 0.08),
+    const pl = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, slopeLen2 + 0.08),
       new THREE.MeshStandardMaterial({ color: colors.roof, roughness: 0.5, metalness: 0.3 }));
     pl.rotation.x = (sideL === 'front' ? 1 : -1) * ang2;
-    pl.position.set(xe * depth / 2, wallTop + rise / 2 + 0.08, (sideL === 'front' ? 1 : -1) * (horiz / 2));
+    pl.position.set(xe * depth / 2, wallTop + rise / 2 - 0.025, (sideL === 'front' ? 1 : -1) * (horiz / 2));
     addR(pl, 'Wing roof panel end flashing', 'roof_skin');
   }));
 
@@ -22065,8 +22073,8 @@ function buildWing3D(dims, wallBase) {
       add(m, 'Wing rake trim', 'roof_trim');
     });
   });
-  const fw = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.45, (zF - zBk) + 2 * gableOH), trimMatW());
-  fw.position.set(s * (L / 2 + eaveOH - 0.02), wallTop - 0.33, (zF + zBk) / 2);
+  const fw = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.58, (zF - zBk) + 2 * gableOH), trimMatW());
+  fw.position.set(s * (L / 2 + eaveOH + 0.02), wallTop - 0.19, (zF + zBk) / 2);
   add(fw, 'Wing eave fascia', 'fascia');
   const wSofD = eaveOH - 0.02;
   const wSof = new THREE.Mesh(new THREE.BoxGeometry(wSofD, 0.10, (zF - zBk) + 2 * gableOH),
@@ -23422,15 +23430,29 @@ function buildRoof(shape, dims, wallTop, rise, topChord) {
   [slopeSheath_F, slopeSheath_B, slopeSkin_F, slopeSkin_B].forEach(m => {
     buildingGroup.add(m); allMeshes.push(m);
   });
+  // Gable-overhang soffit — closes the underside of the rake overhang at
+  // each non-wing gable end (real gable soffit; kills the see-through slit)
+  [[_xA, 'left'], [_xB, 'right']].forEach(([xEnd, endName]) => {
+    if (_wgR && _wgR.end === endName) return;
+    const inward = endName === 'left' ? 1 : -1;
+    ['front', 'back'].forEach(sideF => {
+      const gs = new THREE.Mesh(new THREE.BoxGeometry(gableOH + 0.15, 0.06, effectiveSlopeLen),
+        new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.7 }));
+      gs.rotation.x = (sideF === 'front' ? 1 : -1) * effectiveAngle;
+      gs.position.set(xEnd + inward * (gableOH / 2), wallTop + verticalExtent / 2 - 0.10, (sideF === 'front' ? 1 : -1) * (horizontalExtent / 2));
+      gs.userData = { categoryKey: 'soffit', label: 'Gable overhang soffit — ' + endName };
+      buildingGroup.add(gs); allMeshes.push(gs);
+    });
+  });
   // Panel-end cover strips: the raw box ends of the roof panels (gable rakes
   // and the wing-junction cut) show pale stretched texture — cover every end
   // with a dark strip in the roof color, like real rake/valley flashing.
   [_xA, _xB].forEach(xEnd => {
     ['front', 'back'].forEach(sideF => {
-      const pl = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.34, effectiveSlopeLen + 0.1),
+      const pl = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, effectiveSlopeLen + 0.1),
         new THREE.MeshStandardMaterial({ color: bb3dSelectedColors().roof, roughness: 0.5, metalness: 0.3 }));
       pl.rotation.x = (sideF === 'front' ? 1 : -1) * effectiveAngle;
-      pl.position.set(xEnd, wallTop + verticalExtent / 2 + 0.02, (sideF === 'front' ? 1 : -1) * (horizontalExtent / 2));
+      pl.position.set(xEnd, wallTop + verticalExtent / 2 - 0.045, (sideF === 'front' ? 1 : -1) * (horizontalExtent / 2));
       pl.userData = { categoryKey: 'roof_skin', label: 'Roof panel end flashing — ' + sideF };
       pl.castShadow = pl.receiveShadow = true;
       buildingGroup.add(pl); allMeshes.push(pl);
@@ -25248,6 +25270,15 @@ function _mzAttach() {
     ev.stopPropagation(); ev.preventDefault();
   }, true);
 }
+// QA hook: what mesh is under this page-pixel? (headless debugging)
+window.bb3dProbe = function(px, py) {
+  if (!initialized || !renderer) return [];
+  const r = renderer.domElement.getBoundingClientRect();
+  const nd = new THREE.Vector2(((px - r.left) / r.width) * 2 - 1, -((py - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(nd, camera);
+  return raycaster.intersectObjects(buildingGroup.children, true).slice(0, 4)
+    .map(h => ((h.object.userData || {}).label || '(no label)') + ' @' + h.distance.toFixed(1));
+};
 window.bb3dListMeshes = function(filter) {
   if (!initialized) return [];
   return allMeshes
