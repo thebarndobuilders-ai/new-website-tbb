@@ -2284,7 +2284,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v314</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v315</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -9599,7 +9599,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v314';
+const BB_VERSION = 'v315';
 window.BB_EDITION = window.BB_EDITION || 'house';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
@@ -21153,6 +21153,22 @@ function bbSegsCut(a, b, cuts) {
 }
 // The tied crows-foot gable's x-span on a side (or null) — same gating as
 // the builder, so eave soffit/fascia can break around the porch roof.
+function bbEaveGapsFor(side, dims) {
+  try {
+    const onEl = document.getElementById('porch_' + side + '_on');
+    if (onEl && onEl.checked) {
+      const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+      const plen = n('porch_' + side + '_len') || dims.L;
+      const offEl = document.getElementById('porch_' + side + '_off');
+      const offRaw = offEl ? offEl.value : '';
+      const cx = (offRaw !== '' && !isNaN(parseFloat(offRaw)))
+        ? (parseFloat(offRaw) + plen / 2) - dims.L / 2 : 0;
+      return [[cx - plen / 2 - 0.3, cx + plen / 2 + 0.3]];
+    }
+    const g = bbCrowsSpanX(side, dims);
+    return g ? [[g.a, g.b]] : [];
+  } catch (e) { return []; }
+}
 function bbCrowsSpanX(side, dims) {
   try {
     const styleBtn = document.querySelector('[data-porchtype].active');
@@ -22333,12 +22349,19 @@ function buildWing3D(dims, wallBase) {
       add(zbOut, 'Wing wainscot Z bar — ' + sideN);
       [[s * (L / 2 + 0.115), s], [x1, -s]].forEach(([xw, xs2], wi) => {
         const dEx2 = wi === 0 ? 0.2 : 0;
-        const bS = new THREE.Mesh(new THREE.BoxGeometry(sidingThick + 0.04, bandH, proj + dEx2), wainMat(proj));
-        bS.position.set(xw + xs2 * 0.01, wallBase + bandH / 2, zMid - zs * dEx2 / 2);
-        add(bS, 'Wing wainscot — side (' + sideN + ')');
-        const zbS = new THREE.Mesh(new THREE.BoxGeometry(sidingThick + 0.06, zH, proj + dEx2), zBarMat());
-        zbS.position.set(xw + xs2 * 0.01, wallBase + bandH + zH / 2, zMid - zs * dEx2 / 2);
-        add(zbS, 'Wing wainscot Z bar — side (' + sideN + ')');
+        const zLoS = zMid - zs * dEx2 / 2 - (proj + dEx2) / 2;
+        const zHiS = zMid - zs * dEx2 / 2 + (proj + dEx2) / 2;
+        // the end-side strip lives ON the end wall — break it at the doors
+        const cutsS = (wi === 0 && typeof bbFloorCuts === 'function') ? bbFloorCuts(wg.end, { L, W }) : [];
+        const segsS = (typeof bbSegsCut === 'function') ? bbSegsCut(zLoS, zHiS, cutsS) : [[zLoS, zHiS]];
+        segsS.forEach(([sa, sb]) => {
+          const bS = new THREE.Mesh(new THREE.BoxGeometry(sidingThick + 0.04, bandH, sb - sa), wainMat(proj));
+          bS.position.set(xw + xs2 * 0.01, wallBase + bandH / 2, (sa + sb) / 2);
+          add(bS, 'Wing wainscot — side (' + sideN + ')');
+          const zbS = new THREE.Mesh(new THREE.BoxGeometry(sidingThick + 0.06, zH, sb - sa), zBarMat());
+          zbS.position.set(xw + xs2 * 0.01, wallBase + bandH + zH / 2, (sa + sb) / 2);
+          add(zbS, 'Wing wainscot Z bar — side (' + sideN + ')');
+        });
       });
     }
   });
@@ -23180,8 +23203,7 @@ function buildMetalTrim(dims, wallBase) {
   // height (wall top minus overhang x pitch) so it tucks under the roof ---
   [-1, 1].forEach(sz => {
     const sideF = sz < 0 ? 'back' : 'front';
-    const span = (typeof bbCrowsSpanX === 'function') ? bbCrowsSpanX(sideF, dims) : null;
-    const cuts = span ? [[span.a, span.b]] : [];
+    const cuts = (typeof bbEaveGapsFor === 'function') ? bbEaveGapsFor(sideF, dims) : [];
     bbSegsCut(-L / 2 - gableOH, L / 2 + gableOH, cuts).forEach(([a, b]) => {
       const f = new THREE.Mesh(new THREE.BoxGeometry(b - a, 0.45, 0.14), trimMat());
       f.position.set((a + b) / 2, wallTop - 0.33, sz * (W / 2 + eaveOH - 0.02));
@@ -24690,8 +24712,7 @@ function buildEaveDetails(dims, wallTop, rise) {
   // tucks into the BACK of the fascia. Nothing pokes above the roof surface.
   const soffitD = eaveOH - 0.02;
   [['front', 1], ['back', -1]].forEach(([sideS, sz]) => {
-    const span = (typeof bbCrowsSpanX === 'function') ? bbCrowsSpanX(sideS, dims) : null;
-    const cuts = span ? [[span.a, span.b]] : [];
+    const cuts = (typeof bbEaveGapsFor === 'function') ? bbEaveGapsFor(sideS, dims) : [];
     bbSegsCut(-L / 2 - gableOH, L / 2 + gableOH, cuts).forEach(([a, b]) => {
       const sof = makeBox(b - a, 0.10, soffitD, 'soffit', 'Soffit — ' + sideS);
       sof.position.set((a + b) / 2, wallTop - 0.35, sz * (W / 2 + soffitD / 2));
