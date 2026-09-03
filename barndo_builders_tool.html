@@ -2284,7 +2284,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v309</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v310</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -9586,7 +9586,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v309';
+const BB_VERSION = 'v310';
 window.BB_EDITION = window.BB_EDITION || 'house';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
@@ -20776,6 +20776,65 @@ function bb3dMetalHex(name, fallback) {
   const k = String(name).toLowerCase().replace(/^crinkle\s+/, '').trim();
   return (METAL_COLOR_HEX[k] != null) ? METAL_COLOR_HEX[k] : fallback;
 }
+// Floor-level opening cut intervals for one wall, in that wall's axis
+// coordinate (x for front/back, z for left/right; wing-aware). Only openings
+// that reach the floor (doors, garage doors) interrupt base-of-wall runs.
+function bbFloorCuts(side, dims) {
+  const out = [];
+  const _wg = (typeof bb3dWing === 'function') ? bb3dWing() : null;
+  const isLong = (side === 'front' || side === 'back');
+  const isWingEnd = _wg && _wg.end === side;
+  const len = isLong ? dims.L : (isWingEnd ? (dims.W + _wg.fp + _wg.bp) : dims.W);
+  const shift = (!isLong && isWingEnd) ? (_wg.fp - _wg.bp) / 2 : 0;
+  ['garage', 'extdoor', 'window'].forEach(t => {
+    ((typeof openingsState !== 'undefined' && openingsState[t]) || []).forEach(r => {
+      if (r.wall !== side || r.pos == null) return;
+      const sill = (r.sill != null) ? r.sill : openingDefault(t, 'sill');
+      if (sill >= 1.0) return;
+      const w = (r.w || openingDefault(t, 'w'));
+      const c = -len / 2 + Math.max(0, Math.min(1, r.pos)) * len + shift;
+      out.push([c - w / 2 - 0.12, c + w / 2 + 0.12]);
+    });
+  });
+  return out.sort((a, b) => a[0] - b[0]);
+}
+// Split the run [a,b] around the given cut intervals.
+function bbSegsCut(a, b, cuts) {
+  const segs = []; let p = a;
+  (cuts || []).forEach(([c0, c1]) => {
+    if (c1 <= a || c0 >= b) return;
+    if (c0 > p) segs.push([p, Math.min(c0, b)]);
+    p = Math.max(p, c1);
+  });
+  if (p < b) segs.push([p, b]);
+  return segs.filter(s => s[1] - s[0] > 0.25);
+}
+// The tied crows-foot gable's x-span on a side (or null) — same gating as
+// the builder, so eave soffit/fascia can break around the porch roof.
+function bbCrowsSpanX(side, dims) {
+  try {
+    const styleBtn = document.querySelector('[data-porchtype].active');
+    if (!(styleBtn && styleBtn.dataset.porchtype === 'cypress')) return null;
+    const styleSel = document.querySelector('[data-cypressstyle].active');
+    if (!(styleSel && styleSel.dataset.cypressstyle === 'gable')) return null;
+    if (side === 'back') {
+      const bp = document.getElementById('porch_back_on');
+      if (!(bp && bp.checked)) return null;
+    }
+    const n = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+    const gw = n('cypress_gable_width');
+    if (!(gw > 0 && n('cypress_gable_length') > 0)) return null;
+    let cx = 0;
+    const onEl = document.getElementById('porch_' + side + '_on');
+    const offEl = document.getElementById('porch_' + side + '_off');
+    const offRaw = offEl ? offEl.value : '';
+    if (onEl && onEl.checked && offRaw !== '' && !isNaN(parseFloat(offRaw))) {
+      const plv = n('porch_' + side + '_len') || dims.L;
+      cx = (parseFloat(offRaw) + plv / 2) - dims.L / 2;
+    }
+    return { a: cx - gw / 2 - 0.4, b: cx + gw / 2 + 0.4 };
+  } catch (e) { return null; }
+}
 // Colors currently selected on the Dimensions tab (fallback: white walls, black roof)
 function bb3dWing() {
   const on = document.getElementById('wing_enabled');
@@ -21428,22 +21487,32 @@ function generateModel() {
   // === MUDSILL — PT plate around the perimeter, just above slab ===
   const mudsillH = 0.13; // 1.5" thick ~ 0.125 ft
   const mudsillW = 0.46; // 5.5" wide for 2x6
-  const mudFront = makeBox(L, mudsillH, mudsillW, 'mudsill');
-  mudFront.position.set(0, foundationThickness + mudsillH / 2, W / 2 - mudsillW / 2);
-  buildingGroup.add(mudFront);
-  allMeshes.push(mudFront);
-  const mudBack = makeBox(L, mudsillH, mudsillW, 'mudsill');
-  mudBack.position.set(0, foundationThickness + mudsillH / 2, -W / 2 + mudsillW / 2);
-  buildingGroup.add(mudBack);
-  allMeshes.push(mudBack);
-  const mudLeft = makeBox(mudsillW, mudsillH, W - 2 * mudsillW, 'mudsill');
-  mudLeft.position.set(-L / 2 + mudsillW / 2, foundationThickness + mudsillH / 2, 0);
-  buildingGroup.add(mudLeft);
-  allMeshes.push(mudLeft);
-  const mudRight = makeBox(mudsillW, mudsillH, W - 2 * mudsillW, 'mudsill');
-  mudRight.position.set(L / 2 - mudsillW / 2, foundationThickness + mudsillH / 2, 0);
-  buildingGroup.add(mudRight);
-  allMeshes.push(mudRight);
+  // Mudsill segments — the PT plate breaks at door/garage openings instead
+  // of running through them (it was peeking through the door reveals)
+  (function () {
+    const dimsM = { L, W };
+    const put2 = (m) => { buildingGroup.add(m); allMeshes.push(m); };
+    bbSegsCut(-L / 2, L / 2, bbFloorCuts('front', dimsM)).forEach(([a, b]) => {
+      const m = makeBox(b - a, mudsillH, mudsillW, 'mudsill');
+      m.position.set((a + b) / 2, foundationThickness + mudsillH / 2, W / 2 - mudsillW / 2);
+      put2(m);
+    });
+    bbSegsCut(-L / 2, L / 2, bbFloorCuts('back', dimsM)).forEach(([a, b]) => {
+      const m = makeBox(b - a, mudsillH, mudsillW, 'mudsill');
+      m.position.set((a + b) / 2, foundationThickness + mudsillH / 2, -W / 2 + mudsillW / 2);
+      put2(m);
+    });
+    bbSegsCut(-W / 2 + mudsillW, W / 2 - mudsillW, bbFloorCuts('left', dimsM)).forEach(([a, b]) => {
+      const m = makeBox(mudsillW, mudsillH, b - a, 'mudsill');
+      m.position.set(-L / 2 + mudsillW / 2, foundationThickness + mudsillH / 2, (a + b) / 2);
+      put2(m);
+    });
+    bbSegsCut(-W / 2 + mudsillW, W / 2 - mudsillW, bbFloorCuts('right', dimsM)).forEach(([a, b]) => {
+      const m = makeBox(mudsillW, mudsillH, b - a, 'mudsill');
+      m.position.set(L / 2 - mudsillW / 2, foundationThickness + mudsillH / 2, (a + b) / 2);
+      put2(m);
+    });
+  })();
   
   const wallBase = foundationThickness + mudsillH;
   const wallTop = wallBase + H;
@@ -21530,33 +21599,14 @@ function generateModel() {
   (function buildWainscot() {
     const cw = bb3dSelectedColors();
     if (!cw.wainscotOn || bbEnclosure().mode === 'roof_only') return;
+    // a fresh build's opening rows may not carry wall/pos yet — place them
+    // first so the band cuts land where the doors actually are
+    try { materializeOpeningPositions(dims); } catch (e) {}
     const bandH = 3, zH = 0.07;
     const _wgWS = (typeof bb3dWing === 'function') ? bb3dWing() : null;
     // Openings that interrupt the band: anything whose bottom lands in it.
-    const cutsFor = (side, len, shift) => {
-      const out = [];
-      ['garage', 'extdoor', 'window'].forEach(t => {
-        ((typeof openingsState !== 'undefined' && openingsState[t]) || []).forEach(r => {
-          if (r.wall !== side || r.pos == null) return;
-          const sill = (r.sill != null) ? r.sill : openingDefault(t, 'sill');
-          if (sill >= bandH - 0.05) return;
-          const w = (r.w || openingDefault(t, 'w'));
-          const c = -len / 2 + Math.max(0, Math.min(1, r.pos)) * len + shift;
-          out.push([c - w / 2 - 0.12, c + w / 2 + 0.12]);
-        });
-      });
-      return out.sort((a, b) => a[0] - b[0]);
-    };
-    const segsFrom = (a, b, cuts) => {
-      const segs = []; let p = a;
-      cuts.forEach(([c0, c1]) => {
-        if (c1 <= a || c0 >= b) return;
-        if (c0 > p) segs.push([p, Math.min(c0, b)]);
-        p = Math.max(p, c1);
-      });
-      if (p < b) segs.push([p, b]);
-      return segs.filter(s => s[1] - s[0] > 0.3);
-    };
+    const cutsFor = (side) => bbFloorCuts(side, dims);
+    const segsFrom = bbSegsCut;
     const mkBand = (side, a0, a1, depthPos) => {
       const wln = a1 - a0, mid = (a0 + a1) / 2;
       const tex = cw.wainscotStone ? bbStoneTexture() : makeTuffRibTexture(false, cw.wainscot);
@@ -21586,7 +21636,7 @@ function generateModel() {
       if (openWalls[side]) return;
       if (side === 'front' || side === 'back') {
         const proj = _wgWS ? ((side === 'front' ? _wgWS.fp : _wgWS.bp) || 0) : 0;
-        const cuts = cutsFor(side, L, 0);
+        const cuts = cutsFor(side);
         const dNear = W / 2 + sheathThick + sidingThick / 2;
         const regions = [];
         if (_wgWS && proj > 0) {
@@ -21607,7 +21657,7 @@ function generateModel() {
         const shift = isWingEnd ? (_wgWS.fp - _wgWS.bp) / 2 : 0;
         const a = isWingEnd ? (-W / 2 - _wgWS.bp + sheathThick) : (-W / 2 + sheathThick);
         const b = isWingEnd ? (W / 2 + _wgWS.fp - sheathThick) : (W / 2 - sheathThick);
-        const cuts = cutsFor(side, lenW, shift);
+        const cuts = cutsFor(side);
         segsFrom(a, b, cuts).forEach(([s0, s1]) => mkBand(side, s0, s1, L / 2 + sheathThick + sidingThick / 2));
       }
     });
@@ -21723,10 +21773,16 @@ function generateModel() {
   // === GABLE TRIANGLES (on short sides for gable roof) ===
   if (roofShape === 'gable' || roofShape === 'gambrel') {
     function makeGable(side, key, label) {
+      // The roof plane lands its eave AT wall top with a shallow angle, so at
+      // the wall corners it sits ABOVE wall top — the gable wall rises to
+      // meet it (5 points, no daylight wedge along the rakes).
+      const cRise = rise * (eaveOH / (W / 2 + eaveOH));
       const shape = new THREE.Shape();
       shape.moveTo(-W / 2, 0);
       shape.lineTo(W / 2, 0);
-      shape.lineTo(0, rise);
+      shape.lineTo(W / 2, cRise);
+      shape.lineTo(0, rise + 0.06);
+      shape.lineTo(-W / 2, cRise);
       shape.closePath();
       const geom = new THREE.ExtrudeGeometry(shape, { depth: sidingThick, bevelEnabled: false });
       const tex = makeTuffRibTexture(false, bb3dSelectedColors().siding);
@@ -21940,12 +21996,15 @@ function buildWing3D(dims, wallBase) {
     }
   });
 
-  // --- wing gable triangles (front + back faces of the wing) ---
+  // --- wing gable faces — corners rise to meet the wing roof plane ---
   [[zF, 1], [zBk, -1]].forEach(([zPos, zs]) => {
+    const cRiseW = rise * (eaveOH / (wg.w / 2 + eaveOH));
     const shape = new THREE.Shape();
     shape.moveTo(-wg.w / 2, 0);
     shape.lineTo(wg.w / 2, 0);
-    shape.lineTo(0, rise);
+    shape.lineTo(wg.w / 2, cRiseW);
+    shape.lineTo(0, rise + 0.06);
+    shape.lineTo(-wg.w / 2, cRiseW);
     shape.closePath();
     const geom = new THREE.ExtrudeGeometry(shape, { depth: sidingThick, bevelEnabled: false });
     const tex = makeTuffRibTexture(false, colors.siding);
@@ -22748,24 +22807,32 @@ function buildMetalTrim(dims, wallBase) {
       c.position.set(sx * (L / 2 + 0.02), wallBase + H / 2, sz * zC);
       put(c, 'corner_trim', 'Corner trim — ' + (sx < 0 ? 'rear' : 'front') + '/' + (sz < 0 ? 'back' : 'front'));
     }));
-    // --- RAT GUARD — base band around the walls ---
-    const rg = (len, x, z, alongX) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(alongX ? len : 0.1, 0.28, alongX ? 0.1 : len), trimMat());
-      m.position.set(x, wallBase + 0.18, z);
-      put(m, 'corner_trim', 'Rat guard');
+    // --- RAT GUARD — base band around the walls, broken at the doors ---
+    const rgSeg = (side, a, b, alongX, fixed) => {
+      bbSegsCut(a, b, bbFloorCuts(side, dims)).forEach(([s0, s1]) => {
+        const ln = s1 - s0, mid = (s0 + s1) / 2;
+        const m = new THREE.Mesh(new THREE.BoxGeometry(alongX ? ln : 0.1, 0.28, alongX ? 0.1 : ln), trimMat());
+        m.position.set(alongX ? mid : fixed, wallBase + 0.18, alongX ? fixed : mid);
+        put(m, 'corner_trim', 'Rat guard');
+      });
     };
-    rg(L, 0, W / 2 + 0.08, true);
-    rg(L, 0, -W / 2 - 0.08, true);
-    rg(W, L / 2 + 0.08, 0, false);
-    rg(W, -L / 2 - 0.08, 0, false);
+    rgSeg('front', -L / 2, L / 2, true, W / 2 + 0.08);
+    rgSeg('back', -L / 2, L / 2, true, -W / 2 - 0.08);
+    rgSeg('right', -W / 2, W / 2, false, L / 2 + 0.08);
+    rgSeg('left', -W / 2, W / 2, false, -L / 2 - 0.08);
   }
 
   // --- EAVE FASCIA — along both eave edges, hung from the eave-edge roof
   // height (wall top minus overhang x pitch) so it tucks under the roof ---
   [-1, 1].forEach(sz => {
-    const f = new THREE.Mesh(new THREE.BoxGeometry(L + 2 * gableOH, 0.45, 0.14), trimMat());
-    f.position.set(0, wallTop - 0.33, sz * (W / 2 + eaveOH - 0.02));
-    put(f, 'fascia', 'Eave fascia — ' + (sz < 0 ? 'back' : 'front'));
+    const sideF = sz < 0 ? 'back' : 'front';
+    const span = (typeof bbCrowsSpanX === 'function') ? bbCrowsSpanX(sideF, dims) : null;
+    const cuts = span ? [[span.a, span.b]] : [];
+    bbSegsCut(-L / 2 - gableOH, L / 2 + gableOH, cuts).forEach(([a, b]) => {
+      const f = new THREE.Mesh(new THREE.BoxGeometry(b - a, 0.45, 0.14), trimMat());
+      f.position.set((a + b) / 2, wallTop - 0.33, sz * (W / 2 + eaveOH - 0.02));
+      put(f, 'fascia', 'Eave fascia — ' + sideF);
+    });
   });
 
   // --- RAKE (GABLE) TRIM — up the roof edge on each gable, both slopes.
@@ -24241,12 +24308,15 @@ function buildEaveDetails(dims, wallTop, rise) {
   // Real eave assembly: fascia top meets the roof edge; the level soffit
   // tucks into the BACK of the fascia. Nothing pokes above the roof surface.
   const soffitD = eaveOH - 0.02;
-  const soffitF = makeBox(L + 2 * gableOH, 0.10, soffitD, 'soffit', 'Soffit — front');
-  soffitF.position.set(0, wallTop - 0.35, W / 2 + soffitD / 2);
-  buildingGroup.add(soffitF); allMeshes.push(soffitF);
-  const soffitB = makeBox(L + 2 * gableOH, 0.10, soffitD, 'soffit', 'Soffit — back');
-  soffitB.position.set(0, wallTop - 0.35, -W / 2 - soffitD / 2);
-  buildingGroup.add(soffitB); allMeshes.push(soffitB);
+  [['front', 1], ['back', -1]].forEach(([sideS, sz]) => {
+    const span = (typeof bbCrowsSpanX === 'function') ? bbCrowsSpanX(sideS, dims) : null;
+    const cuts = span ? [[span.a, span.b]] : [];
+    bbSegsCut(-L / 2 - gableOH, L / 2 + gableOH, cuts).forEach(([a, b]) => {
+      const sof = makeBox(b - a, 0.10, soffitD, 'soffit', 'Soffit — ' + sideS);
+      sof.position.set((a + b) / 2, wallTop - 0.35, sz * (W / 2 + soffitD / 2));
+      buildingGroup.add(sof); allMeshes.push(sof);
+    });
+  });
 }
 
 // =============================================================================
