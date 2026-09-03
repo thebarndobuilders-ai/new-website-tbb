@@ -2284,7 +2284,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v305</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v306</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -9566,7 +9566,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v305';
+const BB_VERSION = 'v306';
 window.BB_EDITION = window.BB_EDITION || 'house';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
@@ -21000,35 +21000,87 @@ function init3D() {
     const HZN = 0.46 * 512;   // horizon line — high enough that the mountain ridges
                               // and treeline peek above the 3D ground plane in normal views
 
-    // Sky gradient
+    // Sky gradient — deep zenith rolling into a warm, hazy horizon
     const sky = g.createLinearGradient(0, 0, 0, HZN);
-    sky.addColorStop(0.0, '#6f9bd0');
-    sky.addColorStop(0.55, '#a9c6e3');
-    sky.addColorStop(1.0, '#dfe9f2');
+    sky.addColorStop(0.0, '#4b7fbe');
+    sky.addColorStop(0.45, '#87aed8');
+    sky.addColorStop(0.8, '#c6d8e6');
+    sky.addColorStop(1.0, '#ece9dd');
     g.fillStyle = sky;
     g.fillRect(0, 0, 1024, HZN + 2);
+    // sun glow, matching where the 3D directional sun sits (upper left)
+    const sg = g.createRadialGradient(220, 40, 8, 220, 40, 190);
+    sg.addColorStop(0, 'rgba(255,248,228,0.55)');
+    sg.addColorStop(0.4, 'rgba(255,248,228,0.18)');
+    sg.addColorStop(1, 'rgba(255,248,228,0)');
+    g.fillStyle = sg; g.fillRect(0, 0, 1024, HZN);
 
-    // Puffy clouds — layered soft blobs, bigger/lower ones get gray undersides
-    const cloud = (cx, cy, r, a) => {
-      for (let b = 0; b < 5; b++) {
-        const bx = cx + (b - 2) * r * 0.55, by = cy + (b % 2 ? r * 0.12 : -r * 0.1);
-        const rr = r * (0.55 + 0.5 * Math.abs(2 - b) * 0.35);
-        const rg = g.createRadialGradient(bx, by, rr * 0.15, bx, by, rr);
-        rg.addColorStop(0, `rgba(255,255,255,${a})`);
-        rg.addColorStop(0.7, `rgba(248,250,252,${a * 0.6})`);
-        rg.addColorStop(1, 'rgba(248,250,252,0)');
-        g.fillStyle = rg;
-        g.beginPath(); g.arc(bx, by, rr, 0, Math.PI * 2); g.fill();
-        const ug = g.createRadialGradient(bx, by + rr * 0.4, rr * 0.1, bx, by + rr * 0.4, rr * 0.8);
-        ug.addColorStop(0, `rgba(175,188,200,${a * 0.30})`);
-        ug.addColorStop(1, 'rgba(175,188,200,0)');
-        g.fillStyle = ug;
-        g.beginPath(); g.arc(bx, by + rr * 0.4, rr * 0.8, 0, Math.PI * 2); g.fill();
-      }
+    // Cirrus — thin stretched wisps high up
+    const wisp = (wx, wy, ww, a) => {
+      const wg = g.createRadialGradient(wx, wy, 1, wx, wy, ww);
+      wg.addColorStop(0, `rgba(255,255,255,${a})`);
+      wg.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = wg;
+      g.save(); g.translate(wx, wy); g.scale(1, 0.12); g.translate(-wx, -wy);
+      g.beginPath(); g.arc(wx, wy, ww, 0, Math.PI * 2); g.fill(); g.restore();
     };
-    cloud(140, 60, 46, 0.95); cloud(430, 45, 38, 0.9); cloud(720, 70, 52, 0.95);
-    cloud(940, 40, 34, 0.85); cloud(280, 140, 42, 0.8); cloud(600, 155, 48, 0.85);
-    cloud(870, 170, 36, 0.75); cloud(60, 190, 30, 0.7); cloud(520, 230, 40, 0.6);
+    wisp(340, 34, 150, 0.35); wisp(700, 24, 190, 0.3); wisp(880, 58, 120, 0.25);
+    wisp(120, 80, 130, 0.22); wisp(520, 66, 160, 0.2);
+
+    // Cumulus — flat-based ellipse stacks: bright lit tops, gray-lavender
+    // undersides, edges feathered by stacked low-alpha passes
+    const rnd = (seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647)(7);
+    const cloud = (cx, cy, w, a) => {
+      g.save(); g.translate(cx, cy); g.scale(1, 0.48); g.translate(-cx, -cy);
+      const h = w * 0.42, base = cy + h * 0.32;
+      const puffs = [];
+      const n = 6 + Math.floor(rnd() * 3);
+      for (let b = 0; b < n; b++) {
+        const t = b / (n - 1);
+        const px = cx + (t - 0.5) * w;
+        const pr = (0.28 + 0.5 * Math.sin(Math.PI * t) * (0.7 + rnd() * 0.5)) * h;
+        const py = base - pr * (0.55 + rnd() * 0.3);
+        puffs.push([px, py, pr]);
+      }
+      // soft mass first (three feathering passes)
+      for (let pass = 0; pass < 3; pass++) {
+        const grow = 1 + pass * 0.13, al = a * [0.72, 0.3, 0.12][pass];
+        puffs.forEach(([px, py, pr]) => {
+          const rg = g.createRadialGradient(px, py, pr * 0.2, px, py, pr * grow);
+          rg.addColorStop(0, `rgba(255,255,255,${al})`);
+          rg.addColorStop(0.75, `rgba(252,253,255,${al * 0.55})`);
+          rg.addColorStop(1, 'rgba(252,253,255,0)');
+          g.fillStyle = rg;
+          g.beginPath(); g.arc(px, py, pr * grow, 0, Math.PI * 2); g.fill();
+        });
+      }
+      // lit crowns (sun is upper-left)
+      puffs.forEach(([px, py, pr]) => {
+        const lg = g.createRadialGradient(px - pr * 0.3, py - pr * 0.45, pr * 0.05, px - pr * 0.3, py - pr * 0.45, pr * 0.8);
+        lg.addColorStop(0, `rgba(255,255,252,${a * 0.85})`);
+        lg.addColorStop(1, 'rgba(255,255,252,0)');
+        g.fillStyle = lg;
+        g.beginPath(); g.arc(px - pr * 0.3, py - pr * 0.45, pr * 0.8, 0, Math.PI * 2); g.fill();
+      });
+      // flat shaded base
+      const bg2 = g.createLinearGradient(0, base - h * 0.25, 0, base + h * 0.18);
+      bg2.addColorStop(0, 'rgba(186,193,206,0)');
+      bg2.addColorStop(0.7, `rgba(178,186,201,${a * 0.4})`);
+      bg2.addColorStop(1, 'rgba(178,186,201,0)');
+      g.beginPath();
+      puffs.forEach(([px, py, pr]) => { g.moveTo(px + pr, base); g.arc(px, py, pr * 1.05, 0, Math.PI * 2); });
+      g.save(); g.clip();
+      g.fillStyle = bg2;
+      g.fillRect(cx - w, base - h * 0.3, w * 2, h * 0.55);
+      g.restore();
+      g.restore();
+    };
+    cloud(180, 96, 200, 0.9);
+    cloud(560, 70, 150, 0.8);
+    cloud(860, 120, 240, 0.85);
+    cloud(390, 168, 120, 0.55);
+    cloud(60, 190, 90, 0.45);
+    cloud(680, 200, 100, 0.4);
 
     // Mountain ridges — far hazy layer then nearer blue layer
     const ridge = (baseY, amp, color, seed) => {
@@ -21041,11 +21093,11 @@ function init3D() {
       }
       g.lineTo(1024, HZN + 40); g.lineTo(0, HZN + 40); g.closePath(); g.fill();
     };
-    ridge(HZN - 10, 46, '#8b9cb8', 1.7);   // far ridge (hazy)
-    ridge(HZN - 2, 30, '#63769b', 4.2);    // near ridge (bluer)
+    ridge(HZN - 10, 46, '#a3b1c4', 1.7);   // far ridge (hazier, lighter)
+    ridge(HZN - 2, 30, '#7a8ba6', 4.2);    // near ridge (muted blue)
 
     // Treeline — dark green bumpy strip at the horizon
-    g.fillStyle = '#2e4a2c';
+    g.fillStyle = '#37522f';
     g.beginPath();
     g.moveTo(0, HZN + 16);
     for (let x = 0; x <= 1024; x += 8) {
@@ -21055,9 +21107,9 @@ function init3D() {
 
     // Meadow below the horizon — green gradient + wildflower speckles
     const meadow = g.createLinearGradient(0, HZN + 10, 0, 512);
-    meadow.addColorStop(0, '#578a2f');
-    meadow.addColorStop(0.5, '#4c8128');
-    meadow.addColorStop(1, '#417522');
+    meadow.addColorStop(0, '#7c9150');
+    meadow.addColorStop(0.5, '#617e3b');
+    meadow.addColorStop(1, '#516f31');
     g.fillStyle = meadow;
     g.fillRect(0, HZN + 14, 1024, 512 - HZN - 14);
     for (let i = 0; i < 900; i++) {
@@ -21076,7 +21128,7 @@ function init3D() {
     scene.background = tex;
   })();
   // Soft green-tinted haze so the far ground blends into the meadow backdrop.
-  scene.fog = new THREE.Fog(0x76a557, 300, 520);
+  scene.fog = new THREE.Fog(0x93a578, 320, 560);
   
   camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 500);
   camera.position.set(60, 35, 60);
@@ -21126,8 +21178,8 @@ function init3D() {
   const hemi = new THREE.HemisphereLight(0xeaf2fb, 0x6f7d52, 0.95);
   hemi.position.set(0, 60, 0);
   scene.add(hemi);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-  const sun = new THREE.DirectionalLight(0xfff6e8, 0.85);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.28));
+  const sun = new THREE.DirectionalLight(0xffefda, 1.0);
   sun.position.set(-38, 55, 34);
   sun.castShadow = true;
   sun.shadow.camera.left = -70;
@@ -21145,33 +21197,53 @@ function init3D() {
   fill.position.set(35, 28, -30);
   scene.add(fill);
   
-  // Ground plane — wildflower meadow: mottled grass with scattered white/yellow blooms.
+  // Ground plane — olive field grass: fine blade noise over large patchy
+  // mottling with dry flecks, like a mown Tennessee pasture in late light.
   (function buildGround() {
     const gc = document.createElement('canvas');
-    gc.width = 256; gc.height = 256;
+    gc.width = 512; gc.height = 512;
     const gx = gc.getContext('2d');
-    gx.fillStyle = '#2e661a';
-    gx.fillRect(0, 0, 256, 256);
-    for (let i = 0; i < 5200; i++) {
-      const shade = Math.random();
-      gx.fillStyle = shade > 0.5
-        ? 'rgba(116,168,66,0.35)'
-        : 'rgba(66,112,38,0.35)';
-      const x = Math.random() * 256, y = Math.random() * 256;
-      gx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+    gx.fillStyle = '#485f30';
+    gx.fillRect(0, 0, 512, 512);
+    // macro patches — big soft blotches of lighter / darker / straw grass
+    for (let i = 0; i < 46; i++) {
+      const px = Math.random() * 512, py = Math.random() * 512;
+      const pr = 40 + Math.random() * 90;
+      const kind = Math.random();
+      const col = kind < 0.4 ? '124,146,84' : kind < 0.75 ? '62,86,44' : '132,132,74';
+      for (const ox of [-512, 0, 512]) for (const oy of [-512, 0, 512]) {
+        const pg = gx.createRadialGradient(px + ox, py + oy, pr * 0.15, px + ox, py + oy, pr);
+        pg.addColorStop(0, 'rgba(' + col + ',0.28)');
+        pg.addColorStop(1, 'rgba(' + col + ',0)');
+        gx.fillStyle = pg;
+        gx.beginPath(); gx.arc(px + ox, py + oy, pr, 0, Math.PI * 2); gx.fill();
+      }
     }
-    // Wildflowers — small white and yellow blooms like the photo
-    for (let i = 0; i < 130; i++) {
+    // fine blade noise — short vertical ticks in mixed greens
+    for (let i = 0; i < 15000; i++) {
+      const shade = Math.random();
+      gx.fillStyle = shade > 0.62
+        ? 'rgba(128,150,86,0.45)'
+        : shade > 0.24
+          ? 'rgba(60,84,42,0.45)'
+          : 'rgba(150,148,96,0.3)';
+      const x = Math.random() * 512, y = Math.random() * 512;
+      gx.fillRect(x, y, 1, 1 + Math.random() * 2.6);
+    }
+    // sparse dry-grass flecks and a few tiny blooms
+    for (let i = 0; i < 90; i++) {
       const r = Math.random();
-      gx.fillStyle = r < 0.55 ? 'rgba(248,248,240,0.9)' : 'rgba(242,214,80,0.95)';
-      const x = Math.random() * 256, y = Math.random() * 256;
-      gx.fillRect(x, y, 1.6, 1.6);
+      gx.fillStyle = r < 0.7 ? 'rgba(196,186,120,0.55)' : 'rgba(244,242,230,0.8)';
+      const x = Math.random() * 512, y = Math.random() * 512;
+      gx.fillRect(x, y, 1.4, 1.4);
     }
     const gtex = new THREE.CanvasTexture(gc);
     gtex.wrapS = gtex.wrapT = THREE.RepeatWrapping;
-    gtex.repeat.set(30, 30);
+    gtex.repeat.set(12, 12);
+    try { gtex.anisotropy = renderer.capabilities.getMaxAnisotropy(); } catch (e) {}
+    if (THREE.sRGBEncoding !== undefined) gtex.encoding = THREE.sRGBEncoding;
     const groundGeo = new THREE.PlaneGeometry(600, 600);
-    const groundMat = new THREE.MeshStandardMaterial({ map: gtex, color: 0x71a94c, roughness: 1.0, metalness: 0 });
+    const groundMat = new THREE.MeshStandardMaterial({ map: gtex, color: 0xa8b190, roughness: 1.0, metalness: 0 });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.01;
