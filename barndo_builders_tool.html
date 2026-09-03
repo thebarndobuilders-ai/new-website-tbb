@@ -2284,7 +2284,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v320</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v321</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3160,6 +3160,27 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
     </div>
 
     <input type="hidden" id="bb3d_mode" value="shop">
+    <div class="qbs-card" id="floorplan-trace-card">
+      <h3>Floor plan — interior walls <span class="badge">Trace from the plan PDF · drives Interior wall LF</span></h3>
+      <p class="qbs-sub">Load the floor-plan page of the house PDF as a ground underlay in the 3D view, line it up
+        with the slab (width + offsets below), then trace each interior wall — <b>click and drag in the 3D view</b>.
+        Walls snap square, every wall adds to Interior wall LF, and Frame view shows the full framed skeleton.
+        Esc ends tracing.</p>
+      <div class="qbs-grid-3">
+        <div class="qbs-field"><label>Plan PDF page</label><input type="number" id="fp_underlay_page" value="4" min="1" step="1" /></div>
+        <div class="qbs-field"><label>Underlay width (ft)</label><input type="number" id="fp_underlay_wft" value="0" step="1" oninput="bbFpUnderlayRefresh()" /><div class="qbs-note">0 = stretch to building length</div></div>
+        <div class="qbs-field"><label>Offset X / Z (ft)</label><div style="display:flex;gap:4px;"><input type="number" id="fp_underlay_ox" value="0" step="0.5" style="width:50%;" oninput="bbFpUnderlayRefresh()" /><input type="number" id="fp_underlay_oz" value="0" step="0.5" style="width:50%;" oninput="bbFpUnderlayRefresh()" /></div></div>
+      </div>
+      <input type="file" id="fp_underlay_file" accept="application/pdf" style="display:none;" onchange="bbFpUnderlayLoad(this)" />
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+        <button onclick="document.getElementById('fp_underlay_file').click()">📄 Load plan underlay</button>
+        <button onclick="bbFpUnderlayToggle()">👁 Underlay on/off</button>
+        <button onclick="bbIntWallTraceStart()">✏ Trace interior walls</button>
+        <button onclick="bbIntWallUndo()">↩ Undo wall</button>
+        <button onclick="bbIntWallClear()">🗑 Clear walls</button>
+      </div>
+      <div class="qbs-note" id="fp_trace_status" style="margin-top:6px;">No interior walls traced yet.</div>
+    </div>
     <div class="qbs-card" id="gable-wing-card">
       <h3>T &amp; L footprint — gable wing <span class="badge">Homes · perpendicular wing over one end · its own ridge &amp; pitch</span></h3>
       <p class="qbs-sub" style="margin-bottom: 14px;">Builds a cross-gable wing over one end of the house — the wing's ridge runs front-to-back and the wing can project past the front and/or back walls for a true L or T footprint. Footprint, living sqft, concrete and exterior wall LF follow automatically. Add a truss group for the wing span on the Trusses table so trusses, roof panels, ridge cap and gable metal figure per plan.</p>
@@ -8928,6 +8949,9 @@ function bbClearAllToZero() {
   set('gutters_on', 'none'); set('downspout_qty', 0);
   set('bldg_enclosure', 'full');
   try { onEnclosureChange(); } catch (e) {}
+  window._bbIntWalls = [];
+  try { if (typeof window.bbIntWallStatus === 'function') window.bbIntWallStatus(); } catch (e) {}
+  try { if (typeof window.bbFpUnderlayRemove === 'function') window.bbFpUnderlayRemove(); } catch (e) {}
   ['front', 'back', 'left', 'right'].forEach(sd => { const oe = document.getElementById('porch_' + sd + '_off'); if (oe) oe.value = ''; });
   try { const pe2 = document.getElementById('openings_plan_exact'); if (pe2) pe2.checked = false; } catch (e) {}
   // dims are 0 and the wing/porches are OFF now — re-derive footprint and
@@ -9606,7 +9630,8 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v320';
+const BB_VERSION = 'v321';
+window._bbIntWalls = window._bbIntWalls || [];
 window.BB_EDITION = window.BB_EDITION || 'house';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
@@ -10285,11 +10310,14 @@ function barndoSnapshot() {
     openings: (typeof openingsState !== 'undefined') ? JSON.parse(JSON.stringify(openingsState)) : null,
     openWalls: (typeof window.bb3dOpenWalls === 'function') ? window.bb3dOpenWalls() : null,
     trussGroups: (typeof trussGroups !== 'undefined') ? JSON.parse(JSON.stringify(trussGroups)) : null,
+    interiorWalls: JSON.parse(JSON.stringify(window._bbIntWalls || [])),
   };
 }
 
 function barndoApply(cfg) {
   window._takeoffOnlyQuote = false;   // a loaded model is a full quote — margins apply
+  window._bbIntWalls = Array.isArray(cfg.interiorWalls) ? JSON.parse(JSON.stringify(cfg.interiorWalls)) : [];
+  try { if (typeof window.bbIntWallStatus === 'function') window.bbIntWallStatus(); } catch (e) {}
   try { setTier(cfg.tier || 'shell'); } catch (e) {}
   try { setConstruction(cfg.construction || 'stick'); } catch (e) {}
   Object.entries(cfg.fields || {}).forEach(([id, v]) => {
@@ -12351,6 +12379,69 @@ function bbBPSheets() {
       lines.forEach((l, li) => { o += bbpTxt(BBP_M + 56, ny2 + 16 + li * 24, '- ' + String(l.label).slice(0, 88) + ' — ' + l.qty + ' ' + l.uom, 12.5); });
     }
     sheet('Wall Framing Layout', 'S-4', o);
+  })();
+
+  // ===== S-5 FLOOR PLAN — exterior outline + traced interior walls =====
+  (function () {
+    let o = bbpTxt(BBP_M + 40, BBP_M + 44, 'FLOOR PLAN', 22, 'start', true);
+    const iw = window._bbIntWalls || [];
+    const wgF = (typeof bbFloorCuts === 'function' && typeof document !== 'undefined') ? (function () {
+      const on = document.getElementById('wing_enabled');
+      if (!(on && on.checked)) return null;
+      const n2 = id => parseFloat((document.getElementById(id) || {}).value) || 0;
+      const w2 = n2('wing_width');
+      if (!(w2 > 0)) return null;
+      return { end: ((document.getElementById('wing_end') || {}).value) || 'left', w: w2, fp: n2('wing_front_proj'), bp: n2('wing_back_proj') };
+    })() : null;
+    const zTop = wgF ? (W / 2 + wgF.fp) : W / 2;
+    const zBot2 = wgF ? (W / 2 + wgF.bp) : W / 2;
+    const totH2 = zTop + zBot2;
+    const s = Math.min((BBP_DRW - 280) / L, (BBP_SH - 2 * BBP_M - 300) / totH2, 15);
+    const ox = BBP_M + 150, oy = BBP_M + 130;
+    const X = xv => ox + (xv + L / 2) * s;
+    const Y = zv => oy + (zTop - zv) * s;
+    // exterior outline (wing-aware)
+    if (wgF) {
+      const xA2 = wgF.end === 'left' ? -L / 2 : L / 2 - wgF.w;
+      const xB2 = wgF.end === 'left' ? -L / 2 + wgF.w : L / 2;
+      const pts = wgF.end === 'left'
+        ? [[xA2, W / 2 + wgF.fp], [xB2, W / 2 + wgF.fp], [xB2, W / 2], [L / 2, W / 2], [L / 2, -W / 2], [xB2, -W / 2], [xB2, -W / 2 - wgF.bp], [xA2, -W / 2 - wgF.bp]]
+        : [[-L / 2, W / 2], [xA2, W / 2], [xA2, W / 2 + wgF.fp], [xB2, W / 2 + wgF.fp], [xB2, -W / 2 - wgF.bp], [xA2, -W / 2 - wgF.bp], [xA2, -W / 2], [-L / 2, -W / 2]];
+      o += '<polygon points="' + pts.map(p2 => X(p2[0]) + ',' + Y(p2[1])).join(' ') + '" fill="none" stroke="#111" stroke-width="3"/>';
+    } else {
+      o += bbpRect(X(-L / 2), Y(W / 2), L * s, W * s, 3);
+    }
+    // openings ticks on exterior walls
+    try {
+      ['garage', 'extdoor', 'window'].forEach(t2 => {
+        (openingsState[t2] || []).forEach(r2 => {
+          if (!r2.wall || r2.pos == null) return;
+          const w3 = r2.w || 3;
+          if (r2.wall === 'front' || r2.wall === 'back') {
+            const c2 = -L / 2 + r2.pos * L;
+            const zw = r2.wall === 'front' ? W / 2 : -W / 2;
+            o += bbpLn(X(c2 - w3 / 2), Y(zw), X(c2 + w3 / 2), Y(zw), t2 === 'window' ? 5 : 8, null, '#fff');
+          } else {
+            const lenW2 = (wgF && wgF.end === r2.wall) ? (W + wgF.fp + wgF.bp) : W;
+            const shift2 = (wgF && wgF.end === r2.wall) ? (wgF.fp - wgF.bp) / 2 : 0;
+            const c2 = -lenW2 / 2 + r2.pos * lenW2 + shift2;
+            const xw2 = r2.wall === 'left' ? -L / 2 : L / 2;
+            o += bbpLn(X(xw2), Y(c2 - w3 / 2), X(xw2), Y(c2 + w3 / 2), t2 === 'window' ? 5 : 8, null, '#fff');
+          }
+        });
+      });
+    } catch (e2) {}
+    // interior walls
+    let lfSum = 0;
+    iw.forEach(w2 => {
+      lfSum += Math.hypot(w2.x2 - w2.x1, w2.z2 - w2.z1);
+      o += bbpLn(X(w2.x1), Y(w2.z1), X(w2.x2), Y(w2.z2), 4.5);
+    });
+    o += bbpDim(X(-L / 2), Y(-zBot2) + 34, X(L / 2), Y(-zBot2) + 34, bbpFtIn(L), 0);
+    o += bbpTxt(BBP_M + 60, Y(-zBot2) + 84, iw.length
+      ? 'INTERIOR WALLS: (' + iw.length + ') RUNS · ' + Math.ceil(lfSum) + ' LF — DRIVES THE INTERIOR WALL FRAMING TAKEOFF'
+      : 'NO INTERIOR WALLS TRACED — USE THE FLOOR PLAN CARD ON THE 3D BARNDOS TAB', 14, 'start', true);
+    sheet('Floor Plan', 'S-5', o);
   })();
 
   return sheets;
@@ -21713,6 +21804,7 @@ function init3D() {
   raycaster = new THREE.Raycaster();
   mouse = new THREE.Vector2();
   try { _mzAttach(); } catch (e) { console.warn('measure attach:', e); }
+  try { _iwAttach(); } catch (e) { console.warn('int wall attach:', e); }
   
   // Click handler on the canvas
   renderer.domElement.addEventListener('click', onCanvasClick);
@@ -22024,6 +22116,44 @@ function generateModel() {
         const cuts = cutsFor(side);
         segsFrom(a, b, cuts).forEach(([s0, s1]) => mkBand(side, s0, s1, L / 2 + sheathThick + sidingThick / 2));
       }
+    });
+  })();
+
+  // === INTERIOR WALLS — traced from the plan: framed for real (bottom
+  // plate, studs 16" OC, double top plate). Frame view keeps them.
+  (function buildIntWalls() {
+    const list = window._bbIntWalls || [];
+    if (!list.length) return;
+    try { CATEGORY_COLORS.int_wall = CATEGORY_COLORS.int_wall || { hex: 0xd8c8a0, label: 'Interior wall framing', textHex: '#d8c8a0' }; } catch (e) {}
+    list.forEach(wseg => {
+      const dx = wseg.x2 - wseg.x1, dz = wseg.z2 - wseg.z1;
+      const ln = Math.hypot(dx, dz);
+      if (ln < 0.5) return;
+      const g = new THREE.Group();
+      g.position.set((wseg.x1 + wseg.x2) / 2, wallBase, (wseg.z1 + wseg.z2) / 2);
+      g.rotation.y = -Math.atan2(dz, dx);
+      const addI = (m, lbl) => { m.userData = { categoryKey: 'int_wall', label: lbl, isFraming: true };
+        m.receiveShadow = true; g.add(m); allMeshes.push(m); };
+      const bp = new THREE.Mesh(new THREE.BoxGeometry(ln, 0.12, 0.29),
+        new THREE.MeshStandardMaterial({ color: 0xc8a06a, roughness: 0.9 }));
+      bp.position.y = 0.06; addI(bp, 'Interior wall — bottom plate');
+      [H - 0.24, H - 0.12].forEach(y => {
+        const tp = new THREE.Mesh(new THREE.BoxGeometry(ln, 0.12, 0.29),
+          new THREE.MeshStandardMaterial({ color: 0xc8a06a, roughness: 0.9 }));
+        tp.position.y = y + 0.06; addI(tp, 'Interior wall — top plate');
+      });
+      const studH = H - 0.48;
+      for (let d = 0.06; d <= ln - 0.05; d += 16 / 12) {
+        const st = new THREE.Mesh(new THREE.BoxGeometry(0.12, studH, 0.29),
+          new THREE.MeshStandardMaterial({ color: 0xe2c898, roughness: 0.9 }));
+        st.position.set(-ln / 2 + Math.min(d, ln - 0.06), studH / 2 + 0.12, 0);
+        addI(st, 'Interior wall — stud');
+      }
+      const stE = new THREE.Mesh(new THREE.BoxGeometry(0.12, studH, 0.29),
+        new THREE.MeshStandardMaterial({ color: 0xe2c898, roughness: 0.9 }));
+      stE.position.set(ln / 2 - 0.06, studH / 2 + 0.12, 0);
+      addI(stE, 'Interior wall — stud');
+      buildingGroup.add(g);
     });
   })();
 
@@ -25698,6 +25828,151 @@ window.bb3dProbe = function(px, py) {
   return raycaster.intersectObjects(buildingGroup.children, true).slice(0, 4)
     .map(h => ((h.object.userData || {}).label || '(no label)') + ' @' + h.distance.toFixed(1));
 };
+// ---- Plan underlay: the floor-plan PDF page laid on the ground plane ----
+let _fpMesh = null;
+window.bbFpUnderlayRemove = function () {
+  if (_fpMesh) { try { scene.remove(_fpMesh); _fpMesh.geometry.dispose(); } catch (e) {} _fpMesh = null; }
+};
+window.bbFpUnderlayRefresh = function () {
+  if (!_fpMesh) return;
+  const n = id => parseFloat((document.getElementById(id) || {}).value) || 0;
+  const dims = (typeof getBuildingDims === 'function') ? getBuildingDims() : { L: 40 };
+  const wft = n('fp_underlay_wft') > 0 ? n('fp_underlay_wft') : (dims.L || 40);
+  const ar = _fpMesh.userData._fpAspect || 0.66;
+  _fpMesh.scale.set(wft / (_fpMesh.userData._fpBaseW || 1), (wft * ar) / (_fpMesh.userData._fpBaseH || 1), 1);
+  _fpMesh.position.set(n('fp_underlay_ox'), 0.07, n('fp_underlay_oz'));
+};
+window.bbFpUnderlayToggle = function () {
+  if (_fpMesh) _fpMesh.visible = !_fpMesh.visible;
+  else try { bbToast('No underlay loaded yet — hit 📄 Load plan underlay first.'); } catch (e) {}
+};
+window.bbFpUnderlayLoad = function (input) {
+  const f = input && input.files && input.files[0];
+  if (!f) return;
+  try { switchTab('workspace'); } catch (e) {}
+  const fr = new FileReader();
+  fr.onload = () => {
+    try {
+      const data = new Uint8Array(fr.result);
+      pdfjsLib.getDocument({ data }).promise.then(doc => {
+        const pg = Math.max(1, Math.min(doc.numPages, parseInt((document.getElementById('fp_underlay_page') || {}).value, 10) || 1));
+        return doc.getPage(pg);
+      }).then(page => {
+        const vp1 = page.getViewport({ scale: 1 });
+        const scale = 1800 / vp1.width;
+        const vp = page.getViewport({ scale });
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+        return page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise.then(() => cv);
+      }).then(cv => {
+        if (!initialized) init3D();
+        window.bbFpUnderlayRemove();
+        const tex = new THREE.CanvasTexture(cv);
+        if (THREE.sRGBEncoding !== undefined) tex.encoding = THREE.sRGBEncoding;
+        const ar = cv.height / cv.width;
+        const geo = new THREE.PlaneGeometry(1, ar);
+        const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+          map: tex, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.userData = { _fpAspect: ar, _fpBaseW: 1, _fpBaseH: ar };
+        _fpMesh = mesh;
+        scene.add(mesh);
+        window.bbFpUnderlayRefresh();
+        try { bbToast('Plan underlay loaded — set the underlay width to the plan\'s real footprint length and nudge the offsets until it sits on the slab. Then ✏ Trace interior walls.'); } catch (e) {}
+      }).catch(err => { try { bbToast('Could not read that PDF page: ' + err.message); } catch (e) {} });
+    } catch (err) { try { bbToast('PDF load failed: ' + err.message); } catch (e) {} }
+  };
+  fr.readAsArrayBuffer(f);
+  input.value = '';
+};
+
+// ---- Interior wall tracing: click-drag = one wall, snaps square, stays on until Esc ----
+let _iwOn = false, _iwP0 = null, _iwLine = null;
+window.bbIntWallStatus = function () {
+  const el = document.getElementById('fp_trace_status');
+  if (!el) return;
+  const list = window._bbIntWalls || [];
+  const lf = list.reduce((t, w) => t + Math.hypot(w.x2 - w.x1, w.z2 - w.z1), 0);
+  el.textContent = list.length
+    ? '(' + list.length + ') interior walls traced · ' + lf.toFixed(1) + ' LF → Interior wall LF'
+    : 'No interior walls traced yet.';
+};
+function _iwSyncLF() {
+  const list = window._bbIntWalls || [];
+  const lf = list.reduce((t, w) => t + Math.hypot(w.x2 - w.x1, w.z2 - w.z1), 0);
+  const el = document.getElementById('int_wall_lf');
+  if (el) { el.value = Math.ceil(lf); }
+  try { recalc(); } catch (e) {}
+  try { window.bb3dRefresh(); } catch (e) {}
+  window.bbIntWallStatus();
+}
+let _iwDown = 0;
+window._bbIwState = function () { return { on: _iwOn, hasP0: !!_iwP0, init: !!initialized, downs: _iwDown }; };
+window._bbIwProbe = function (px, py) { const p = _mzGround({ clientX: px, clientY: py }); return p ? [Math.round(p.x), Math.round(p.z)] : null; };
+window.bbIntWallTraceStart = function () {
+  try { switchTab('workspace'); } catch (e) {}
+  const go = tries => {
+    if (!initialized || !renderer) { if (tries > 0) setTimeout(() => go(tries - 1), 300); return; }
+    _iwOn = true;
+    try { controls.enabled = false; } catch (e) {}
+    try { bbToast('Tracing interior walls: click and drag each wall on the plan — walls snap square and keep adding until you press Esc.'); } catch (e) {}
+  };
+  go(12);
+};
+window.bbIntWallUndo = function () {
+  (window._bbIntWalls || []).pop();
+  _iwSyncLF();
+};
+window.bbIntWallClear = function () {
+  window._bbIntWalls = [];
+  _iwSyncLF();
+  try { bbToast('Interior walls cleared.'); } catch (e) {}
+};
+function _iwCleanup(stay) {
+  if (_iwLine) { try { scene.remove(_iwLine); _iwLine.geometry.dispose(); } catch (e) {} _iwLine = null; }
+  _iwP0 = null;
+  if (!stay) { _iwOn = false; try { controls.enabled = true; } catch (e) {} }
+}
+window.addEventListener('keydown', ev => { if (ev.key === 'Escape' && _iwOn) { _iwCleanup(false); try { bbToast('Interior wall tracing off.'); } catch (e) {} } });
+function _iwAttach() {
+  const el = renderer.domElement;
+  el.addEventListener('pointerdown', ev => {
+    if (!_iwOn) return;
+    _iwDown++;
+    const p = _mzGround(ev); if (!p) return;
+    _iwP0 = p;
+    const g = new THREE.BufferGeometry().setFromPoints([p.clone().setY(0.25), p.clone().setY(0.25)]);
+    _iwLine = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x3d6ea5 }));
+    scene.add(_iwLine);
+    ev.stopPropagation(); ev.preventDefault();
+  }, true);
+  el.addEventListener('pointermove', ev => {
+    if (!_iwOn || !_iwP0 || !_iwLine) return;
+    const p = _mzGround(ev); if (!p) return;
+    _iwLine.geometry.setFromPoints([_iwP0.clone().setY(0.25), p.clone().setY(0.25)]);
+    ev.stopPropagation();
+  }, true);
+  el.addEventListener('pointerup', ev => {
+    if (!_iwOn || !_iwP0) return;
+    const p = _mzGround(ev);
+    const p0 = _iwP0;
+    _iwCleanup(true);
+    if (p) {
+      let x1 = p0.x, z1 = p0.z, x2 = p.x, z2 = p.z;
+      // snap square: dominant axis wins
+      if (Math.abs(x2 - x1) >= Math.abs(z2 - z1)) { const zm = (z1 + z2) / 2; z1 = zm; z2 = zm; }
+      else { const xm = (x1 + x2) / 2; x1 = xm; x2 = xm; }
+      const r4 = v => Math.round(v * 4) / 4;
+      x1 = r4(x1); z1 = r4(z1); x2 = r4(x2); z2 = r4(z2);
+      if (Math.hypot(x2 - x1, z2 - z1) >= 1) {
+        window._bbIntWalls = window._bbIntWalls || [];
+        window._bbIntWalls.push({ x1, z1, x2, z2 });
+        _iwSyncLF();
+      }
+    }
+    ev.stopPropagation(); ev.preventDefault();
+  }, true);
+}
 window.bb3dListMeshes = function(filter) {
   if (!initialized) return [];
   return allMeshes
