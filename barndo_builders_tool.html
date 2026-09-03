@@ -2284,7 +2284,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v318</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v319</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -4146,9 +4146,8 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
     <div class="qbs-card">
       <h3>Framing labor rates <span class="badge">$/sqft</span></h3>
       <div class="qbs-grid-4">
-        <div class="qbs-field"><label>House framing ($/sf)</label><input type="number" id="frame_house" value="10.00" step="0.10" oninput="recalc()" /></div>
+        <div class="qbs-field"><label>Main framing ($/sf)</label><input type="number" id="frame_main" value="10.00" step="0.10" oninput="recalc()" /><div class="qbs-note">House + shop framing — one rate for the main structure</div></div>
         <div class="qbs-field"><label>Garage framing ($/sf)</label><input type="number" id="frame_garage" value="10.00" step="0.10" oninput="recalc()" /></div>
-        <div class="qbs-field"><label>Shop framing ($/sf)</label><input type="number" id="frame_shop" value="8.00" step="0.10" oninput="recalc()" /></div>
         <div class="qbs-field"><label>Porch framing ($/sf)</label><input type="number" id="frame_porch" value="8.00" step="0.10" oninput="recalc()" /></div>
       </div>
     </div>
@@ -9599,7 +9598,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v318';
+const BB_VERSION = 'v319';
 window.BB_EDITION = window.BB_EDITION || 'house';
 const SCHED_KEY = 'bb_schedule_v1';
 // Standard build schedule: [label, duration in days]
@@ -13643,8 +13642,8 @@ let roofLaborQuoteAdded = false;
 let roofLaborQuoteAmount = 0;
 
 const FRAMING_LABOR_COLUMNS = [
-  { key: 'house',         label: 'House framing',         basisField: 'living' },
-  { key: 'shop_enclosed', label: 'Enclosed shop labor',   basisField: 'shopSqft' },
+  { key: 'main',          label: 'Main framing',          basisField: 'living',
+    basis: i => (i.living || 0) + (i.shopSqft || 0) },
   { key: 'porch',         label: 'Porch labor',           basisField: 'porchSqft' },
   // Roof-only labor: only applies to TRULY OPEN structures (pole barns / open lean-tos).
   // If the project has ANY enclosed area, the roof labor is already included in that scope.
@@ -13666,7 +13665,7 @@ function framingLaborSuggestedSqft(colKey, i) {
   if (!c) return 0;
   // Skip auto-fill if this scope doesn't apply to the current project mix
   if (c.applies && !c.applies(i)) return 0;
-  return Math.round(i[c.basisField] || 0);
+  return Math.round(c.basis ? c.basis(i) : (i[c.basisField] || 0));
 }
 
 // Returns true if a scope is "applicable" given the current project mix.
@@ -13677,7 +13676,7 @@ function framingLaborApplies(colKey, i) {
   if (!c) return true;
   if (c.applies && !c.applies(i)) return false;
   // Column applies if its basis area is > 0 in the project
-  return (i && (i[c.basisField] || 0) > 0);
+  return (i && (c.basis ? c.basis(i) : (i[c.basisField] || 0)) > 0);
 }
 
 function updateFramingLaborField(colKey, field, value) {
@@ -15907,9 +15906,9 @@ function getInputs() {
     ftg12x12: num('ftg_12x12') || 1.00,
     ftg12x24: num('ftg_12x24') || 2.00,
     ftg24x24: num('ftg_24x24') || 4.00,
-    frameHouse: num('frame_house') || 10.00,
+    frameMain: num('frame_main') || num('frame_house') || 10.00,
     frameGarage: num('frame_garage') || 10.00,
-    frameShop: num('frame_shop') || 8.00,
+
     framePorch: num('frame_porch') || 8.00,
     extWallLF, intWallLF: num('int_wall_lf'),
     windows: windows + _shedWinQty, extDoors, garageDoors, intDoors,
@@ -16899,14 +16898,12 @@ function calcSubs(i) {
     });
   } else {
     // Legacy fallback — uses the rate config in Settings
-    if (i.living > 0) {
-      subs.push({ trade: "Framing labor — house", basis: "per sqft (markup baked in)", qty: i.living, rate: '$' + i.frameHouse, cost: i.living * i.frameHouse, noMarkup: true, subCategory: 'Labor' });
+    const mainSqftL = (i.living || 0) + (i.shopSqft || 0);
+    if (mainSqftL > 0) {
+      subs.push({ trade: "Framing labor — main", basis: "per sqft (markup baked in)", qty: mainSqftL, rate: '$' + i.frameMain, cost: mainSqftL * i.frameMain, noMarkup: true, subCategory: 'Labor' });
     }
     if (i.garageSqft > 0) {
       subs.push({ trade: "Framing labor — garage", basis: "per sqft (markup baked in)", qty: i.garageSqft, rate: '$' + i.frameGarage, cost: i.garageSqft * i.frameGarage, noMarkup: true, subCategory: 'Labor' });
-    }
-    if (i.shopSqft > 0) {
-      subs.push({ trade: "Framing labor — shop", basis: "per sqft (markup baked in)", qty: i.shopSqft, rate: '$' + i.frameShop, cost: i.shopSqft * i.frameShop, noMarkup: true, subCategory: 'Labor' });
     }
     if (i.porchSqft > 0) {
       subs.push({ trade: "Framing labor — porch", basis: "per sqft (markup baked in)", qty: i.porchSqft, rate: '$' + i.framePorch, cost: i.porchSqft * i.framePorch, noMarkup: true, subCategory: 'Labor' });
