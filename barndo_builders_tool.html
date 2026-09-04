@@ -2284,7 +2284,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v322</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v323</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -9630,7 +9630,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v322';
+const BB_VERSION = 'v323';
 window._bbIntWalls = window._bbIntWalls || [];
 window.BB_EDITION = window.BB_EDITION || 'house';
 const SCHED_KEY = 'bb_schedule_v1';
@@ -22514,6 +22514,60 @@ function buildWing3D(dims, wallBase) {
     }
   });
 
+  // --- wing WALL framing (frame view): plates + studs on the projection
+  // walls and the full end wall, skipping opening spans ---
+  (function wingWallFraming() {
+    const lumW = () => new THREE.MeshStandardMaterial({ color: 0xd2ad79, roughness: 0.92 });
+    const fudW = lbl => ({ categoryKey: 'wall_framing', isFraming: true, label: lbl });
+    const t = 0.13, d = 0.46;
+    // opening spans, keyed by wall, in that wall's run coordinate
+    const spans = wallName => {
+      const out = [];
+      ['garage', 'extdoor', 'window'].forEach(tp => {
+        ((typeof openingsState !== 'undefined' && openingsState[tp]) || []).forEach(r => {
+          if (r.wall !== wallName || r.pos == null) return;
+          const ow = r.w || openingDefault(tp, 'w');
+          const isEnd = wallName === wg.end;
+          const len = isEnd ? (W + wg.fp + wg.bp) : L;
+          const shift = isEnd ? (wg.fp - wg.bp) / 2 : 0;
+          const c = -len / 2 + Math.max(0, Math.min(1, r.pos)) * len + shift;
+          out.push([c - ow / 2 - 0.35, c + ow / 2 + 0.35]);
+        });
+      });
+      return out;
+    };
+    // one framed run: from a to b along an axis at a fixed line
+    const frameRun = (alongX, fixed, a, b, cuts, lbl) => {
+      if (b - a < 0.8) return;
+      const mk = (wLen, hgt, px, py, pz, tag) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(alongX ? wLen : d, hgt, alongX ? d : wLen), lumW());
+        m.position.set(px, py, pz);
+        m.userData = fudW(tag); m.castShadow = false;
+        buildingGroup.add(m); allMeshes.push(m);
+      };
+      const mid = (a + b) / 2, ln = b - a;
+      mk(ln, t, alongX ? mid : fixed, wallBase + t / 2, alongX ? fixed : mid, lbl + ' — bottom plate');
+      [H - 0.26, H - 0.13].forEach(y =>
+        mk(ln, t, alongX ? mid : fixed, wallBase + y + t / 2 - 0.005, alongX ? fixed : mid, lbl + ' — top plate'));
+      for (let dd = a + 0.1; dd <= b - 0.05; dd += 16 / 12) {
+        if ((cuts || []).some(([c0, c1]) => dd > c0 && dd < c1)) continue;
+        mk(t, H - 0.52, alongX ? dd : fixed, wallBase + (H - 0.52) / 2 + t, alongX ? fixed : dd, lbl + ' — stud');
+      }
+    };
+    // wing END wall — the full run, garage door and man door spans skipped
+    frameRun(false, s * (L / 2 - 0.35), -W / 2 - wg.bp + 0.3, W / 2 + wg.fp - 0.3, spans(wg.end), 'Wing end wall framing');
+    // projection walls (front / back of the wing)
+    [['front', wg.fp, 1], ['back', wg.bp, -1]].forEach(([sideN, proj, zsn]) => {
+      if (!(proj > 0)) return;
+      const zOut = zsn * (W / 2 + proj);
+      const xEdge = s * (L / 2), xIn = s * (L / 2 - wg.w);
+      const xa = Math.min(xEdge, xIn) + 0.3, xb = Math.max(xEdge, xIn) - 0.3;
+      frameRun(true, zOut - zsn * 0.35, xa, xb, spans(sideN), 'Wing ' + sideN + ' wall framing');
+      // junction side wall of the projection
+      frameRun(false, xIn + (s < 0 ? 0.35 : -0.35), Math.min(zsn * W / 2, zOut) + 0.3, Math.max(zsn * W / 2, zOut) - 0.3, [], 'Wing side wall framing');
+    });
+  })();
+
   // --- wing gable STUD framing (frame view) — front and back faces ---
   [[zF, 1], [zBk, -1]].forEach(([zPosF, zsF]) => {
     const slopeW = rise / (wg.w / 2 + eaveOH);
@@ -22707,6 +22761,14 @@ function buildCrowsFootOne(dims, wallBase, side) {
     }
   });
 
+  // EAVE RAFTER CARRIERS — one per side, building face out to the fly
+  // rafter line, carrying the rafter run at the post line
+  [-1, 1].forEach(sc => {
+    const car = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.5, gd + 0.9), woodM(hdrHex));
+    car.position.set(sc * (effHalf - postT / 2), wallBase + gh - 0.25, (gd + 0.8) / 2);
+    add(car, 'Porch eave rafter carrier — 4×6 ' + (tHdrType === 'yp' ? 'YP' : 'cypress'));
+  });
+
   // ONE header / carrier across the posts — carries the crows foot
   const hdr = new THREE.Mesh(new THREE.BoxGeometry(effHalf * 2, hdrT, hdrT), woodM(hdrHex));
   hdr.position.set(0, wallBase + gh - hdrT / 2, faceZ);
@@ -22739,9 +22801,9 @@ function buildCrowsFootOne(dims, wallBase, side) {
     : 0;
 
   // Ridge — from the building (or into the main roof) out to the truss peak
-  const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.5, gd + 0.1 + tExt), woodM(CY2));
-  ridge.position.set(0, wallBase + gh + effRise - 0.25, (gd - tExt) / 2);
-  add(ridge, 'Gable ridge — 4×6 cypress');
+  const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.5, gd + 0.9 + tExt), woodM(CY2));
+  ridge.position.set(0, wallBase + gh + effRise - 0.25, (gd + 0.8 - tExt) / 2);
+  add(ridge, 'Gable ridge — 4×6 cypress (to the fly rafter)');
 
   // Rafters — pairs down both slopes @48", from the building to the face,
   // PLUS the FLY RAFTER pair floating past the open gable face
@@ -24499,6 +24561,33 @@ function buildOpeningInstance(dims, wallBase, type, wall, posFrac, sill, w, h, m
       king.position.set(sx * (w / 2 + t * 1.5 + 0.01), (hdrH + 0.1) / 2, 0);
       king.userData = fud('King stud'); grp.add(king); allMeshes.push(king);
     });
+    // rough sill + cripple studs BELOW a window (floor -> sill), so the wall
+    // framing never shows a void under the opening
+    if (type === 'window' && sill > 0.4) {
+      const rs = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, t, d), lum());
+      rs.position.set(0, -h / 2 - t / 2, 0);
+      rs.userData = fud('Rough sill'); grp.add(rs); allMeshes.push(rs);
+      const crH = sill - t - 0.02;
+      if (crH > 0.25) {
+        for (let cx = -w / 2 + 0.1; cx <= w / 2 - 0.05; cx += 16 / 12) {
+          const cr = new THREE.Mesh(new THREE.BoxGeometry(t, crH, d), lum());
+          cr.position.set(cx, -h / 2 - t - crH / 2, 0);
+          cr.userData = fud('Cripple stud (below sill)'); grp.add(cr); allMeshes.push(cr);
+        }
+        const crE = new THREE.Mesh(new THREE.BoxGeometry(t, crH, d), lum());
+        crE.position.set(w / 2 - 0.07, -h / 2 - t - crH / 2, 0);
+        crE.userData = fud('Cripple stud (below sill)'); grp.add(crE); allMeshes.push(crE);
+      }
+    }
+    // cripples ABOVE the header up to the top plate
+    const gapTop = (dims.H - (sill + h)) - hdrH - 0.26;
+    if (gapTop > 0.3) {
+      for (let cx = -w / 2 + 0.1; cx <= w / 2 - 0.05; cx += 16 / 12) {
+        const cu = new THREE.Mesh(new THREE.BoxGeometry(t, gapTop, d), lum());
+        cu.position.set(cx, h / 2 + hdrH + 0.04 + gapTop / 2, 0);
+        cu.userData = fud('Cripple stud (above header)'); grp.add(cu); allMeshes.push(cu);
+      }
+    }
   })();
 
   // Trim frame (4 sides) — copper-highlighted when selected
