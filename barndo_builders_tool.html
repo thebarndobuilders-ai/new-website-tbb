@@ -2284,7 +2284,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v324</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v325</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -9629,7 +9629,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v324';
+const BB_VERSION = 'v325';
 window._bbIntWalls = window._bbIntWalls || [];
 window.BB_EDITION = window.BB_EDITION || 'house';
 const SCHED_KEY = 'bb_schedule_v1';
@@ -10460,15 +10460,20 @@ function barndoAllModels() {
       merged.metaLine = (o.footprint || m.footprint) + ' · ' + ((o.sqft || m.sqft) || 0).toLocaleString() + " sqft · factory model — updated " + String(o.updatedDate || '').slice(0, 10);
       return merged;
     });
-  return builtins.concat(barndoModels());
+  const hidden = bbHiddenBuiltins();
+  return builtins.filter(m => !hidden.includes(m.id)).concat(barndoModels());
 }
 
 function renderBarndoGrid() {
   const grid = document.getElementById('barndo-grid');
   if (!grid) return;
   const list = barndoAllModels();
+  const _hid = bbHiddenBuiltins();
+  const _restoreCard = _hid.length
+    ? `<div class="qbs-card" style="margin:0; display:flex; align-items:center; justify-content:center; min-height:120px;"><button onclick="bbRestoreHiddenBuiltins()" style="font-size:12px;">↺ Restore ${_hid.length} hidden factory model${_hid.length > 1 ? 's' : ''}</button></div>`
+    : '';
   if (!list.length) {
-    grid.innerHTML = '<div class="qbs-card"><p class="qbs-sub" style="margin:0;">No model homes saved yet. Build one on the ⚡ 3D Buildout, come back, and hit "Save current build as model".</p></div>';
+    grid.innerHTML = '<div class="qbs-card"><p class="qbs-sub" style="margin:0;">No model homes saved yet. Build one on the ⚡ 3D Buildout, come back, and hit "Save current build as model".</p></div>' + _restoreCard;
     return;
   }
   const money = v => '$' + Math.round(v || 0).toLocaleString('en-US');
@@ -10499,11 +10504,14 @@ function renderBarndoGrid() {
         <div style="display:flex; gap:6px;">
           <button onclick="barndoLoad('${m.id}')" style="background:var(--copper); color:var(--bg-deep); border-color:var(--copper); flex:1;">Load into 3D tool</button>
           <button onclick="barndoExportOne('${m.id}')" title="Export this model as a file">⬇</button>
-          ${m.builtin ? (m.updated ? `<button onclick="bbResetFactoryModel('${m.id}')" title="Undo your update — back to the shipped version">↺</button>` : '') : `<button onclick="barndoDelete('${m.id}')" title="Delete this model" class="opening-remove-btn">×</button>`}
+          ${m.builtin && m.updated ? `<button onclick="bbResetFactoryModel('${m.id}')" title="Undo your update — back to the shipped version">↺</button>` : ''}
+        </div>
+        <div style="margin-top:6px;">
+          <button onclick="${m.builtin ? 'bbHideBuiltin' : 'barndoDelete'}('${m.id}')" style="width:100%; font-size:11px; background:${_barndoDelArm === m.id ? '#5a1f1f' : '#3a1414'}; color:#ff9b9b; border:1px solid #5a1f1f;">${_barndoDelArm === m.id ? ('⚠ REALLY ' + (m.builtin ? 'remove' : 'delete') + ' — click again to confirm') : ('× ' + (m.builtin ? 'Remove this model' : 'Delete this model'))}</button>
         </div>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + _restoreCard;
 }
 
 function barndoLoad(id) {
@@ -10529,9 +10537,44 @@ function barndoLoad(id) {
   } catch (e) {}
 }
 
+let _barndoDelArm = null;      // two-click delete: no browser dialogs
+let _barndoDelArmTimer = null; // auto-disarm so an armed button never lingers
+function _barndoArm(id) {
+  _barndoDelArm = id;
+  if (_barndoDelArmTimer) clearTimeout(_barndoDelArmTimer);
+  _barndoDelArmTimer = setTimeout(() => { _barndoDelArm = null; try { renderBarndoGrid(); } catch (e) {} }, 6000);
+  renderBarndoGrid();
+}
+function _barndoDisarm() {
+  _barndoDelArm = null;
+  if (_barndoDelArmTimer) { clearTimeout(_barndoDelArmTimer); _barndoDelArmTimer = null; }
+}
 function barndoDelete(id) {
+  if (_barndoDelArm !== id) { _barndoArm(id); bbToast('Click the red button again to delete this model for good.'); return; }
+  _barndoDisarm();
+  const m = barndoModels().find(x => x.id === id);
   barndoStore(barndoModels().filter(x => x.id !== id));
   renderBarndoGrid();
+  bbToast(m ? '"' + m.name + '" deleted.' : 'Model deleted.');
+}
+const BB_HIDDEN_BUILTINS_KEY = 'BB_HIDDEN_BUILTINS';
+function bbHiddenBuiltins() {
+  try { const a = JSON.parse(localStorage.getItem(BB_HIDDEN_BUILTINS_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function bbHideBuiltin(id) {
+  if (_barndoDelArm !== id) { _barndoArm(id); bbToast('Click the red button again to remove this factory model. You can restore it anytime.'); return; }
+  _barndoDisarm();
+  const h = bbHiddenBuiltins();
+  if (!h.includes(id)) h.push(id);
+  try { localStorage.setItem(BB_HIDDEN_BUILTINS_KEY, JSON.stringify(h)); } catch (e) {}
+  renderBarndoGrid();
+  bbToast('Factory model removed from the grid. "Restore hidden factory models" brings it back.');
+}
+function bbRestoreHiddenBuiltins() {
+  try { localStorage.removeItem(BB_HIDDEN_BUILTINS_KEY); } catch (e) {}
+  renderBarndoGrid();
+  bbToast('Hidden factory models restored.');
 }
 
 function _barndoDownload(obj, filename) {
