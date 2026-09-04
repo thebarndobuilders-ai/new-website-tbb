@@ -2284,7 +2284,7 @@
   <div class="qbs-header">
     <div class="qbs-brand">
       <h1 class="qbs-brand-text" style="margin:0;line-height:0"><span id="bb-header-logo-default"><svg width="380" height="144" viewBox="36 76 592 224" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Barndo Builders Warehouse"><g stroke="#fff" stroke-width="4.5" fill="none" stroke-linecap="square"><path d="M246 212 H102 V90 H620 V212 H442"/></g><text transform="rotate(-90 68 150)" x="68" y="150" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="60" textLength="108" lengthAdjust="spacing" fill="#fff">THE</text><text x="361" y="151" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="94" textLength="442" lengthAdjust="spacingAndGlyphs" fill="#fff">BARNDO</text><text x="344" y="213" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="25" textLength="190" lengthAdjust="spacing" fill="#fff">BUILDERS</text><text x="338" y="256" text-anchor="middle" dominant-baseline="central" font-family="Rockwell, 'Courier New', Courier, serif" font-weight="bold" font-size="40" textLength="372" lengthAdjust="spacing" fill="#fff">WAREHOUSE</text><path d="M156 294 Q340 280 512 301 Q340 277 160 291 Z" fill="#fff"/></svg></span><img id="bb-header-logo-custom" alt="The Barndo Builders Warehouse" style="display:none;max-height:150px;max-width:440px" /></h1>
-      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v323</p>
+      <p class="qbs-sub" id="bb-storage-status">Local database · this device · v324</p>
     </div>
     <div class="qbs-actions">
       <span id="bb-user-pill-container"></span>
@@ -3646,12 +3646,6 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
       </div>
     </div>
 
-    <!-- Pipeline analytics — computed from the same leads + saved quotes; display only -->
-    <div class="qbs-card" style="margin-top:12px;">
-      <h3>Pipeline analytics <span class="badge">Close rate · pipeline value · sources · months</span></h3>
-      <div id="leads-analytics-body"><p class="qbs-sub">Loading…</p></div>
-    </div>
-
     <!-- Action bar -->
     <div class="qbs-card" style="padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
       <div style="display: flex; align-items: center; gap: 12px;">
@@ -4225,6 +4219,11 @@ garage, 216, 84, 1, OVERHEAD SECTIONAL, D01" style="width: 100%; min-height: 180
   <!-- FRAMING PAGES — per-stage proof of takeoff: 3D of just that stage + dims + editable materials -->
   <!-- TAB: COST & PROFIT — job P&L tracking -->
   <div class="qbs-tab-content" id="tab-jobcost" style="display:none">
+    <!-- Pipeline analytics — computed from leads + saved quotes; display only -->
+    <div class="qbs-card" style="margin-bottom:12px;">
+      <h3>Pipeline analytics <span class="badge">Close rate · pipeline value · sources · months</span></h3>
+      <div id="leads-analytics-body"><p class="qbs-sub">Loading…</p></div>
+    </div>
     <div class="qbs-card">
       <h3>💰 Cost &amp; Profit <span class="badge">Budget vs committed vs paid · projected margin · every job</span></h3>
       <p class="qbs-sub" style="margin-bottom:12px;">Each job gets a cost sheet: the budget seeds from your quote, then you log <strong>committed</strong> costs (signed POs / sub agreements) and <strong>paid</strong> costs against each category. Projected profit updates as you type. The table below is the whole company at a glance.</p>
@@ -9630,7 +9629,7 @@ function printCounterTicket() {
 // =============================================================
 // Visible build version — bump on every release so the header shows which
 // file is actually open (guards against running a stale download).
-const BB_VERSION = 'v323';
+const BB_VERSION = 'v324';
 window._bbIntWalls = window._bbIntWalls || [];
 window.BB_EDITION = window.BB_EDITION || 'house';
 const SCHED_KEY = 'bb_schedule_v1';
@@ -13050,7 +13049,7 @@ function switchTab(name) {
   if (name === 'workspace') { try { wsEnter(); } catch (e) {} } else { try { wsLeave(); } catch (e) {} }
   if (name === 'framing') { try { renderFramingPages(); } catch (e) {} }
   if (name === 'barndos') { try { renderBarndoGrid(); } catch (e) {} }
-  if (name === 'jobcost') { try { renderJobCost(); } catch (e) {} }
+  if (name === 'jobcost') { try { renderJobCost(); } catch (e) {} try { renderLeadsAnalytics(); } catch (e) {} }
   if (name === 'takeoff') { try { bbTakeoffRailEnter(); } catch (e) {} try { bbSheetrockRender(); } catch (e) {} }
   if (name === 'blueprints') { try { bbBPRender(); } catch (e) {} }
   if (name === 'calcs') { ['grCalc','gsCalc','shCalc','swCalc','stCalc','csCalc','phCalc','rfCalc','gpCalc','dwCalc','bfCalc','cbCalc','cfCalc','rsCalc','wsCalc'].forEach(f => { try { window[f] ? window[f]() : eval(f + '()'); } catch (e) {} }); }
