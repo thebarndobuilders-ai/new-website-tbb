@@ -1,7 +1,9 @@
 <!-- ============================================================
- LOCKED SNAPSHOT — Takeoff tab, v202, builder-confirmed working.
- (v201 + page-scoped Clear: THIS page only vs EVERYTHING, via modal,
- zero browser dialogs.)
+ LOCKED SNAPSHOT — Takeoff tab, v360, builder-confirmed working.
+ (v202 + builder-ordered v360 change: #to-canvas-wrap viewer height
+ 600px -> calc(100vh - 150px)/min 620px — bigger PDF viewer. Only
+ that one markup line changed; the script block is untouched.
+ Also: v201 + page-scoped Clear via modal, zero browser dialogs.)
  Two sections: (1) #tab-takeoff markup, (2) the BLUEPRINT TAKEOFF
  script block. Verify by re-extracting and diffing; restore verbatim.
  ============================================================ -->
@@ -95,7 +97,7 @@
               <button onclick="takeoffZoom(0)" title="Fit page (0)">Fit</button>
             </span>
           </div>
-          <div id="to-canvas-wrap" style="position:relative; width:100%; height:600px; overflow:auto; background:#2a2a2a; border:1px solid var(--hairline); border-radius:6px;">
+          <div id="to-canvas-wrap" style="position:relative; width:100%; height:calc(100vh - 150px); min-height:620px; overflow:auto; background:#2a2a2a; border:1px solid var(--hairline); border-radius:6px;">
             <div id="to-stage" style="position:relative;">
               <canvas id="to-pdf-canvas" style="display:block; position:relative; z-index:1;"></canvas>
               <canvas id="to-draw-canvas" style="position:absolute; left:0; top:0; z-index:2;"></canvas>
