@@ -24,6 +24,10 @@ PDF viewer, 2026-09-15)** after a long, painful debugging saga.
 ## Other standing rules
 - Every change: commit + push to `claude/new-session-87wo5r`, bump `BB_VERSION` and the
   header stamp, and send the user a plain `.html` file named `barndo_vNNN.html` (never a zip).
+- The app is LIVE on GitHub Pages from `docs/` on this branch
+  (https://thebarndobuilders-ai.github.io/new-website-tbb/ — index = dealer page,
+  app.html = software, dealer.html = dealer edition). Run `python3 make_site.py`
+  after `make_dealer_edition.py` and commit `docs/` in the same release commit.
 - Verify changes headless (Playwright, chromium at /opt/pw-browsers) with REAL mouse
   input and with dialogs force-dismissed before shipping.
 - Pricing rules, builder conventions, and feature history: see `BARNDO_TOOL_HANDOFF.md`.
