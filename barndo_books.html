@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Barndo Books — Statement &amp; Invoice Audit</title>
+<style>
+:root {
+  --bg: #0d0d0d; --surface: #161616; --surface-2: #1e1e1e;
+  --hairline: #2c2c2c; --hairline-emphasis: #3a3a3a;
+  --text: #f2ede3; --text-2: #c9c2b4; --text-3: #8a8375;
+  --copper: #d4823a; --copper-soft: rgba(212,130,58,0.14);
+  --cream: #e8d9b0; --warn: #e06c5a; --ok: #2e9e5b;
+  --font-mono: "SF Mono", Consolas, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; padding: 18px; }
+.wrap { max-width: 1120px; margin: 0 auto; }
+header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; border-bottom: 2px solid var(--hairline-emphasis); padding-bottom: 12px; }
+header h1 { margin: 0; font-size: 21px; letter-spacing: 0.04em; }
+header h1 b { color: var(--cream); }
+header .sub { color: var(--text-3); font-family: var(--font-mono); font-size: 11px; }
+.card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 10px; padding: 16px 18px; margin-bottom: 18px; }
+.card h3 { margin: 0 0 10px; font-size: 16px; }
+.badge { font-size: 11px; font-weight: 400; color: var(--text-3); margin-left: 8px; }
+.sub { color: var(--text-3); font-size: 12px; margin: 6px 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+@media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } body { padding: 10px; } }
+.field label { display: block; font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+input, select, textarea, button { background: var(--surface-2); color: var(--text); border: 1px solid var(--hairline); border-radius: 6px; padding: 7px 9px; font-size: 13px; font-family: inherit; width: 100%; }
+input[type=file] { padding: 5px; }
+button { cursor: pointer; width: auto; }
+button:hover { border-color: var(--copper); }
+button.primary { background: var(--cream); color: #111; font-weight: 700; border-color: var(--cream); }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3); border-bottom: 2px solid var(--hairline-emphasis); padding: 5px 7px; }
+td { border-bottom: 1px solid var(--hairline); padding: 5px 7px; vertical-align: middle; }
+td.num, th.num { text-align: right; font-family: var(--font-mono); }
+h4.sect { margin: 16px 0 6px; font-size: 12px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--copper); }
+.tiles { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.tile { flex: 1; min-width: 115px; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 8px; padding: 8px 12px; }
+.tile .l { font-family: var(--font-mono); font-size: 10px; color: var(--text-3); text-transform: uppercase; }
+.tile .v { font-family: var(--font-mono); font-size: 17px; font-weight: 700; margin-top: 2px; }
+.rulechip { display: inline-flex; align-items: center; gap: 6px; margin: 3px 6px 3px 0; padding: 3px 9px; background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 12px; font-size: 11px; font-family: var(--font-mono); }
+.rulechip a { cursor: pointer; color: var(--text-3); text-decoration: none; }
+#toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); background: var(--cream); color: #111; padding: 9px 18px; border-radius: 8px; font-weight: 600; font-size: 13px; display: none; z-index: 50; box-shadow: 0 6px 24px rgba(0,0,0,0.5); }
+.filterbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.filterbar select, .filterbar input { width: auto; }
+.filterbar input[type=text] { flex: 1; min-width: 150px; font-family: var(--font-mono); font-size: 12px; }
+.tablewrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>THE <b>BARNDO BUILDERS</b> WAREHOUSE · BOOKS</h1>
+    <span class="sub" id="bk_version">Statement &amp; invoice audit · v1 · all data stays on this computer</span>
+  </header>
+
+  <div class="card">
+    <h3>Import statements &amp; invoices <span class="badge">CSV files from your bank / card portal</span></h3>
+    <p class="sub">Download transactions as <b>CSV</b> from your bank or credit-card website (look for "Download" or "Export" on the activity page), then load the file here. Invoices take a CSV with date, customer, amount (and invoice # if you have it). Nothing is uploaded anywhere — this page works entirely on your computer.</p>
+    <div class="grid2">
+      <div class="field"><label>This file is…</label>
+        <select id="bk_acct">
+          <option value="bank" selected>Bank statement (checking)</option>
+          <option value="card">Credit card statement</option>
+          <option value="inv">Customer invoices</option>
+        </select>
+      </div>
+      <div class="field"><label>CSV file</label><input type="file" id="bk_file" accept=".csv,.txt,text/csv" onchange="bbBooksFilePicked(this)"></div>
+      <div class="field" style="grid-column:1 / -1;"><label>…or paste CSV text here</label>
+        <textarea id="bk_paste" rows="3" style="font-family:var(--font-mono); font-size:11px;" placeholder="Date,Description,Amount&#10;01/05/2026,QUALITY BUILDING SUPPLY,-1842.50"></textarea>
+        <div style="margin-top:6px;"><button onclick="bbBooksParsePaste()">Read pasted text</button></div>
+      </div>
+    </div>
+    <div id="bk_maparea" style="display:none; margin-top:12px; border-top:1px dashed var(--hairline); padding-top:12px;">
+      <div class="grid2">
+        <div class="field"><label>Date column</label><select id="bk_col_date" onchange="bbBooksPreview()"></select></div>
+        <div class="field"><label id="bk_desc_label">Description column</label><select id="bk_col_desc" onchange="bbBooksPreview()"></select></div>
+        <div class="field"><label>Amount column</label><select id="bk_col_amt" onchange="bbBooksPreview()"></select></div>
+        <div class="field" id="bk_sign_wrap"><label>Amount signs</label>
+          <select id="bk_sign" onchange="bbBooksPreview()">
+            <option value="auto" selected>Auto (negative = money out)</option>
+            <option value="flip">Flip (positive = money out)</option>
+            <option value="dc">Separate debit / credit columns</option>
+          </select>
+        </div>
+        <div class="field" id="bk_dc_wrap" style="display:none;"><label>Debit (out) / Credit (in) columns</label>
+          <div style="display:flex; gap:6px;"><select id="bk_col_debit" onchange="bbBooksPreview()" style="flex:1;"></select><select id="bk_col_credit" onchange="bbBooksPreview()" style="flex:1;"></select></div>
+        </div>
+        <div class="field" id="bk_inv_num_wrap" style="display:none;"><label>Invoice # column (optional)</label><select id="bk_col_invnum" onchange="bbBooksPreview()"></select></div>
+      </div>
+      <div id="bk_preview" style="margin-top:8px; font-family:var(--font-mono); font-size:11px; overflow-x:auto;"></div>
+      <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+        <button class="primary" onclick="bbBooksImport()">⬇ Import these rows</button>
+        <span id="bk_import_status" class="sub"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Ledger <span class="badge" id="bk_ledger_badge">0 transactions</span></h3>
+    <div class="tiles" id="bk_tiles"></div>
+    <div class="filterbar">
+      <select id="bk_f_acct" onchange="bbBooksRender()"><option value="">All accounts</option><option value="bank">Bank</option><option value="card">Credit card</option></select>
+      <select id="bk_f_cat" onchange="bbBooksRender()"><option value="">All categories</option></select>
+      <select id="bk_f_month" onchange="bbBooksRender()"><option value="">All months</option></select>
+      <input type="text" id="bk_f_q" placeholder="Search description…" oninput="bbBooksRender()">
+      <button onclick="bbBooksExportCSV()">⬇ Categorized CSV</button>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Date</th><th>Acct</th><th>Description</th><th>Category</th><th class="num">Amount</th><th></th></tr></thead>
+        <tbody id="bk_tbody"></tbody>
+      </table>
+    </div>
+    <p class="sub">Change a category on any line and it's remembered as a rule for that merchant. "Transfer / CC payment" lines stay out of the expense totals so card payments aren't counted twice.</p>
+  </div>
+
+  <div class="card">
+    <h3>Audit report <span class="badge">Itemized · month by month · recurring · duplicates · invoice matching</span></h3>
+    <div id="bk_audit"><p class="sub">Import at least one statement to see the audit.</p></div>
+  </div>
+
+  <div class="card">
+    <h3>Rules &amp; data <span class="badge">Merchant → category, applied on import</span></h3>
+    <div id="bk_rules"></div>
+    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <input type="text" id="bk_rule_match" placeholder="Description contains… (e.g. SUNOCO)" style="width:auto; flex:1; min-width:170px; font-family:var(--font-mono); font-size:12px;">
+      <select id="bk_rule_cat" style="width:auto;"></select>
+      <button onclick="bbBooksAddRule()">Add rule</button>
+    </div>
+    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; border-top:1px dashed var(--hairline); padding-top:12px;">
+      <button onclick="bbBooksBackup()">⬇ Backup all books data (JSON)</button>
+      <label style="display:inline-flex; align-items:center;"><span style="border:1px solid var(--hairline); border-radius:6px; padding:7px 9px; cursor:pointer; background:var(--surface-2);">⬆ Restore backup<input type="file" accept=".json,application/json" style="display:none;" onchange="bbBooksRestore(this)"></span></label>
+      <button id="bk_clear_btn" onclick="bbBooksClearAll()" style="margin-left:auto; color:var(--warn);">Clear ALL books data</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+// =============================================================
+// BARNDO BOOKS v1 — standalone bank / credit-card / invoice audit.
+// All data in localStorage key bb_books_v1 on THIS computer.
+// Sign convention: amount > 0 = money INTO the business, < 0 = out.
+// Zero browser dialogs — toasts only.
+// =============================================================
+const BB_BOOKS_VERSION = 'books v1';
+const BB_BOOKS_KEY = 'bb_books_v1';
+const BB_BOOK_CATS = ['Materials','Fuel','Subcontractors','Payroll','Equipment & rental','Insurance','Utilities & phone','Office & software','Meals','Advertising','Loan & interest','Bank fees','Taxes & licenses','Transfer / CC payment','Owner draw','Customer payment','Other income','Uncategorized'];
+const BB_BOOK_SEED_RULES = [
+  { match: 'LOWE', cat: 'Materials' }, { match: 'HOME DEPOT', cat: 'Materials' },
+  { match: 'QUALITY BUILDING', cat: 'Materials' }, { match: 'QBS', cat: 'Materials' },
+  { match: '84 LUMBER', cat: 'Materials' }, { match: 'SINKING CREEK', cat: 'Materials' },
+  { match: 'BUILDERS SUPPLY', cat: 'Materials' }, { match: 'TRACTOR SUPPLY', cat: 'Materials' },
+  { match: 'SHELL', cat: 'Fuel' }, { match: 'EXXON', cat: 'Fuel' }, { match: 'SUNOCO', cat: 'Fuel' },
+  { match: 'MARATHON', cat: 'Fuel' }, { match: 'PILOT', cat: 'Fuel' }, { match: 'CHEVRON', cat: 'Fuel' },
+  { match: 'CASEY', cat: 'Fuel' }, { match: 'BP#', cat: 'Fuel' }, { match: 'FUEL', cat: 'Fuel' },
+  { match: 'INTUIT', cat: 'Office & software' }, { match: 'QUICKBOOKS', cat: 'Office & software' },
+  { match: 'GODADDY', cat: 'Office & software' }, { match: 'ADOBE', cat: 'Office & software' },
+  { match: 'VERIZON', cat: 'Utilities & phone' }, { match: 'AT&T', cat: 'Utilities & phone' },
+  { match: 'ELECTRIC', cat: 'Utilities & phone' },
+  { match: 'MOBILE DEPOSIT', cat: 'Customer payment' }, { match: 'REMOTE DEPOSIT', cat: 'Customer payment' },
+  { match: 'STRIPE', cat: 'Customer payment' },
+  { match: 'PAYMENT THANK YOU', cat: 'Transfer / CC payment' }, { match: 'AUTOPAY', cat: 'Transfer / CC payment' },
+  { match: 'ONLINE PAYMENT', cat: 'Transfer / CC payment' }, { match: 'ONLINE TRANSFER', cat: 'Transfer / CC payment' },
+  { match: 'TRANSFER', cat: 'Transfer / CC payment' }, { match: 'CARDMEMBER SERV', cat: 'Transfer / CC payment' },
+  { match: 'IRS', cat: 'Taxes & licenses' }, { match: 'DEPT OF REVENUE', cat: 'Taxes & licenses' },
+  { match: 'INTEREST', cat: 'Loan & interest' }, { match: 'LOAN PMT', cat: 'Loan & interest' },
+  { match: 'SERVICE CHARGE', cat: 'Bank fees' }, { match: 'OVERDRAFT', cat: 'Bank fees' },
+  { match: 'MAINTENANCE FEE', cat: 'Bank fees' },
+];
+
+function bbToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.style.display = 'block';
+  clearTimeout(window._toastT);
+  window._toastT = setTimeout(() => { el.style.display = 'none'; }, 3200);
+}
+function bbBooksLoad() {
+  try { const d = JSON.parse(localStorage.getItem(BB_BOOKS_KEY) || 'null'); if (d && d.tx) return d; } catch (e) {}
+  return { tx: [], inv: [], rules: [] };
+}
+function bbBooksSave(d) { try { localStorage.setItem(BB_BOOKS_KEY, JSON.stringify(d)); } catch (e) { bbToast('Could not save — storage blocked?'); } }
+
+// -------- CSV parsing --------
+function bbCsvParse(text) {
+  const rows = []; let row = [], field = '', inQ = false;
+  const s = String(text || '');
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inQ) {
+      if (ch === '"') { if (s[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && s[i + 1] === '\n') i++;
+      row.push(field); field = '';
+      if (row.length > 1 || (row[0] || '').trim() !== '') rows.push(row);
+      row = [];
+    } else field += ch;
+  }
+  if (field !== '' || row.length) { row.push(field); if (row.length > 1 || (row[0] || '').trim() !== '') rows.push(row); }
+  return rows;
+}
+function bbBookDate(v) {
+  const t = String(v || '').trim();
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0');
+  m = t.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (m) { const y = m[3].length === 2 ? '20' + m[3] : m[3]; return y + '-' + m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0'); }
+  return null;
+}
+function bbBookAmt(v) {
+  let t = String(v == null ? '' : v).replace(/[$,\s]/g, '');
+  if (!t) return null;
+  let neg = false;
+  if (/^\(.*\)$/.test(t)) { neg = true; t = t.slice(1, -1); }
+  if (/CR$/i.test(t)) t = t.replace(/CR$/i, '');
+  const n = parseFloat(t);
+  if (isNaN(n)) return null;
+  return neg ? -n : n;
+}
+
+// -------- import flow --------
+let _bkParsed = null; // { rows, header, acct }
+function bbBooksFilePicked(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { bbBooksStartMap(String(r.result || '')); input.value = ''; };
+  r.readAsText(f);
+}
+function bbBooksParsePaste() {
+  const t = (document.getElementById('bk_paste') || {}).value || '';
+  if (t.trim()) bbBooksStartMap(t); else bbToast('Paste some CSV text first.');
+}
+function bbBooksStartMap(text) {
+  const rows = bbCsvParse(text);
+  if (rows.length < 2) { bbToast('Could not read that CSV — need a header row plus data rows.'); return; }
+  const acct = (document.getElementById('bk_acct') || {}).value || 'bank';
+  const header = rows[0].map((h, idx) => (String(h || '').trim() || ('Column ' + (idx + 1))));
+  _bkParsed = { rows: rows.slice(1), header, acct };
+  const fill = (id, guessFn, allowNone) => {
+    const sel = document.getElementById(id); if (!sel) return;
+    sel.innerHTML = (allowNone ? '<option value="-1">—</option>' : '') + header.map((h, idx) => `<option value="${idx}">${h}</option>`).join('');
+    const g = guessFn(); if (g >= 0) sel.value = String(g);
+  };
+  const sample = _bkParsed.rows.slice(0, 8);
+  const colScore = (fn) => { let best = -1, bestN = 0; header.forEach((h, ci) => { let n = 0; sample.forEach(r => { if (fn(r[ci], h)) n++; }); if (n > bestN) { bestN = n; best = ci; } }); return bestN > 0 ? best : -1; };
+  fill('bk_col_date', () => colScore(v => bbBookDate(v) !== null));
+  fill('bk_col_amt', () => {
+    const hinted = header.findIndex(h => /amount|amt/i.test(h)); if (hinted >= 0) return hinted;
+    return colScore((v, h) => bbBookAmt(v) !== null && bbBookDate(v) === null && !/balance|check|ref|invoice|#|num/i.test(h));
+  });
+  fill('bk_col_desc', () => {
+    const hinted = header.findIndex(h => /desc|memo|payee|merchant|name|customer/i.test(h)); if (hinted >= 0) return hinted;
+    return colScore(v => { const t = String(v || '').trim(); return t.length > 5 && bbBookAmt(t) === null && bbBookDate(t) === null; });
+  });
+  fill('bk_col_debit', () => header.findIndex(h => /debit|withdraw/i.test(h)), true);
+  fill('bk_col_credit', () => header.findIndex(h => /credit|deposit/i.test(h)), true);
+  fill('bk_col_invnum', () => header.findIndex(h => /invoice|inv\s*#|number|no\.?$/i.test(h)), true);
+  const hasDC = header.some(h => /debit|withdraw/i.test(h)) && header.some(h => /credit|deposit/i.test(h));
+  const signSel = document.getElementById('bk_sign');
+  if (signSel) signSel.value = hasDC && !header.some(h => /^amount$/i.test(String(h).trim())) ? 'dc' : 'auto';
+  document.getElementById('bk_desc_label').textContent = acct === 'inv' ? 'Customer column' : 'Description column';
+  document.getElementById('bk_inv_num_wrap').style.display = acct === 'inv' ? '' : 'none';
+  document.getElementById('bk_sign_wrap').style.display = acct === 'inv' ? 'none' : '';
+  document.getElementById('bk_maparea').style.display = 'block';
+  document.getElementById('bk_import_status').textContent = '';
+  bbBooksPreview();
+}
+function bbBooksRowValues(r) {
+  const gi = id => parseInt((document.getElementById(id) || {}).value, 10);
+  const acct = _bkParsed.acct;
+  const date = bbBookDate(r[gi('bk_col_date')]);
+  const desc = String(r[gi('bk_col_desc')] || '').trim().replace(/\s+/g, ' ');
+  const mode = (document.getElementById('bk_sign') || {}).value || 'auto';
+  let amt = null;
+  if (acct !== 'inv' && mode === 'dc') {
+    const d = bbBookAmt(r[gi('bk_col_debit')]), c = bbBookAmt(r[gi('bk_col_credit')]);
+    if (d != null && d !== 0) amt = -Math.abs(d);
+    else if (c != null && c !== 0) amt = Math.abs(c);
+  } else {
+    amt = bbBookAmt(r[gi('bk_col_amt')]);
+    if (amt != null && acct !== 'inv' && mode === 'flip') amt = -amt;
+  }
+  const invnum = acct === 'inv' ? String(r[gi('bk_col_invnum')] || '').trim() : '';
+  return { date, desc, amt, invnum };
+}
+function bbBooksPreview() {
+  if (!_bkParsed) return;
+  document.getElementById('bk_dc_wrap').style.display = ((document.getElementById('bk_sign') || {}).value === 'dc') ? '' : 'none';
+  const el = document.getElementById('bk_preview'); if (!el) return;
+  const lines = _bkParsed.rows.slice(0, 5).map(r => {
+    const v = bbBooksRowValues(r);
+    const good = v.date && v.desc && v.amt != null;
+    return `<div style="color:${good ? 'var(--text-2)' : 'var(--warn)'};">${v.date || '??date??'} · ${(v.desc || '??desc??').slice(0, 44)} · ${v.amt != null ? v.amt.toFixed(2) : '??amount??'}${v.invnum ? ' · #' + v.invnum : ''}</div>`;
+  });
+  el.innerHTML = `<div class="sub">Preview (first 5 of ${_bkParsed.rows.length} rows) — check the columns look right, then import:</div>` + lines.join('');
+}
+function bbBooksCategorize(desc, amt, acct, rules) {
+  const U = String(desc || '').toUpperCase();
+  for (const r of rules) { if (r.match && U.indexOf(String(r.match).toUpperCase()) >= 0) return r.cat; }
+  for (const r of BB_BOOK_SEED_RULES) { if (U.indexOf(r.match) >= 0) return r.cat; }
+  if (acct === 'bank' && amt > 0) return 'Customer payment';
+  return 'Uncategorized';
+}
+function bbBooksImport() {
+  if (!_bkParsed) return;
+  const d = bbBooksLoad();
+  const acct = _bkParsed.acct;
+  let added = 0, skipped = 0, dup = 0;
+  const seen = {};
+  d.tx.forEach(t => { seen[t.acct + '|' + t.date + '|' + t.amount.toFixed(2) + '|' + t.desc] = 1; });
+  d.inv.forEach(t => { seen['inv|' + t.date + '|' + t.amount.toFixed(2) + '|' + t.customer] = 1; });
+  _bkParsed.rows.forEach((r, ri) => {
+    const v = bbBooksRowValues(r);
+    if (!v.date || !v.desc || v.amt == null) { skipped++; return; }
+    // Skip rows already in the ledger from a PREVIOUS import (re-importing the
+    // same file is safe). Within one file nothing is skipped — two identical
+    // same-day charges are both real, and the duplicate audit flags them.
+    if (acct === 'inv') {
+      const key = 'inv|' + v.date + '|' + Math.abs(v.amt).toFixed(2) + '|' + v.desc;
+      if (seen[key]) { dup++; return; }
+      d.inv.push({ id: 'i' + Date.now() + '_' + ri, date: v.date, customer: v.desc, amount: Math.abs(v.amt), num: v.invnum });
+    } else {
+      const key = acct + '|' + v.date + '|' + v.amt.toFixed(2) + '|' + v.desc;
+      if (seen[key]) { dup++; return; }
+      d.tx.push({ id: 't' + Date.now() + '_' + ri, acct, date: v.date, desc: v.desc, amount: v.amt, cat: bbBooksCategorize(v.desc, v.amt, acct, d.rules) });
+    }
+    added++;
+  });
+  bbBooksSave(d);
+  _bkParsed = null;
+  document.getElementById('bk_maparea').style.display = 'none';
+  const pasteEl = document.getElementById('bk_paste'); if (pasteEl) pasteEl.value = '';
+  bbToast(`Imported ${added} rows` + (dup ? ` · ${dup} already in the ledger` : '') + (skipped ? ` · ${skipped} unreadable` : ''));
+  bbBooksRender();
+}
+
+// -------- ledger + audit --------
+function bbBooksMerchKey(desc) {
+  return String(desc || '').toUpperCase().replace(/[0-9#*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 18);
+}
+function bbBooksAddDays(iso, n) {
+  const dt = new Date(iso + 'T12:00:00');
+  dt.setDate(dt.getDate() + n);
+  return dt.toISOString().slice(0, 10);
+}
+function bbBooksRender() {
+  const d = bbBooksLoad();
+  const money = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  const catSel = document.getElementById('bk_f_cat'), monSel = document.getElementById('bk_f_month');
+  const months = [...new Set(d.tx.map(t => t.date.slice(0, 7)))].sort().reverse();
+  if (catSel) { const cur = catSel.value; catSel.innerHTML = '<option value="">All categories</option>' + BB_BOOK_CATS.map(c => `<option>${c}</option>`).join(''); catSel.value = cur; }
+  if (monSel) { const cur = monSel.value; monSel.innerHTML = '<option value="">All months</option>' + months.map(m => `<option>${m}</option>`).join(''); monSel.value = cur; }
+  const ruleCat = document.getElementById('bk_rule_cat');
+  if (ruleCat && !ruleCat.options.length) ruleCat.innerHTML = BB_BOOK_CATS.map(c => `<option>${c}</option>`).join('');
+  const fAcct = (document.getElementById('bk_f_acct') || {}).value || '';
+  const fCat = (catSel || {}).value || '';
+  const fMon = (monSel || {}).value || '';
+  const fQ = ((document.getElementById('bk_f_q') || {}).value || '').toLowerCase();
+  const shown = d.tx.filter(t => (!fAcct || t.acct === fAcct) && (!fCat || t.cat === fCat) && (!fMon || t.date.slice(0, 7) === fMon) && (!fQ || t.desc.toLowerCase().indexOf(fQ) >= 0))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const isXfer = t => t.cat === 'Transfer / CC payment';
+  const moneyIn = d.tx.filter(t => t.amount > 0 && !isXfer(t)).reduce((s, t) => s + t.amount, 0);
+  const moneyOut = d.tx.filter(t => t.amount < 0 && !isXfer(t)).reduce((s, t) => s + t.amount, 0);
+  const tiles = document.getElementById('bk_tiles');
+  if (tiles) {
+    const tile = (l, v, color) => `<div class="tile"><div class="l">${l}</div><div class="v" style="${color ? 'color:' + color : ''}">${v}</div></div>`;
+    tiles.innerHTML = d.tx.length === 0 ? '' :
+      tile('Money in', money(moneyIn), 'var(--ok)') + tile('Money out', money(moneyOut), 'var(--warn)') + tile('Net', money(moneyIn + moneyOut))
+      + tile('Transactions', d.tx.length.toLocaleString()) + tile('Invoices loaded', d.inv.length.toLocaleString());
+  }
+  const badge = document.getElementById('bk_ledger_badge');
+  if (badge) badge.textContent = d.tx.length + ' transactions · showing ' + shown.length;
+  const tb = document.getElementById('bk_tbody');
+  if (tb) {
+    tb.innerHTML = (shown.slice(0, 400).map(t => `<tr>
+      <td style="font-family:var(--font-mono); font-size:11px; white-space:nowrap;">${t.date}</td>
+      <td style="font-size:11px;">${t.acct === 'card' ? 'CC' : 'Bank'}</td>
+      <td style="font-size:12px;" title="${esc(t.desc)}">${esc(t.desc.slice(0, 60))}</td>
+      <td><select onchange="bbBooksSetCat('${t.id}', this.value)" style="font-size:11px; width:auto;">${BB_BOOK_CATS.map(c => `<option${c === t.cat ? ' selected' : ''}>${c}</option>`).join('')}</select></td>
+      <td class="num" style="color:${t.amount < 0 ? 'var(--warn)' : 'var(--ok)'};">${money(t.amount)}</td>
+      <td style="text-align:center;"><button onclick="bbBooksDelTx('${t.id}')" style="padding:1px 7px; font-size:11px; background:transparent; color:var(--text-3);">×</button></td>
+    </tr>`).join('') + (shown.length > 400 ? `<tr><td colspan="6" class="sub">…${shown.length - 400} more rows match (narrow the filters)</td></tr>` : ''))
+      || '<tr><td colspan="6" style="color:var(--text-3); padding:18px; text-align:center;">No transactions yet — import a statement above.</td></tr>';
+  }
+  bbBooksRenderAudit(d, money, esc);
+  bbBooksRenderRules(d, esc);
+}
+function bbBooksSetCat(id, cat) {
+  const d = bbBooksLoad();
+  const t = d.tx.find(x => x.id === id);
+  if (!t) return;
+  t.cat = cat;
+  const key = bbBooksMerchKey(t.desc);
+  if (key.length >= 4 && cat !== 'Uncategorized' && !d.rules.some(r => r.match === key)) {
+    d.rules.push({ match: key, cat });
+    let n = 0;
+    d.tx.forEach(x => { if (x.cat === 'Uncategorized' && bbBooksMerchKey(x.desc) === key) { x.cat = cat; n++; } });
+    bbToast(`Rule saved: "${key}" → ${cat}` + (n ? ` (${n} more lines updated)` : ''));
+  }
+  bbBooksSave(d);
+  bbBooksRender();
+}
+function bbBooksDelTx(id) {
+  const d = bbBooksLoad();
+  d.tx = d.tx.filter(x => x.id !== id);
+  bbBooksSave(d); bbBooksRender();
+}
+function bbBooksAddRule() {
+  const m = ((document.getElementById('bk_rule_match') || {}).value || '').trim();
+  const c = (document.getElementById('bk_rule_cat') || {}).value;
+  if (!m) { bbToast('Type what the description contains first.'); return; }
+  const d = bbBooksLoad();
+  d.rules.push({ match: m, cat: c });
+  let n = 0;
+  d.tx.forEach(x => { if (x.desc.toUpperCase().indexOf(m.toUpperCase()) >= 0) { x.cat = c; n++; } });
+  bbBooksSave(d);
+  document.getElementById('bk_rule_match').value = '';
+  bbToast(`Rule added — ${n} line(s) recategorized`);
+  bbBooksRender();
+}
+function bbBooksDelRule(idx) {
+  const d = bbBooksLoad();
+  d.rules.splice(idx, 1);
+  bbBooksSave(d); bbBooksRender();
+}
+let _bkClearArm = 0;
+function bbBooksClearAll() {
+  const btn = document.getElementById('bk_clear_btn');
+  if (Date.now() - _bkClearArm > 4000) { _bkClearArm = Date.now(); if (btn) btn.textContent = 'Tap again to clear EVERYTHING'; setTimeout(() => { if (btn && Date.now() - _bkClearArm >= 3900) btn.textContent = 'Clear ALL books data'; }, 4200); return; }
+  _bkClearArm = 0;
+  bbBooksSave({ tx: [], inv: [], rules: [] });
+  if (btn) btn.textContent = 'Clear ALL books data';
+  bbToast('Books data cleared');
+  bbBooksRender();
+}
+function bbBooksRenderRules(d, esc) {
+  const el = document.getElementById('bk_rules'); if (!el) return;
+  el.innerHTML = d.rules.length
+    ? d.rules.map((r, i) => `<span class="rulechip">${esc(r.match)} → ${esc(r.cat)} <a onclick="bbBooksDelRule(${i})">×</a></span>`).join('')
+    : '<p class="sub">No custom rules yet. Built-in rules cover the common ones (Lowe’s, fuel stops, QBS…). Change a category on any ledger line and it becomes a rule automatically.</p>';
+}
+function bbBooksRenderAudit(d, money, esc) {
+  const el = document.getElementById('bk_audit'); if (!el) return;
+  if (!d.tx.length && !d.inv.length) { el.innerHTML = '<p class="sub">Import at least one statement to see the audit.</p>'; return; }
+  const isXfer = t => t.cat === 'Transfer / CC payment';
+  const H = t => `<h4 class="sect">${t}</h4>`;
+  const tbl = (head, rows) => `<div class="tablewrap"><table style="min-width:420px;"><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  let html = '';
+  // itemized by category
+  const byCat = {};
+  d.tx.forEach(t => { if (!isXfer(t)) { (byCat[t.cat] = byCat[t.cat] || { n: 0, sum: 0 }); byCat[t.cat].n++; byCat[t.cat].sum += t.amount; } });
+  const exp = Object.entries(byCat).filter(([, v]) => v.sum < 0).sort((a, b) => a[1].sum - b[1].sum);
+  const inc = Object.entries(byCat).filter(([, v]) => v.sum >= 0).sort((a, b) => b[1].sum - a[1].sum);
+  if (exp.length) html += H('Expenses — itemized by category') + tbl(['Category', 'Lines', 'Total'], exp.map(([c, v]) => `<tr><td>${c}</td><td class="num">${v.n}</td><td class="num">${money(v.sum)}</td></tr>`));
+  if (inc.length) html += H('Income — itemized') + tbl(['Category', 'Lines', 'Total'], inc.map(([c, v]) => `<tr><td>${c}</td><td class="num">${v.n}</td><td class="num">${money(v.sum)}</td></tr>`));
+  // monthly
+  const byMon = {};
+  d.tx.forEach(t => { if (isXfer(t)) return; const m = t.date.slice(0, 7); (byMon[m] = byMon[m] || { i: 0, o: 0 }); if (t.amount > 0) byMon[m].i += t.amount; else byMon[m].o += t.amount; });
+  const mons = Object.keys(byMon).sort().reverse();
+  if (mons.length > 1) html += H('Month by month') + tbl(['Month', 'In', 'Out', 'Net'], mons.map(m => `<tr><td style="font-family:var(--font-mono);">${m}</td><td class="num">${money(byMon[m].i)}</td><td class="num" style="color:var(--warn);">${money(byMon[m].o)}</td><td class="num">${money(byMon[m].i + byMon[m].o)}</td></tr>`));
+  // recurring
+  const byMerch = {};
+  d.tx.forEach(t => { if (t.amount < 0 && !isXfer(t)) { const k = bbBooksMerchKey(t.desc); (byMerch[k] = byMerch[k] || []).push(t); } });
+  const rec = [];
+  Object.entries(byMerch).forEach(([k, list]) => {
+    const monsK = [...new Set(list.map(t => t.date.slice(0, 7)))];
+    if (monsK.length < 3 || k.length < 4) return;
+    const amts = list.map(t => -t.amount);
+    const avg = amts.reduce((s, x) => s + x, 0) / amts.length;
+    if (avg <= 0) return;
+    const spread = (Math.max(...amts) - Math.min(...amts)) / avg;
+    if (spread <= 0.2) rec.push({ k, avg, months: monsK.length, annual: avg * 12 });
+  });
+  rec.sort((a, b) => b.annual - a.annual);
+  if (rec.length) html += H('Recurring charges (subscriptions & the like)') + tbl(['Merchant', 'About', 'Seen in', 'Yearly cost'], rec.slice(0, 20).map(r => `<tr><td>${esc(r.k)}</td><td class="num">${money(-r.avg)}/mo</td><td class="num">${r.months} months</td><td class="num" style="color:var(--warn);">${money(-r.annual)}</td></tr>`));
+  // duplicates
+  const dups = [];
+  const sorted = d.tx.slice().sort((a, b) => a.date.localeCompare(b.date));
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = i + 1; j < sorted.length; j++) {
+      const a = sorted[i], b = sorted[j];
+      if (b.date > bbBooksAddDays(a.date, 4)) break;
+      if (a.acct === b.acct && a.amount < 0 && Math.abs(a.amount - b.amount) < 0.005 && bbBooksMerchKey(a.desc) === bbBooksMerchKey(b.desc)) dups.push([a, b]);
+    }
+  }
+  if (dups.length) html += H('⚠ Possible double charges') + tbl(['Dates', 'Description', 'Amount'], dups.slice(0, 15).map(([a, b]) => `<tr><td style="font-family:var(--font-mono);">${a.date} + ${b.date}</td><td>${esc(a.desc.slice(0, 48))}</td><td class="num" style="color:var(--warn);">${money(a.amount)} each</td></tr>`));
+  // invoice reconciliation
+  if (d.inv.length) {
+    const deposits = d.tx.filter(t => t.acct === 'bank' && t.amount > 0 && !isXfer(t)).map(t => ({ t, used: false }));
+    const paid = [], unpaid = [];
+    d.inv.slice().sort((a, b) => a.date.localeCompare(b.date)).forEach(inv => {
+      const hit = deposits.find(dp => !dp.used && Math.abs(dp.t.amount - inv.amount) <= 1
+        && dp.t.date >= bbBooksAddDays(inv.date, -5) && dp.t.date <= bbBooksAddDays(inv.date, 120));
+      if (hit) { hit.used = true; paid.push({ inv, dep: hit.t }); } else unpaid.push(inv);
+    });
+    const stray = deposits.filter(dp => !dp.used && dp.t.amount >= 500);
+    html += H('Invoice reconciliation')
+      + `<p class="sub">${paid.length} of ${d.inv.length} invoices matched to a deposit (same amount ±$1, within 120 days).</p>`;
+    if (unpaid.length) html += tbl(['⚠ UNPAID — no deposit found', 'Date', 'Amount'], unpaid.map(i => `<tr><td>${esc(i.customer)}${i.num ? ' · #' + esc(i.num) : ''}</td><td style="font-family:var(--font-mono);">${i.date}</td><td class="num" style="color:var(--warn);">${money(i.amount)}</td></tr>`));
+    else html += '<p class="sub" style="color:var(--ok);">Every invoice matched a deposit. ✓</p>';
+    if (stray.length) html += tbl(['Deposits ≥ $500 with NO matching invoice', 'Date', 'Amount'], stray.slice(0, 15).map(dp => `<tr><td>${esc(dp.t.desc.slice(0, 48))}</td><td style="font-family:var(--font-mono);">${dp.t.date}</td><td class="num">${money(dp.t.amount)}</td></tr>`));
+  } else {
+    html += H('Invoice reconciliation') + '<p class="sub">Load a customer-invoice CSV (date, customer, amount) and the audit checks every invoice against your deposits — who paid, who hasn’t, and which deposits don’t match any invoice.</p>';
+  }
+  el.innerHTML = html;
+}
+
+// -------- exports / backup --------
+function bbBooksExportCSV() {
+  const d = bbBooksLoad();
+  let csv = 'Date,Account,Description,Category,Amount\n';
+  d.tx.slice().sort((a, b) => a.date.localeCompare(b.date)).forEach(t => {
+    csv += `${t.date},${t.acct},"${String(t.desc).replace(/"/g, '""')}","${t.cat}",${t.amount.toFixed(2)}\n`;
+  });
+  bbBooksDownload(csv, 'books_categorized.csv', 'text/csv');
+}
+function bbBooksBackup() {
+  bbBooksDownload(JSON.stringify(bbBooksLoad()), 'barndo_books_backup.json', 'application/json');
+}
+function bbBooksRestore(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(String(r.result || ''));
+      if (!d || !Array.isArray(d.tx)) { bbToast('That file is not a books backup.'); return; }
+      bbBooksSave(d);
+      bbToast('Backup restored — ' + d.tx.length + ' transactions');
+      bbBooksRender();
+    } catch (e) { bbToast('Could not read that backup file.'); }
+    input.value = '';
+  };
+  r.readAsText(f);
+}
+function bbBooksDownload(text, name, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+bbBooksRender();
+</script>
+</body>
+</html>
