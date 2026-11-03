@@ -54,7 +54,7 @@ h4.sect { margin: 16px 0 6px; font-size: 12px; letter-spacing: 0.07em; text-tran
 <div class="wrap">
   <header>
     <h1>THE <b>BARNDO BUILDERS</b> WAREHOUSE · BOOKS</h1>
-    <span class="sub" id="bk_version">Statement &amp; invoice audit · v1 · all data stays on this computer</span>
+    <span class="sub" id="bk_version">Statement &amp; invoice audit · v1.2 · jobs + per-job P&amp;L · all data stays on this computer</span>
   </header>
 
   <div class="card">
@@ -124,6 +124,17 @@ h4.sect { margin: 16px 0 6px; font-size: 12px; letter-spacing: 0.07em; text-tran
   </div>
 
   <div class="card">
+    <h3>Jobs <span class="badge">Keyword → job · powers the per-job P&amp;L in the audit</span></h3>
+    <p class="sub">Add a keyword for each job (what appears in check memos and invoice customer names — e.g. keyword <b>MCCAIN</b>, job <b>McCain Home</b>). Every bank/card line and invoice containing the keyword counts toward that job. One job can have several keywords.</p>
+    <div id="bk_jobs"></div>
+    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <input type="text" id="bk_job_match" placeholder="Description contains… (e.g. IRON CITY)" style="width:auto; flex:1; min-width:150px; font-family:var(--font-mono); font-size:12px;">
+      <input type="text" id="bk_job_name" placeholder="Job name (e.g. Iron City #1)" style="width:auto; flex:1; min-width:150px; font-size:12px;">
+      <button onclick="bbBooksAddJob()">Add job keyword</button>
+    </div>
+  </div>
+
+  <div class="card">
     <h3>Rules &amp; data <span class="badge">Merchant → category, applied on import</span></h3>
     <div id="bk_rules"></div>
     <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
@@ -149,7 +160,7 @@ h4.sect { margin: 16px 0 6px; font-size: 12px; letter-spacing: 0.07em; text-tran
 // =============================================================
 const BB_BOOKS_VERSION = 'books v1';
 const BB_BOOKS_KEY = 'bb_books_v1';
-const BB_BOOK_CATS = ['Materials','Fuel','Subcontractors','Payroll','Equipment & rental','Insurance','Utilities & phone','Office & software','Meals','Advertising','Loan & interest','Bank fees','Taxes & licenses','Transfer / CC payment','Owner draw','Customer payment','Other income','Uncategorized'];
+const BB_BOOK_CATS = ['Materials','Fuel','Subcontractors','Payroll','Equipment & rental','Vehicles & repairs','Rent','Insurance','Utilities & phone','Office & software','Meals','Advertising','Donations & sponsorship','Loan & interest','Bank fees','Taxes & licenses','Transfer / CC payment','Owner draw','Customer payment','Other income','Uncategorized'];
 const BB_BOOK_SEED_RULES = [
   { match: 'LOWE', cat: 'Materials' }, { match: 'HOME DEPOT', cat: 'Materials' },
   { match: 'QUALITY BUILDING', cat: 'Materials' }, { match: 'QBS', cat: 'Materials' },
@@ -180,8 +191,41 @@ function bbToast(msg) {
   window._toastT = setTimeout(() => { el.style.display = 'none'; }, 3200);
 }
 function bbBooksLoad() {
-  try { const d = JSON.parse(localStorage.getItem(BB_BOOKS_KEY) || 'null'); if (d && d.tx) return d; } catch (e) {}
-  return { tx: [], inv: [], rules: [] };
+  try {
+    const d = JSON.parse(localStorage.getItem(BB_BOOKS_KEY) || 'null');
+    if (d && d.tx) { if (!Array.isArray(d.jobs)) d.jobs = []; return d; }
+  } catch (e) {}
+  return { tx: [], inv: [], rules: [], jobs: [] };
+}
+
+// Which job a description belongs to (first matching keyword wins).
+function bbBooksJobOf(desc, jobs) {
+  const U = String(desc || '').toUpperCase();
+  for (const j of jobs) { if (j.match && U.indexOf(String(j.match).toUpperCase()) >= 0) return j.job; }
+  return null;
+}
+function bbBooksAddJob() {
+  const m = ((document.getElementById('bk_job_match') || {}).value || '').trim();
+  const name = ((document.getElementById('bk_job_name') || {}).value || '').trim() || m;
+  if (!m) { bbToast('Type the keyword first (what the memos contain).'); return; }
+  const d = bbBooksLoad();
+  d.jobs.push({ match: m, job: name });
+  bbBooksSave(d);
+  document.getElementById('bk_job_match').value = '';
+  document.getElementById('bk_job_name').value = '';
+  bbToast('Job keyword added: ' + m + ' → ' + name);
+  bbBooksRender();
+}
+function bbBooksDelJob(idx) {
+  const d = bbBooksLoad();
+  d.jobs.splice(idx, 1);
+  bbBooksSave(d); bbBooksRender();
+}
+function bbBooksRenderJobs(d, esc) {
+  const el = document.getElementById('bk_jobs'); if (!el) return;
+  el.innerHTML = d.jobs.length
+    ? d.jobs.map((j, i) => `<span class="rulechip">${esc(j.match)} → ${esc(j.job)} <a onclick="bbBooksDelJob(${i})">×</a></span>`).join('')
+    : '<p class="sub">No jobs defined yet.</p>';
 }
 function bbBooksSave(d) { try { localStorage.setItem(BB_BOOKS_KEY, JSON.stringify(d)); } catch (e) { bbToast('Could not save — storage blocked?'); } }
 
@@ -393,6 +437,7 @@ function bbBooksRender() {
   }
   bbBooksRenderAudit(d, money, esc);
   bbBooksRenderRules(d, esc);
+  bbBooksRenderJobs(d, esc);
 }
 function bbBooksSetCat(id, cat) {
   const d = bbBooksLoad();
@@ -493,6 +538,35 @@ function bbBooksRenderAudit(d, money, esc) {
     }
   }
   if (dups.length) html += H('⚠ Possible double charges') + tbl(['Dates', 'Description', 'Amount'], dups.slice(0, 15).map(([a, b]) => `<tr><td style="font-family:var(--font-mono);">${a.date} + ${b.date}</td><td>${esc(a.desc.slice(0, 48))}</td><td class="num" style="color:var(--warn);">${money(a.amount)} each</td></tr>`));
+  // per-job P&L
+  if (d.jobs.length) {
+    const jobNames = [...new Set(d.jobs.map(j => j.job))];
+    const J = {};
+    jobNames.forEach(j => J[j] = { exp: 0, expN: 0, incTx: 0, incInv: 0 });
+    d.tx.forEach(t => {
+      if (isXfer(t)) return;
+      const j = bbBooksJobOf(t.desc, d.jobs);
+      if (!j) return;
+      if (t.amount < 0) { J[j].exp += -t.amount; J[j].expN++; }
+      else J[j].incTx += t.amount;
+    });
+    d.inv.forEach(inv => {
+      const j = bbBooksJobOf(inv.customer, d.jobs);
+      if (j) J[j].incInv += inv.amount;
+    });
+    const rows = jobNames.map(j => {
+      const income = Math.max(J[j].incInv, J[j].incTx);
+      const net = income - J[j].exp;
+      return { j, income, exp: J[j].exp, expN: J[j].expN, net };
+    }).filter(r => r.exp > 0 || r.income > 0).sort((a, b) => b.exp - a.exp);
+    const untagged = d.tx.filter(t => !isXfer(t) && t.amount < 0 && !bbBooksJobOf(t.desc, d.jobs)).reduce((s, t) => s + -t.amount, 0);
+    if (rows.length) {
+      html += H('Job P&L (tagged by keyword)')
+        + tbl(['Job', 'Income (invoiced / deposits)', 'Job costs', 'Lines', 'Net'],
+          rows.map(r => `<tr><td>${esc(r.j)}</td><td class="num">${money(r.income)}</td><td class="num" style="color:var(--warn);">${money(-r.exp)}</td><td class="num">${r.expN}</td><td class="num" style="color:${r.net >= 0 ? 'var(--ok)' : 'var(--warn)'};">${money(r.net)}</td></tr>`))
+        + `<p class="sub">Income counts invoices whose customer matches the job keywords (falling back to tagged deposits). ${money(-untagged)} of spending is not tagged to any job — overhead, or memos that need another keyword.</p>`;
+    }
+  }
   // invoice reconciliation
   if (d.inv.length) {
     const deposits = d.tx.filter(t => t.acct === 'bank' && t.amount > 0 && !isXfer(t)).map(t => ({ t, used: false }));
@@ -551,6 +625,24 @@ function bbBooksDownload(text, name, type) {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
+</script>
+<script id="bb-books-data" type="application/json"></script>
+<script>
+// Preloaded-data hook: a delivered copy of this tool can embed its ledger in
+// the #bb-books-data JSON tag above. It seeds storage ONCE (only when this
+// browser has no books data yet); after that, localStorage is the truth.
+(function () {
+  try {
+    const tag = document.getElementById('bb-books-data');
+    if (tag && tag.textContent.trim().length > 2) {
+      const existing = localStorage.getItem(BB_BOOKS_KEY);
+      if (!existing || !(JSON.parse(existing) || {}).tx || !JSON.parse(existing).tx.length) {
+        const seed = JSON.parse(tag.textContent);
+        if (seed && Array.isArray(seed.tx)) { bbBooksSave(seed); bbToast('Loaded ' + seed.tx.length.toLocaleString() + ' preloaded transactions'); }
+      }
+    }
+  } catch (e) { console.warn('preload skipped:', e); }
+})();
 bbBooksRender();
 </script>
 </body>
