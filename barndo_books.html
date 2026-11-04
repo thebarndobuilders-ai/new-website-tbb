@@ -48,13 +48,31 @@ h4.sect { margin: 16px 0 6px; font-size: 12px; letter-spacing: 0.07em; text-tran
 .filterbar select, .filterbar input { width: auto; }
 .filterbar input[type=text] { flex: 1; min-width: 150px; font-family: var(--font-mono); font-size: 12px; }
 .tablewrap { overflow-x: auto; }
+/* ---- job board ---- */
+.board { display: grid; grid-template-columns: minmax(0,1fr) 360px; gap: 12px; }
+@media (max-width: 880px) { .board { grid-template-columns: 1fr; } }
+.bl-list { max-height: 540px; overflow-y: auto; border: 1px solid var(--hairline); border-radius: 8px; background: var(--surface-2); }
+.bl-row { display: flex; gap: 8px; align-items: center; padding: 6px 9px; border-bottom: 1px solid var(--hairline); cursor: grab; font-size: 12px; user-select: none; }
+.bl-row:active { cursor: grabbing; }
+.bl-row.sel { outline: 2px solid var(--copper); outline-offset: -2px; background: var(--copper-soft); }
+.bl-row .d { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-3); white-space: nowrap; }
+.bl-row .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bl-row .a { font-family: var(--font-mono); white-space: nowrap; }
+.bl-row .j { font-size: 10px; color: var(--copper); border: 1px solid var(--copper); border-radius: 9px; padding: 0 6px; white-space: nowrap; }
+.jobgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; max-height: 494px; overflow-y: auto; }
+.jobbox { background: var(--surface-2); border: 1.5px dashed var(--hairline-emphasis); border-radius: 10px; padding: 9px 11px; cursor: pointer; min-height: 60px; }
+.jobbox:hover { border-color: var(--copper); }
+.jobbox.over { border-color: var(--cream); background: var(--copper-soft); border-style: solid; }
+.jobbox.openbox { border-color: var(--cream); border-style: solid; }
+.jobbox .nm { font-weight: 700; font-size: 12.5px; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jobbox .st { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-3); }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>THE <b>BARNDO BUILDERS</b> WAREHOUSE · BOOKS</h1>
-    <span class="sub" id="bk_version">Statement &amp; invoice audit · v1.2 · jobs + per-job P&amp;L · all data stays on this computer</span>
+    <span class="sub" id="bk_version">Statement &amp; invoice audit · v1.3 · job board: drag charges onto jobs · all data stays on this computer</span>
   </header>
 
   <div class="card">
@@ -97,6 +115,29 @@ h4.sect { margin: 16px 0 6px; font-size: 12px; letter-spacing: 0.07em; text-tran
         <span id="bk_import_status" class="sub"></span>
       </div>
     </div>
+  </div>
+
+  <div class="card">
+    <h3>Job board <span class="badge">Drag a charge from the left onto a job box to file it</span></h3>
+    <div class="filterbar">
+      <button onclick="bbBoardMonth(1)" style="padding:4px 11px;" title="Earlier month">‹</button>
+      <select id="bb_bd_month" onchange="_bkBoard.month=this.value; bbBooksRender();" style="width:auto;"></select>
+      <button onclick="bbBoardMonth(-1)" style="padding:4px 11px;" title="Later month">›</button>
+      <label style="display:inline-flex; align-items:center; gap:6px; width:auto; font-size:12px; color:var(--text-2); border:none; background:none; padding:0;"><input type="checkbox" id="bb_bd_untagged" checked onchange="_bkBoard.untaggedOnly=this.checked; bbBooksRender();" style="width:auto;"> untagged only</label>
+      <input type="text" id="bb_bd_q" placeholder="Search description…" oninput="_bkBoard.q=this.value; bbBooksRender();">
+    </div>
+    <div class="board">
+      <div class="bl-list" id="bb_bd_list"></div>
+      <div>
+        <div style="display:flex; gap:6px; margin-bottom:8px;">
+          <input type="text" id="bb_bd_newjob" placeholder="New job box… (e.g. Morse House)" style="flex:1; font-size:12px;" onkeydown="if(event.key==='Enter')bbBooksAddJobBox()">
+          <button onclick="bbBooksAddJobBox()">+ Box</button>
+        </div>
+        <div class="jobgrid" id="bb_bd_jobs"></div>
+      </div>
+    </div>
+    <div id="bb_bd_detail"></div>
+    <p class="sub">Drag any line onto a job box to file it — deposits too (tag the customer's payments to their job). On a phone or tablet: tap the line, then tap the job box. Click a box to open the full client file; the × on a filed line sends it back to untagged.</p>
   </div>
 
   <div class="card">
@@ -203,6 +244,138 @@ function bbBooksJobOf(desc, jobs) {
   const U = String(desc || '').toUpperCase();
   for (const j of jobs) { if (j.match && U.indexOf(String(j.match).toUpperCase()) >= 0) return j.job; }
   return null;
+}
+// Job for a transaction: a hand-filed tag (drag & drop) beats keyword matching.
+function bbBooksJobFor(t, jobs) { return t.job || bbBooksJobOf(t.desc, jobs) || null; }
+
+// -------- job board (drag & drop filing) --------
+let _bkBoard = { month: '', untaggedOnly: true, q: '', sel: null, open: null };
+function bbBoardMonth(step) {
+  const sel = document.getElementById('bb_bd_month'); if (!sel || !sel.options.length) return;
+  let i = sel.selectedIndex + step;
+  if (i < 0) i = 0; if (i >= sel.options.length) i = sel.options.length - 1;
+  sel.selectedIndex = i; _bkBoard.month = sel.value; bbBooksRender();
+}
+function bbBooksJobNames(d) {
+  const names = [];
+  d.jobs.forEach(j => { if (j.job && names.indexOf(j.job) < 0) names.push(j.job); });
+  d.tx.forEach(t => { if (t.job && names.indexOf(t.job) < 0) names.push(t.job); });
+  return names;
+}
+function bbBooksAddJobBox() {
+  const el = document.getElementById('bb_bd_newjob');
+  const name = ((el || {}).value || '').trim();
+  if (!name) { bbToast('Type the job name first.'); return; }
+  const d = bbBooksLoad();
+  if (bbBooksJobNames(d).some(n => n.toUpperCase() === name.toUpperCase())) { bbToast('That job already has a box.'); el.value = ''; return; }
+  d.jobs.push({ match: '', job: name });
+  bbBooksSave(d); el.value = '';
+  bbToast('Job box added: ' + name);
+  bbBooksRender();
+}
+function bbBooksTagTx(id, job) {
+  const d = bbBooksLoad();
+  const t = d.tx.find(x => x.id === id); if (!t || !job) return;
+  t.job = job;
+  bbBooksSave(d);
+  _bkBoard.sel = null;
+  bbToast('Filed to ' + job + ': ' + t.desc.slice(0, 40));
+  bbBooksRender();
+}
+function bbBooksUntagTx(id) {
+  const d = bbBooksLoad();
+  const t = d.tx.find(x => x.id === id); if (!t) return;
+  delete t.job;
+  bbBooksSave(d);
+  bbToast('Sent back to untagged');
+  bbBooksRender();
+}
+function bbBooksDragTx(ev, id) { try { ev.dataTransfer.setData('text/plain', id); ev.dataTransfer.effectAllowed = 'move'; } catch (e) {} }
+function bbBooksDropTx(ev, job) {
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('over');
+  const id = ev.dataTransfer.getData('text/plain');
+  if (id) bbBooksTagTx(id, job);
+}
+function bbBooksRowTap(id) { _bkBoard.sel = (_bkBoard.sel === id) ? null : id; bbBooksRender(); }
+function bbBooksBoxTap(job) {
+  if (_bkBoard.sel) { bbBooksTagTx(_bkBoard.sel, job); return; }
+  _bkBoard.open = (_bkBoard.open === job) ? null : job;
+  bbBooksRender();
+}
+function bbBooksRenderBoard(d, money, esc) {
+  const listEl = document.getElementById('bb_bd_list'); if (!listEl) return;
+  const monSel = document.getElementById('bb_bd_month');
+  const months = [...new Set(d.tx.map(t => t.date.slice(0, 7)))].sort().reverse();
+  if (monSel) {
+    monSel.innerHTML = '<option value="">All months</option>' + months.map(m => `<option>${m}</option>`).join('');
+    monSel.value = months.indexOf(_bkBoard.month) >= 0 ? _bkBoard.month : '';
+  }
+  const q = (_bkBoard.q || '').toLowerCase();
+  const isX = t => t.cat === 'Transfer / CC payment';
+  const rows = d.tx.filter(t =>
+      !isX(t)
+      && (!_bkBoard.month || t.date.slice(0, 7) === _bkBoard.month)
+      && (!_bkBoard.untaggedOnly || !bbBooksJobFor(t, d.jobs))
+      && (!q || t.desc.toLowerCase().indexOf(q) >= 0))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  listEl.innerHTML = (rows.slice(0, 300).map(t => {
+    const j = bbBooksJobFor(t, d.jobs);
+    return `<div class="bl-row${_bkBoard.sel === t.id ? ' sel' : ''}" draggable="true" ondragstart="bbBooksDragTx(event,'${t.id}')" onclick="bbBooksRowTap('${t.id}')">
+      <span class="d">${t.date}</span><span class="t" title="${esc(t.desc)}">${esc(t.desc)}</span>
+      ${j ? `<span class="j">${esc(j)}</span>` : ''}
+      <span class="a" style="color:${t.amount < 0 ? 'var(--warn)' : 'var(--ok)'};">${money(t.amount)}</span>
+    </div>`;
+  }).join('') + (rows.length > 300 ? `<div class="bl-row" style="cursor:default; color:var(--text-3);">…${(rows.length - 300).toLocaleString()} more — narrow by month or search</div>` : ''))
+    || `<div style="padding:22px; text-align:center; color:var(--text-3); font-size:12px;">${d.tx.length ? 'Nothing left untagged here — pick another month or untick “untagged only”.' : 'Import a statement first.'}</div>`;
+  const boxEl = document.getElementById('bb_bd_jobs'); if (!boxEl) return;
+  const names = bbBooksJobNames(d);
+  const stats = {};
+  names.forEach(n => stats[n] = { exp: 0, inc: 0, invInc: 0, n: 0 });
+  d.tx.forEach(t => { if (isX(t)) return; const j = bbBooksJobFor(t, d.jobs); if (!j || !stats[j]) return; stats[j].n++; if (t.amount < 0) stats[j].exp += -t.amount; else stats[j].inc += t.amount; });
+  d.inv.forEach(inv => { const j = bbBooksJobOf(inv.customer, d.jobs); if (j && stats[j]) stats[j].invInc += inv.amount; });
+  boxEl.innerHTML = names.map(n => {
+    const s = stats[n]; const income = Math.max(s.invInc, s.inc); const net = income - s.exp;
+    return `<div class="jobbox${_bkBoard.open === n ? ' openbox' : ''}" data-job="${esc(n)}" ondragover="event.preventDefault(); this.classList.add('over');" ondragleave="this.classList.remove('over');" ondrop="bbBooksDropTx(event, this.dataset.job)" onclick="bbBooksBoxTap(this.dataset.job)">
+      <div class="nm" title="${esc(n)}">📁 ${esc(n)}</div>
+      <div class="st">costs ${money(-s.exp)} · ${s.n} lines</div>
+      <div class="st" style="color:${net >= 0 ? 'var(--ok)' : 'var(--warn)'};">net ${money(net)}</div>
+    </div>`;
+  }).join('') || '<p class="sub" style="grid-column:1/-1;">No jobs yet — type a name above and press + Box.</p>';
+  bbBooksRenderJobDetail(d, money, esc);
+}
+function bbBooksRenderJobDetail(d, money, esc) {
+  const el = document.getElementById('bb_bd_detail'); if (!el) return;
+  const job = _bkBoard.open;
+  if (!job) { el.innerHTML = ''; return; }
+  const isX = t => t.cat === 'Transfer / CC payment';
+  const lines = d.tx.filter(t => !isX(t) && bbBooksJobFor(t, d.jobs) === job);
+  const invs = d.inv.filter(i => bbBooksJobOf(i.customer, d.jobs) === job);
+  const dep = lines.filter(t => t.amount > 0).sort((a, b) => a.date.localeCompare(b.date));
+  const costs = lines.filter(t => t.amount < 0);
+  const invTot = invs.reduce((s, i) => s + i.amount, 0);
+  const depTot = dep.reduce((s, t) => s + t.amount, 0);
+  const income = Math.max(invTot, depTot);
+  const totCost = costs.reduce((s, t) => s + -t.amount, 0);
+  const row = t => `<tr><td style="font-family:var(--font-mono); font-size:11px; white-space:nowrap;">${t.date}</td><td style="font-size:12px;">${esc(t.desc.slice(0, 76))}${t.job ? '' : ' <span style="color:var(--text-3); font-size:10px;">(keyword)</span>'}</td><td class="num" style="color:${t.amount < 0 ? 'var(--warn)' : 'var(--ok)'};">${money(t.amount)}</td><td style="text-align:center; width:28px;">${t.job ? `<button onclick="bbBooksUntagTx('${t.id}')" style="padding:0 7px; font-size:11px; background:transparent; color:var(--text-3);" title="Remove from this job">×</button>` : ''}</td></tr>`;
+  const sect = (title, inner) => `<h4 class="sect">${title}</h4><div class="tablewrap"><table style="min-width:420px;"><tbody>${inner}</tbody></table></div>`;
+  let html = `<div style="margin-top:14px; border-top:2px solid var(--hairline-emphasis); padding-top:10px;">
+    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+      <h3 style="margin:0;">📁 ${esc(job)}</h3>
+      <span class="sub" style="font-size:13px;">income ${money(income)} · costs ${money(-totCost)} · <b style="color:${income - totCost >= 0 ? 'var(--ok)' : 'var(--warn)'};">net ${money(income - totCost)}</b></span>
+      <button onclick="_bkBoard.open=null; bbBooksRender();" style="margin-left:auto;">Close file</button>
+    </div>`;
+  if (invs.length) html += sect('Invoiced — ' + money(invTot), invs.slice().sort((a, b) => a.date.localeCompare(b.date)).map(i => `<tr><td style="font-family:var(--font-mono); font-size:11px; white-space:nowrap;">${i.date}</td><td style="font-size:12px;">${esc(i.customer)}${i.num ? ' · #' + esc(i.num) : ''}</td><td class="num" style="color:var(--ok);">${money(i.amount)}</td><td></td></tr>`).join(''));
+  if (dep.length) html += sect('Payments received — ' + money(depTot), dep.map(row).join(''));
+  const catOrder = BB_BOOK_CATS.filter(c => costs.some(t => t.cat === c));
+  catOrder.forEach(c => {
+    const list = costs.filter(t => t.cat === c).sort((a, b) => a.date.localeCompare(b.date));
+    const sum = list.reduce((s, t) => s + -t.amount, 0);
+    html += sect(c + ' — ' + money(-sum), list.map(row).join(''));
+  });
+  if (!lines.length && !invs.length) html += '<p class="sub">Nothing filed to this job yet — drag charges here from the list.</p>';
+  html += '</div>';
+  el.innerHTML = html;
 }
 function bbBooksAddJob() {
   const m = ((document.getElementById('bk_job_match') || {}).value || '').trim();
@@ -438,6 +611,7 @@ function bbBooksRender() {
   bbBooksRenderAudit(d, money, esc);
   bbBooksRenderRules(d, esc);
   bbBooksRenderJobs(d, esc);
+  bbBooksRenderBoard(d, money, esc);
 }
 function bbBooksSetCat(id, cat) {
   const d = bbBooksLoad();
@@ -482,7 +656,7 @@ function bbBooksClearAll() {
   const btn = document.getElementById('bk_clear_btn');
   if (Date.now() - _bkClearArm > 4000) { _bkClearArm = Date.now(); if (btn) btn.textContent = 'Tap again to clear EVERYTHING'; setTimeout(() => { if (btn && Date.now() - _bkClearArm >= 3900) btn.textContent = 'Clear ALL books data'; }, 4200); return; }
   _bkClearArm = 0;
-  bbBooksSave({ tx: [], inv: [], rules: [] });
+  bbBooksSave({ tx: [], inv: [], rules: [], jobs: [] });
   if (btn) btn.textContent = 'Clear ALL books data';
   bbToast('Books data cleared');
   bbBooksRender();
@@ -542,10 +716,12 @@ function bbBooksRenderAudit(d, money, esc) {
   if (d.jobs.length) {
     const jobNames = [...new Set(d.jobs.map(j => j.job))];
     const J = {};
+    const handTagged = [...new Set(d.tx.filter(t => t.job).map(t => t.job))];
+    handTagged.forEach(j => { if (jobNames.indexOf(j) < 0) jobNames.push(j); });
     jobNames.forEach(j => J[j] = { exp: 0, expN: 0, incTx: 0, incInv: 0 });
     d.tx.forEach(t => {
       if (isXfer(t)) return;
-      const j = bbBooksJobOf(t.desc, d.jobs);
+      const j = bbBooksJobFor(t, d.jobs);
       if (!j) return;
       if (t.amount < 0) { J[j].exp += -t.amount; J[j].expN++; }
       else J[j].incTx += t.amount;
@@ -559,7 +735,7 @@ function bbBooksRenderAudit(d, money, esc) {
       const net = income - J[j].exp;
       return { j, income, exp: J[j].exp, expN: J[j].expN, net };
     }).filter(r => r.exp > 0 || r.income > 0).sort((a, b) => b.exp - a.exp);
-    const untagged = d.tx.filter(t => !isXfer(t) && t.amount < 0 && !bbBooksJobOf(t.desc, d.jobs)).reduce((s, t) => s + -t.amount, 0);
+    const untagged = d.tx.filter(t => !isXfer(t) && t.amount < 0 && !bbBooksJobFor(t, d.jobs)).reduce((s, t) => s + -t.amount, 0);
     if (rows.length) {
       html += H('Job P&L (tagged by keyword)')
         + tbl(['Job', 'Income (invoiced / deposits)', 'Job costs', 'Lines', 'Net'],
@@ -591,9 +767,9 @@ function bbBooksRenderAudit(d, money, esc) {
 // -------- exports / backup --------
 function bbBooksExportCSV() {
   const d = bbBooksLoad();
-  let csv = 'Date,Account,Description,Category,Amount\n';
+  let csv = 'Date,Account,Description,Category,Job,Amount\n';
   d.tx.slice().sort((a, b) => a.date.localeCompare(b.date)).forEach(t => {
-    csv += `${t.date},${t.acct},"${String(t.desc).replace(/"/g, '""')}","${t.cat}",${t.amount.toFixed(2)}\n`;
+    csv += `${t.date},${t.acct},"${String(t.desc).replace(/"/g, '""')}","${t.cat}","${String(bbBooksJobFor(t, d.jobs) || '').replace(/"/g, '""')}",${t.amount.toFixed(2)}\n`;
   });
   bbBooksDownload(csv, 'books_categorized.csv', 'text/csv');
 }
@@ -635,10 +811,18 @@ function bbBooksDownload(text, name, type) {
   try {
     const tag = document.getElementById('bb-books-data');
     if (tag && tag.textContent.trim().length > 2) {
-      const existing = localStorage.getItem(BB_BOOKS_KEY);
-      if (!existing || !(JSON.parse(existing) || {}).tx || !JSON.parse(existing).tx.length) {
-        const seed = JSON.parse(tag.textContent);
+      const seed = JSON.parse(tag.textContent);
+      let existing = null;
+      try { existing = JSON.parse(localStorage.getItem(BB_BOOKS_KEY) || 'null'); } catch (e) {}
+      if (!existing || !Array.isArray(existing.tx) || !existing.tx.length) {
         if (seed && Array.isArray(seed.tx)) { bbBooksSave(seed); bbToast('Loaded ' + seed.tx.length.toLocaleString() + ' preloaded transactions'); }
+      } else if (seed && Array.isArray(seed.jobs)) {
+        // This browser already has books data: keep it, but pick up any NEW
+        // job keywords this delivered copy ships with.
+        if (!Array.isArray(existing.jobs)) existing.jobs = [];
+        let n = 0;
+        seed.jobs.forEach(j => { if (!existing.jobs.some(e => e.match === j.match && e.job === j.job)) { existing.jobs.push(j); n++; } });
+        if (n) { bbBooksSave(existing); bbToast(n + ' new job keywords added to your books'); }
       }
     }
   } catch (e) { console.warn('preload skipped:', e); }
