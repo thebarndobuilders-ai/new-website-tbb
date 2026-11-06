@@ -335,11 +335,22 @@
     <p class="note"><b>Every registered TN therapist and assistant is already loaded</b> — 8,241 people: 3,939 speech therapists, 3,006 OTs, 1,078 OT assistants, and 218 speech assistants — federal registry deep scan MERGED with the TN Board of Communication Disorders state roster (all 201 registered SLPAs; license numbers &amp; expirations shown under names; "state roster (no NPI)" marks the 170 licensed SLPAs invisible to the federal registry). 206 are 🧒 Pediatrics-specialized, and <b>2,969 have a direct/personal number</b> distinct from their practice line (📱 Direct column). Filter to your cities, work the list, track every call. Statuses and notes save in this browser and ride in your JSON backup. "Load therapist CSV" is only for refreshing months from now — imports merge without touching statuses.</p>
     <div class="kpi" id="recKpi"></div>
     <div class="flexrow">
-      <button class="btn" id="btnRecFile">📂 Load therapist CSV</button>
+      <button class="btn" id="btnOutreach">🎯 Start outreach mode</button>
+      <button class="btn secondary" id="btnRecFile">📂 Load therapist CSV</button>
       <input type="file" id="recFile" accept=".csv" style="display:none">
       <button class="btn secondary" id="btnRecExport">⬇ Export current view (CSV)</button>
       <button class="btn danger small" id="btnRecClear">Clear all recruiting data</button>
     </div>
+    <details style="margin-top:10px"><summary class="note" style="cursor:pointer"><b>✉️ Outreach message templates (click to edit)</b></summary>
+      <p class="note" style="margin-top:6px">Placeholders fill automatically: <code>{first}</code> <code>{last}</code> <code>{role}</code> <code>{city}</code> <code>{practice}</code></p>
+      <div class="grid g2" style="margin-top:6px">
+        <div><label class="fld">Text message</label><textarea id="outSms" rows="3" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:13px"></textarea></div>
+        <div><label class="fld">Email subject</label><input type="text" id="outEsub" style="margin-bottom:6px">
+             <label class="fld">Email body</label><textarea id="outEbody" rows="3" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:13px"></textarea></div>
+      </div>
+      <button class="btn small secondary" id="btnOutTplSave" style="margin-top:6px">Save templates</button>
+    </details>
+    <div id="outPanel" class="resultbox" style="display:none;margin-top:12px"></div>
     <h3>Add a person manually</h3>
     <div class="grid g3" style="margin-bottom:6px">
       <div><label class="fld">First name</label><input type="text" id="mFn"></div>
@@ -1666,8 +1677,8 @@ document.getElementById("btnAddManual").onclick=()=>{
 };
 document.getElementById("btnRecExport").onclick=()=>{
   const rows=recFiltered();
-  const csv="LastName,FirstName,Credential,Discipline,Specialization,City,Zip,PracticePhone,DirectPhone,Registered,Status,Notes\n"+
-    rows.map(x=>[x.ln,x.fn,x.cred,x.tax,recSpecOf(x),x.city,x.zip,x.phone,x.phone2||"",x.enum,x.status,x.notes]
+  const csv="LastName,FirstName,Credential,Discipline,Specialization,City,Zip,PracticePhone,DirectPhone,Email,Registered,Status,Notes\n"+
+    rows.map(x=>[x.ln,x.fn,x.cred,x.tax,recSpecOf(x),x.city,x.zip,x.phone,x.phone2||"",x.email||"",x.enum,x.status,x.notes]
       .map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
   const blob=new Blob([csv],{type:"text/csv"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
@@ -1676,6 +1687,81 @@ document.getElementById("btnRecExport").onclick=()=>{
 document.getElementById("btnRecClear").onclick=()=>{
   if(!confirm("Erase the whole recruiting list including statuses and notes?")) return;
   recruits=[]; save(LS.recruits,recruits); renderRecruits();
+};
+
+/* ══════════════════ OUTREACH MODE ══════════════════ */
+const OUT_DEF={
+  sms:"Hi {first}! I own {practice}, a pediatric speech & OT group in Middle TN. We're hiring {role}s — flexible schedules, benefits at 25 hrs/week, paid documentation time. Worth a quick chat?",
+  esub:"{role} opening — benefits at part-time hours ({practice})",
+  ebody:"Hi {first},\n\nI'm the owner of {practice}, a pediatric speech and OT practice in Middle Tennessee. We're hiring {role}s and built the schedule around how therapists actually want to work: flexible part-time with real benefits at 25 hours, paid documentation time, and schedule control.\n\nIf you're open to a quick call, what's the best number to reach you?\n\nThank you!"};
+let outTpl=load("hd_outreach", OUT_DEF);
+let outQ=[], outI=0;
+const OUT_ROLE={ST:"speech-language pathologist",OT:"occupational therapist",STA:"speech-language assistant",OTA:"COTA"};
+const outCap=s=>String(s||"").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+function outFill(t,x){
+  return String(t||"").replace(/\{first\}/g,outCap(x.fn)).replace(/\{last\}/g,outCap(x.ln))
+    .replace(/\{role\}/g,OUT_ROLE[recDiscOf(x)]||"therapist").replace(/\{city\}/g,outCap(x.city))
+    .replace(/\{practice\}/g,settings.name);
+}
+function outRender(){
+  const P=document.getElementById("outPanel");
+  if(!outQ.length){ P.style.display="none"; renderRecruits(); return; }
+  if(outI>=outQ.length){ P.innerHTML=`<h3 style="margin-top:0">🎉 Outreach run done — ${outQ.length} candidates worked</h3><button class="btn" onclick="document.getElementById('outPanel').style.display='none'">Close</button>`; renderRecruits(); return; }
+  const x=outQ[outI];
+  const best=(x.phone2&&x.phone2!==x.phone)?x.phone2:x.phone;
+  const tel=String(best||"").replace(/[^0-9+]/g,"");
+  const smsTxt=outFill(outTpl.sms,x);
+  const mailto=x.email?`mailto:${encodeURIComponent(x.email)}?subject=${encodeURIComponent(outFill(outTpl.esub,x))}&body=${encodeURIComponent(outFill(outTpl.ebody,x))}`:"";
+  P.style.display="";
+  P.innerHTML=`
+    <div class="flexrow" style="justify-content:space-between">
+      <h3 style="margin:0">${outI+1} of ${outQ.length}: ${esc(outCap(x.fn))} ${esc(outCap(x.ln))} ${x.cred?`<span class="note">· ${esc(x.cred)}</span>`:""}</h3>
+      <button class="btn ghost small" id="outClose">✕ Close</button>
+    </div>
+    <p class="note" style="margin:4px 0 10px">${recDiscBadge(x)} ${x.spec?("· "+esc(x.spec)):""} ${x.city?("· "+esc(outCap(x.city))):""} ${x.zip?("· "+esc(x.zip)):""} · registered ${esc(String(x.enum).slice(0,10)||"—")} · status: <b>${esc(x.status)}</b></p>
+    <div class="flexrow" style="gap:8px;margin-bottom:10px">
+      ${tel?`<a class="btn" href="sms:${tel}?&body=${encodeURIComponent(smsTxt)}">📱 Text them (${esc(best)})</a>
+             <a class="btn secondary" href="tel:${tel}">📞 Call</a>`:`<span class="badge b-pa">No phone on file — use copy + Facebook/LinkedIn</span>`}
+      <button class="btn secondary" id="outCopy">📋 Copy message</button>
+      ${mailto?`<a class="btn secondary" href="${mailto}">✉️ Email</a>`:""}
+    </div>
+    <div class="grid g3" style="margin-bottom:10px">
+      <div><label class="fld">Email (when you get it)</label><input type="text" id="outEmail" value="${esc(x.email||"")}" placeholder="their email"></div>
+      <div><label class="fld">Personal number (when you get it)</label><input type="text" id="outP2" value="${esc(x.phone2||"")}" placeholder="their cell"></div>
+      <div><label class="fld">Notes</label><input type="text" id="outNotes" value="${esc(x.notes||"")}"></div>
+    </div>
+    <div class="flexrow" style="gap:8px">
+      ${["Called","Voicemail","Interested","Not interested"].map(s=>`<button class="btn small ${s==="Interested"?"":"secondary"}" data-outst="${s}">${s} →</button>`).join("")}
+      <button class="btn ghost small" id="outSkip">Skip →</button>
+      ${outI>0?`<button class="btn ghost small" id="outBack">← Back</button>`:""}
+    </div>`;
+  const saveFields=()=>{
+    x.email=document.getElementById("outEmail").value.trim();
+    const p2=document.getElementById("outP2").value.trim(); if(p2) x.phone2=p2;
+    x.notes=document.getElementById("outNotes").value.trim();
+    save(LS.recruits,recruits);
+  };
+  ["outEmail","outP2","outNotes"].forEach(id=>document.getElementById(id).addEventListener("change",saveFields));
+  document.getElementById("outCopy").onclick=()=>{
+    saveFields();
+    navigator.clipboard.writeText(smsTxt).then(()=>{ document.getElementById("outCopy").textContent="Copied ✓"; });
+  };
+  P.querySelectorAll("[data-outst]").forEach(b=>b.onclick=()=>{ saveFields(); x.status=b.dataset.outst; save(LS.recruits,recruits); outI++; outRender(); });
+  document.getElementById("outSkip").onclick=()=>{ saveFields(); outI++; outRender(); };
+  const back=document.getElementById("outBack"); if(back) back.onclick=()=>{ saveFields(); outI--; outRender(); };
+  document.getElementById("outClose").onclick=()=>{ saveFields(); P.style.display="none"; renderRecruits(); };
+}
+document.getElementById("btnOutreach").onclick=()=>{
+  outQ=recFiltered(); outI=0;
+  if(!outQ.length) return alert("No candidates match the current filters — widen them first.");
+  outRender();
+  document.getElementById("outPanel").scrollIntoView({behavior:"smooth",block:"start"});
+};
+document.getElementById("btnOutTplSave").onclick=()=>{
+  outTpl={sms:document.getElementById("outSms").value, esub:document.getElementById("outEsub").value, ebody:document.getElementById("outEbody").value};
+  save("hd_outreach",outTpl);
+  document.getElementById("btnOutTplSave").textContent="Saved ✓";
+  setTimeout(()=>document.getElementById("btnOutTplSave").textContent="Save templates",1500);
 };
 
 /* ══════════════════ SETTINGS / BACKUP ══════════════════ */
@@ -1737,7 +1823,7 @@ const csTs  = load("hd_cloud_ts", {});
 function csStatus(msg, good){ const el=document.getElementById("csStatus"); if(el){ el.textContent=msg; el.style.color=good?"var(--good)":"var(--muted)"; } }
 function csSection(section){
   if(section==="recmeta"){
-    const m={}; recruits.forEach(r=>{ if(!r.manual&&(r.status!=="New"||r.notes)) m[r.npi]={s:r.status,n:r.notes}; });
+    const m={}; recruits.forEach(r=>{ if(!r.manual&&(r.status!=="New"||r.notes||r.email||r.p2set)) m[r.npi]={s:r.status,n:r.notes,e:r.email||"",p:r.phone2||""}; });
     return {m, x:recruits.filter(r=>r.manual)};
   }
   const key=Object.keys(CS_SECTIONS).find(k=>CS_SECTIONS[k]===section);
@@ -1748,7 +1834,7 @@ function csApply(section, data){
   try{
     if(section==="recmeta"){
       const byNpi={}; recruits.forEach(r=>byNpi[r.npi]=r);
-      Object.entries(data.m||{}).forEach(([npi,v])=>{ const r=byNpi[npi]; if(r){ r.status=v.s; r.notes=v.n; } });
+      Object.entries(data.m||{}).forEach(([npi,v])=>{ const r=byNpi[npi]; if(r){ r.status=v.s; r.notes=v.n; if(v.e) r.email=v.e; if(v.p) r.phone2=v.p; } });
       (data.x||[]).forEach(x=>{ if(!byNpi[x.npi]) recruits.push(x); });
       localStorage.setItem("hd_recruits", JSON.stringify(recruits));
     } else if(section==="settings"){ settings=data; localStorage.setItem("hd_settings", JSON.stringify(data)); }
@@ -1855,6 +1941,9 @@ document.getElementById("advDate").value=iso;
 document.getElementById("dDate").value=iso;
 document.getElementById("csUrl").value=csCfg.url||"";
 document.getElementById("csKey").value=csCfg.key||"";
+document.getElementById("outSms").value=outTpl.sms;
+document.getElementById("outEsub").value=outTpl.esub;
+document.getElementById("outEbody").value=outTpl.ebody;
 csConnect();
 </script>
 </body>
