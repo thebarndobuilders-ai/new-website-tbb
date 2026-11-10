@@ -130,6 +130,7 @@
     <div class="chipbar">
       <button class="chip" id="chipTele">Telehealth (adds modifier 95)</button>
       <button class="chip" id="chipHab">Habilitative plan (modifier 96 — commercial plans)</button>
+      <button class="chip" id="chip2027">📅 2027 codes (92507 → timed, eff. Jan 1)</button>
     </div>
     <div class="grid g2">
       <div id="advColST">
@@ -471,7 +472,25 @@ const CODES = [
   {code:"92630", disc:"ST", eval:false, timed:false, unit:"per session", name:"Auditory rehabilitation — prelingual hearing loss",
    desc:"Listening & spoken language therapy for a child whose hearing loss came before language developed (hearing aids, cochlear implants). Pediatric-specific — more accurate than 92507 when the session targets auditory skill development. Not all payers recognize it: verify per payer and fall back to 92507 where they don't."},
   {code:"92507", disc:"ST", eval:false, timed:false, unit:"per session", name:"Speech/language treatment, individual",
-   desc:"The workhorse ST treatment code — articulation, language, fluency, voice, auditory processing. Untimed: one unit per session regardless of length."},
+   desc:"The workhorse ST treatment code — articulation, language, fluency, voice, auditory processing. Untimed: one unit per session regardless of length. ⚠ DELETED 1/1/2027 — replaced by timed codes 92654–92663 (flip the 2027 toggle in the Advisor)."},
+  {code:"92654", disc:"ST", eval:false, timed:true, unit:"first 30 min", name:"Fluency treatment, individual — first 30 min (2027)",
+   desc:"2027 replacement family for 92507. Base code needs ≥16 documented minutes; bill +92655 per add-on threshold (≥37 total min for the first). Document start/stop times."},
+  {code:"92655", disc:"ST", eval:false, timed:true, unit:"each addl 15 min", name:"Fluency treatment — each addl 15 min (2027)",
+   desc:"Add-on to 92654. First unit at ≥37 total minutes, next at ≥53 (verify payer time tables)."},
+  {code:"92656", disc:"ST", eval:false, timed:true, unit:"first 30 min", name:"Speech sound production treatment — first 30 min (2027)",
+   desc:"2027 timed code — articulation/phonology-only sessions. Add-on +92657."},
+  {code:"92657", disc:"ST", eval:false, timed:true, unit:"each addl 15 min", name:"Speech sound production — each addl 15 min (2027)", desc:"Add-on to 92656."},
+  {code:"92658", disc:"ST", eval:false, timed:true, unit:"first 30 min", name:"Language comprehension/expression treatment — first 30 min (2027)",
+   desc:"2027 timed code — language-only sessions. Add-on +92659."},
+  {code:"92659", disc:"ST", eval:false, timed:true, unit:"each addl 15 min", name:"Language treatment — each addl 15 min (2027)", desc:"Add-on to 92658."},
+  {code:"92660", disc:"ST", eval:false, timed:true, unit:"first 30 min", name:"Speech sound + language treatment — first 30 min (2027)",
+   desc:"The combined code — most pediatric sessions land here (artic + language in one session). Add-on +92661."},
+  {code:"92661", disc:"ST", eval:false, timed:true, unit:"each addl 15 min", name:"Speech sound + language — each addl 15 min (2027)", desc:"Add-on to 92660."},
+  {code:"92662", disc:"ST", eval:false, timed:true, unit:"first 30 min", name:"Voice / upper airway / resonance treatment — first 30 min (2027)",
+   desc:"2027 timed code — voice and resonance sessions. Add-on +92663."},
+  {code:"92663", disc:"ST", eval:false, timed:true, unit:"each addl 15 min", name:"Voice/resonance — each addl 15 min (2027)", desc:"Add-on to 92662."},
+  {code:"G0903", disc:"ST", eval:false, timed:false, unit:"per session", name:"Pediatric SLP treatment, untimed (Medicare G-code, 2027)",
+   desc:"Medicare's flat once-per-day code for patients ≤21. Pays roughly HALF a 60-min timed stack — only bill it where a payer REQUIRES it. Watch whether any TennCare MCO adopts it; push back with EPSDT if they try to force it."},
   {code:"92508", disc:"ST", eval:false, timed:false, unit:"per session", name:"Speech/language treatment, group (2+)",
    desc:"Group speech treatment. Untimed. Don't also bill 92507 for the same client the same visit."},
   {code:"92526", disc:"ST", eval:false, timed:false, unit:"per session", name:"Treatment of swallowing / oral function for feeding",
@@ -527,6 +546,8 @@ const BENCHMARK = {
   "92507":85.53,"92508":40,"92521":150,"92522":140,"92523":223,"92524":150,
   "92526":83,"92610":130,"92605":190,"92606":90,"92607":220,"92608":75,
   "92609":102.60,"92630":75,"96125":110,"97129":40,"97130":37,
+  "92654":66,"92655":30,"92656":66,"92657":30,"92658":66,"92659":30,
+  "92660":66,"92661":30,"92662":66,"92663":30,"G0903":66,
   "97165":100,"97166":100,"97167":100,"97168":68,
   "97110":31,"97112":35,"97530":39,"97533":37,"97535":36,"97150":25,"97755":40
 };
@@ -535,7 +556,8 @@ const BENCHMARK = {
 /* Each service the front desk / therapist can tick, mapped to code(s). */
 const SERVICES = {
   ST: [
-    {id:"st_tx",    label:"Individual speech/language treatment", detail:"Artic, language, fluency, voice, AP — the standard 1:1 session", codes:["92507"]},
+    {id:"st_tx",    label:"Individual speech/language treatment", detail:"Artic, language, fluency, voice, AP — the standard 1:1 session (92507, dies 12/31/26)", codes:["92507"]},
+    {id:"st_tx27",  label:"Individual speech/language treatment (2027 timed codes)", detail:"Pick the category that matches the session; enter total minutes — base + add-ons compute automatically", codes:["92660","92658","92656","92654","92662"], pick:true, timed:true},
     {id:"st_group", label:"Group speech treatment (2+ kids)", detail:"Bill 92508 per child — not 92507", codes:["92508"]},
     {id:"st_feed",  label:"Feeding / swallowing treatment", detail:"Oral-motor feeding work, picky-eater/texture therapy, dysphagia tx", codes:["92526"]},
     {id:"st_aural", label:"Aural rehab — child with hearing loss (LSL therapy)", detail:"92630 — hearing aids/cochlear implant listening therapy; verify payer recognizes it", codes:["92630"]},
@@ -686,7 +708,13 @@ function statusBadge(s){
 
 /* ══════════════════ ADVISOR ══════════════════ */
 let advDisc = {ST:true, OT:false};
-let advTele=false, advHab=false;
+let advTele=false, advHab=false, adv2027=false;
+function applyYearMode(){
+  const hide27=["st_tx"], hideNow=["st_tx27"];
+  (adv2027?hide27:hideNow).forEach(id=>{ const row=document.querySelector(`[data-svc="${id}"]`); if(row){ row.style.display="none"; const c=row.querySelector("input[type=checkbox]"); if(c&&c.checked){ c.checked=false; row.classList.remove("checked"); } } });
+  (adv2027?hideNow:hide27).forEach(id=>{ const row=document.querySelector(`[data-svc="${id}"]`); if(row) row.style.display=""; });
+  liveComboCheck();
+}
 
 function renderServices(){
   ["ST","OT"].forEach(d=>{
@@ -746,6 +774,7 @@ document.getElementById("chipST").onclick = function(){ advDisc.ST=!advDisc.ST; 
 document.getElementById("chipOT").onclick = function(){ advDisc.OT=!advDisc.OT; chip(this,advDisc.OT); this.classList.toggle("otchip",advDisc.OT); document.getElementById("advColOT").style.display=advDisc.OT?"":"none"; liveComboCheck(); };
 document.getElementById("chipTele").onclick = function(){ advTele=!advTele; chip(this,advTele); };
 document.getElementById("chipHab").onclick = function(){ advHab=!advHab; chip(this,advHab); };
+document.getElementById("chip2027").onclick = function(){ adv2027=!adv2027; chip(this,adv2027); applyYearMode(); };
 
 /* 8-minute rule: total timed minutes → total units; allocate by biggest-minutes-first */
 function eightMinuteUnits(items){ // items: [{code, minutes}]
@@ -781,6 +810,20 @@ document.getElementById("btnAdvise").onclick = ()=>{
   if(!picked.length){ R.innerHTML = `<div class="alert warn">Nothing selected — tick the services that were performed.</div>`; return; }
 
   const alerts=[], hints=[];
+
+  // 2027 timed ST codes: base (first 30 min, needs ≥16 min) + add-on units (≥37 total min, then +16/unit — verify payer tables)
+  const NEW27={ "92654":"92655","92656":"92657","92658":"92659","92660":"92661","92662":"92663" };
+  let note27="";
+  picked.filter(p=>NEW27[p.code]).forEach(p=>{
+    const m=p.minutes||0;
+    if(m<16){ p.fixedUnits=0; alerts.push({cls:"bad", txt:p.code+" needs at least 16 documented minutes to bill the base code — you entered "+m+"."}); return; }
+    p.fixedUnits=1;
+    const addl = m>=37 ? 1+Math.floor((m-37)/16) : 0;
+    if(addl>0) picked.push({code:NEW27[p.code], disc:p.disc, minutes:0, label:"2027 add-on", fixedUnits:addl});
+    note27 += (note27?" · ":"")+m+" min → "+p.code+" ×1"+(addl?" + "+NEW27[p.code]+" ×"+addl:"");
+    if(m>=30&&m<37) hints.push(p.code+": "+m+" minutes just misses the first add-on (needs 37). Two more documented minutes of treatment = one more billable unit — worth knowing when sessions naturally run long.");
+  });
+  if(note27) alerts.push({cls:"good", txt:"2027 timed coding: "+note27+". Document start/stop times in the note — timed codes require it."});
 
   // Cognitive add-on: 97129 minutes >30 → split into 97129 + 97130 units
   const cogIdx = picked.findIndex(p=>p.code==="97129");
@@ -1476,7 +1519,7 @@ function renderAuths(){
     <td>${esc(locName(a.loc))}</td>
     <td>${esc(a.payer)}</td>
     <td>${esc(a.disc)}</td>
-    <td>${esc(a.codes)}</td>
+    <td>${esc(a.codes)}${(String(a.codes).includes("92507")&&(!a.end||a.end>="2027-01-01"))?'<br><span class="badge b-pa">⚠ 92507 ends 12/31/26 — amend this auth to 9265x codes</span>':""}</td>
     <td class="note" style="color:var(--ink)">${esc(a.num)}</td>
     <td style="white-space:nowrap"><b>${a.used}</b> / ${a.visits||"∞"} <button class="btn small" data-authplus="${a.id}" style="margin-left:4px">+1</button></td>
     <td>${esc(a.end||"—")}</td>
@@ -1935,6 +1978,7 @@ function refreshAll(){
   renderCodes(); renderMatrix(); renderComboTools(); renderDenials(); renderAuths(); renderRecruits(); renderStandby();
 }
 renderServices();
+applyYearMode();
 refreshAll();
 const today=new Date(); const iso=today.toISOString().slice(0,10);
 document.getElementById("advDate").value=iso;
